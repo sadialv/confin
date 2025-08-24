@@ -263,6 +263,29 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filtroDataFim) transacoesFiltradas = transacoesFiltradas.filter(t => t.data <= filtroDataFim);
         if (filtroDescricao) transacoesFiltradas = transacoesFiltradas.filter(t => t.descricao.toLowerCase().includes(filtroDescricao));
         
+        // --- INÍCIO DA LÓGICA DO RESUMO ---
+        const totalReceitasFiltradas = transacoesFiltradas
+            .filter(t => t.tipo === 'receita')
+            .reduce((acc, t) => acc + t.valor, 0);
+
+        const totalDespesasFiltradas = transacoesFiltradas
+            .filter(t => t.tipo === 'despesa')
+            .reduce((acc, t) => acc + t.valor, 0);
+
+        const saldoFiltrado = totalReceitasFiltradas - totalDespesasFiltradas;
+        const corSaldo = saldoFiltrado >= 0 ? 'income-text' : 'expense-text';
+
+        let summaryHTML = '';
+        if (transacoesFiltradas.length > 0) {
+            summaryHTML = `
+                <div class="filtered-summary">
+                    <span>Receitas: <strong class="income-text">${formatarMoeda(totalReceitasFiltradas)}</strong></span>
+                    <span>Despesas: <strong class="expense-text">${formatarMoeda(totalDespesasFiltradas)}</strong></span>
+                    <span>Saldo: <strong class="${corSaldo}">${formatarMoeda(saldoFiltrado)}</strong></span>
+                </div>`;
+        }
+        // --- FIM DA LÓGICA DO RESUMO ---
+
         const transacoesParaRenderizar = transacoesFiltradas.slice(0, transacoesVisiveisCount);
 
         let listHTML;
@@ -285,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }).join('');
         }
         
-        container.innerHTML = filtersHTML + listHTML;
+        container.innerHTML = filtersHTML + summaryHTML + listHTML;
 
         if (transacoesVisiveisCount < transacoesFiltradas.length) {
             const loadMoreButton = document.createElement('button');
@@ -312,13 +335,14 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     // --- LÓGICA DE AÇÕES ---
-    // (As funções de Ações - salvar, deletar, abrir modais - estão todas completas abaixo)
     const openAccountModal = (id = null) => {
         const isEditing = id !== null;
         const conta = isEditing ? contasCache.find(c => c.id == id) : {};
-        const isBalanceEditable = !isEditing || (conta.tipo === 'Conta Corrente' || conta.tipo === 'Poupança');
+        const isBalanceEditable = true;
         const balanceDisabledAttr = isBalanceEditable ? '' : 'disabled';
-        const content = `<div class="card-header"><div class="card-header-title"><h2>${isEditing ? 'Editar' : 'Nova'} Conta</h2></div></div><form id="formConta"><input type="hidden" id="c_id" value="${conta.id || ''}"><div class="form-group"><label>Nome da Conta</label><input id="c_nome" type="text" value="${conta.nome || ''}" required></div><div class="form-group"><label>Tipo de Conta</label><select id="c_tipo" ${isEditing ? 'disabled' : ''}></select></div><div class="form-group"><label>Saldo Inicial</label><input id="c_saldo_inicial" type="number" step="0.01" value="${conta.saldo_inicial || 0}" ${balanceDisabledAttr}></div><div id="creditCardFields" style="display:none;"><div class="form-group"><label>Limite do Cartão</label><input id="c_limite" type="number" step="0.01" value="${conta.limite_cartao || ''}"></div><div class="form-group"><label>Dia do Fechamento</label><input id="c_fechamento" type="number" min="1" max="31" value="${conta.dia_fechamento_cartao || ''}"></div><div class="form-group"><label>Dia do Vencimento</label><input id="c_vencimento" type="number" min="1" max="31" value="${conta.dia_vencimento_cartao || ''}"></div></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button type="submit" class="btn">${isEditing ? 'Salvar Alterações' : 'Criar Conta'}</button></div></form>`;
+        
+        const content = `<div class="card-header"><div class="card-header-title"><h2>${isEditing ? 'Editar' : 'Nova'} Conta</h2></div></div><form id="formConta"><input type="hidden" id="c_id" value="${conta.id || ''}"><div class="form-group"><label>Nome da Conta</label><input id="c_nome" type="text" value="${conta.nome || ''}" required></div><div class="form-group"><label>Tipo de Conta</label><select id="c_tipo"></select></div><div class="form-group"><label>Saldo Inicial</label><input id="c_saldo_inicial" type="number" step="0.01" value="${conta.saldo_inicial || 0}" ${balanceDisabledAttr}></div><div id="creditCardFields" style="display:none;"><div class="form-group"><label>Limite do Cartão</label><input id="c_limite" type="number" step="0.01" value="${conta.limite_cartao || ''}"></div><div class="form-group"><label>Dia do Fechamento</label><input id="c_fechamento" type="number" min="1" max="31" value="${conta.dia_fechamento_cartao || ''}"></div><div class="form-group"><label>Dia do Vencimento</label><input id="c_vencimento" type="number" min="1" max="31" value="${conta.dia_vencimento_cartao || ''}"></div></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="window.app.closeModal()">Cancelar</button><button type="submit" class="btn">${isEditing ? 'Salvar Alterações' : 'Criar Conta'}</button></div></form>`;
+        
         openModal(content);
         const tipoSelect = document.getElementById('c_tipo');
         ['Conta Corrente', 'Poupança', 'Cartão de Crédito', 'Dinheiro', 'Investimentos'].forEach(opt => tipoSelect.add(new Option(opt, opt)));
@@ -387,7 +411,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const openBillModal = (id = null) => {
         const isEditing = id !== null;
         const bill = isEditing ? lancamentosFuturosCache.find(l => l.id == id) : {};
-        const content = `<div class="card-header"><div class="card-header-title"><h2>${isEditing ? 'Editar' : 'Novo'} Lançamento</h2></div></div><form id="formBill"><input type="hidden" id="b_id" value="${bill.id || ''}"><div class="form-group"><label>Descrição</label><input id="b_descricao" type="text" value="${bill.descricao || ''}" required></div><div class="form-group"><label>Valor</label><input id="b_valor" type="number" step="0.01" value="${bill.valor || ''}" required></div><div class="form-group"><label>Data de Vencimento</label><input id="b_vencimento" type="date" value="${bill.data_vencimento || toISODateString(new Date())}" required></div><div class="form-group"><label>Categoria</label><select id="b_categoria">${CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${bill.categoria === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div><div class="form-group"><label>Tipo</label><select id="b_tipo"><option value="a_pagar" ${bill.tipo === 'a_pagar' ? 'selected' : ''}>Conta a Pagar</option><option value="a_receber" ${bill.tipo === 'a_receber' ? 'selected' : ''}>Conta a Receber</option></select></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button type="submit" class="btn">${isEditing ? 'Salvar' : 'Adicionar'}</button></div></form>`;
+        const content = `<div class="card-header"><div class="card-header-title"><h2>${isEditing ? 'Editar' : 'Novo'} Lançamento</h2></div></div><form id="formBill"><input type="hidden" id="b_id" value="${bill.id || ''}"><div class="form-group"><label>Descrição</label><input id="b_descricao" type="text" value="${bill.descricao || ''}" required></div><div class="form-group"><label>Valor</label><input id="b_valor" type="number" step="0.01" value="${bill.valor || ''}" required></div><div class="form-group"><label>Data de Vencimento</label><input id="b_vencimento" type="date" value="${bill.data_vencimento || toISODateString(new Date())}" required></div><div class="form-group"><label>Categoria</label><select id="b_categoria">${CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${bill.categoria === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div><div class="form-group"><label>Tipo</label><select id="b_tipo"><option value="a_pagar" ${bill.tipo === 'a_pagar' ? 'selected' : ''}>Conta a Pagar</option><option value="a_receber" ${bill.tipo === 'a_receber' ? 'selected' : ''}>Conta a Receber</option></select></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="window.app.closeModal()">Cancelar</button><button type="submit" class="btn">${isEditing ? 'Salvar' : 'Adicionar'}</button></div></form>`;
         openModal(content);
         document.getElementById('formBill').addEventListener('submit', salvarLancamentoFuturo);
     };
@@ -446,7 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const bill = lancamentosFuturosCache.find(b => b.id === billId);
         const contasOptions = contasCache.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
         const title = bill.tipo === 'a_pagar' ? 'Pagar Conta' : 'Confirmar Recebimento';
-        const content = `<div class="card-header"><div class="card-header-title"><h2>${title}</h2></div></div><p><strong>Descrição:</strong> ${bill.descricao}</p><p><strong>Valor:</strong> ${formatarMoeda(bill.valor)}</p><form id="formPagarConta"><input type="hidden" id="pay_bill_id" value="${bill.id}"><div class="form-group"><label>Confirmar com a conta:</label><select id="pc_conta_id">${contasOptions}</select></div><div class="form-group"><label>Data da Confirmação:</label><input type="date" id="pc_data" value="${toISODateString(HOJE)}" required></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button type="submit" class="btn">Confirmar</button></div></form>`;
+        const content = `<div class="card-header"><div class="card-header-title"><h2>${title}</h2></div></div><p><strong>Descrição:</strong> ${bill.descricao}</p><p><strong>Valor:</strong> ${formatarMoeda(bill.valor)}</p><form id="formPagarConta"><input type="hidden" id="pay_bill_id" value="${bill.id}"><div class="form-group"><label>Confirmar com a conta:</label><select id="pc_conta_id">${contasOptions}</select></div><div class="form-group"><label>Data da Confirmação:</label><input type="date" id="pc_data" value="${toISODateString(HOJE)}" required></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="window.app.closeModal()">Cancelar</button><button type="submit" class="btn">Confirmar</button></div></form>`;
         openModal(content);
         document.getElementById('formPagarConta').addEventListener('submit', confirmarPagamento);
     };
@@ -549,7 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const t = transacoesCache.find(item => item.id === id);
         const contasOptions = contasCache.map(c => `<option value="${c.id}" ${t.conta_id === c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
         const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option ${t.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
-        const content = `<div class="card-header"><div class="card-header-title"><h2>Editar Transação</h2></div></div><form id="formEditTransacao"><input type="hidden" id="t_id" value="${t.id}"><div class="form-group"><label>Descrição</label><input type="text" id="t_descricao" value="${t.descricao}" required></div><div class="form-group"><label>Valor</label><input type="number" id="t_valor" step="0.01" value="${t.valor}" required></div><div class="form-group"><label>Conta</label><select id="t_conta_id">${contasOptions}</select></div><div class="form-group"><label>Categoria</label><select id="t_categoria">${categoriasOptions}</select></div><div class="form-group"><label>Data</label><input type="date" id="t_data" value="${t.data}" required></div><div class="form-group"><label>Tipo</label><select id="t_tipo"><option value="despesa" ${t.tipo==='despesa'?'selected':''}>Despesa</option><option value="receita" ${t.tipo==='receita'?'selected':''}>Receita</option></select></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button type="submit" class="btn">Salvar Alterações</button></div></form>`;
+        const content = `<div class="card-header"><div class="card-header-title"><h2>Editar Transação</h2></div></div><form id="formEditTransacao"><input type="hidden" id="t_id" value="${t.id}"><div class="form-group"><label>Descrição</label><input type="text" id="t_descricao" value="${t.descricao}" required></div><div class="form-group"><label>Valor</label><input type="number" id="t_valor" step="0.01" value="${t.valor}" required></div><div class="form-group"><label>Conta</label><select id="t_conta_id">${contasOptions}</select></div><div class="form-group"><label>Categoria</label><select id="t_categoria">${categoriasOptions}</select></div><div class="form-group"><label>Data</label><input type="date" id="t_data" value="${t.data}" required></div><div class="form-group"><label>Tipo</label><select id="t_tipo"><option value="despesa" ${t.tipo==='despesa'?'selected':''}>Despesa</option><option value="receita" ${t.tipo==='receita'?'selected':''}>Receita</option></select></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="window.app.closeModal()">Cancelar</button><button type="submit" class="btn">Salvar Alterações</button></div></form>`;
         openModal(content);
         document.getElementById('formEditTransacao').addEventListener('submit', salvarTransacao);
     };
@@ -577,7 +601,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const cartoesOptions = cartoesDeCredito.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
         const categoriasOptions = CATEGORIAS_PADRAO.filter(c => c !== 'Salário').map(c => `<option value="${c}" ${c === 'Compras' ? 'selected' : ''}>${c}</option>`).join('');
-        const content = `<div class="card-header"><div class="card-header-title"><h2>Registrar Compra Parcelada</h2></div></div><form id="formCompraParcelada"><div class="form-group"><label for="cp_descricao">Descrição</label><input type="text" id="cp_descricao" required></div><div class="form-group"><label for="cp_valor_total">Valor Total da Compra</label><input type="number" id="cp_valor_total" step="0.01" min="0.01" required></div><div class="form-group"><label for="cp_num_parcelas">Número de Parcelas</label><input type="number" id="cp_num_parcelas" step="1" min="1" value="1" required></div><div class="form-group"><label for="cp_data_compra">Data da Compra</label><input type="date" id="cp_data_compra" value="${toISODateString(new Date())}" required></div><div class="form-group"><label for="cp_conta_id">Cartão de Crédito</label><select id="cp_conta_id" required>${cartoesOptions}</select></div><div class="form-group"><label for="cp_categoria">Categoria</label><select id="cp_categoria" required>${categoriasOptions}</select></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button type="submit" class="btn">Salvar Compra</button></div></form>`;
+        const content = `<div class="card-header"><div class="card-header-title"><h2>Registrar Compra Parcelada</h2></div></div><form id="formCompraParcelada"><div class="form-group"><label for="cp_descricao">Descrição</label><input type="text" id="cp_descricao" required></div><div class="form-group"><label for="cp_valor_total">Valor Total da Compra</label><input type="number" id="cp_valor_total" step="0.01" min="0.01" required></div><div class="form-group"><label for="cp_num_parcelas">Número de Parcelas</label><input type="number" id="cp_num_parcelas" step="1" min="1" value="1" required></div><div class="form-group"><label for="cp_data_compra">Data da Compra</label><input type="date" id="cp_data_compra" value="${toISODateString(new Date())}" required></div><div class="form-group"><label for="cp_conta_id">Cartão de Crédito</label><select id="cp_conta_id" required>${cartoesOptions}</select></div><div class="form-group"><label for="cp_categoria">Categoria</label><select id="cp_categoria" required>${categoriasOptions}</select></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="window.app.closeModal()">Cancelar</button><button type="submit" class="btn">Salvar Compra</button></div></form>`;
         openModal(content);
         document.getElementById('formCompraParcelada').addEventListener('submit', salvarCompraParcelada);
     };
@@ -596,28 +620,59 @@ document.addEventListener('DOMContentLoaded', () => {
             const contaId = document.getElementById('cp_conta_id').value;
             const categoria = document.getElementById('cp_categoria').value;
             const cartaoSelecionado = contasCache.find(c => c.id == contaId);
-            if (!cartaoSelecionado || !cartaoSelecionado.dia_vencimento_cartao) throw new Error('O cartão de crédito selecionado não possui um dia de vencimento configurado.');
-            const { data: compraMae, error: erroCompra } = await clienteSupabase.from('compras_parceladas').insert({ descricao, valor_total: valorTotal, numero_parcelas: numParcelas, conta_id: contaId, categoria }).select().single();
+
+            if (!cartaoSelecionado || !cartaoSelecionado.dia_vencimento_cartao) {
+                throw new Error('O cartão de crédito selecionado não possui um dia de vencimento configurado.');
+            }
+
+            const { data: compraMae, error: erroCompra } = await clienteSupabase
+                .from('compras_parceladas')
+                .insert({
+                    descricao,
+                    valor_total: valorTotal,
+                    numero_parcelas: numParcelas,
+                    conta_id: contaId,
+                    categoria,
+                    data_compra: dataCompraStr
+                })
+                .select()
+                .single();
+            
             if (erroCompra) throw erroCompra;
+
             const valorParcela = parseFloat((valorTotal / numParcelas).toFixed(2));
             const dataCompra = new Date(dataCompraStr + 'T12:00:00');
             let lancamentos = [];
+
             for (let i = 1; i <= numParcelas; i++) {
                 let dataVencimento = new Date(dataCompra.getFullYear(), dataCompra.getMonth() + i, cartaoSelecionado.dia_vencimento_cartao);
-                lancamentos.push({ descricao: `${descricao} (${i}/${numParcelas})`, valor: valorParcela, data_vencimento: toISODateString(dataVencimento), tipo: 'a_pagar', status: 'pendente', categoria, compra_parcelada_id: compraMae.id });
+                lancamentos.push({
+                    descricao: `${descricao} (${i}/${numParcelas})`,
+                    valor: valorParcela,
+                    data_vencimento: toISODateString(dataVencimento),
+                    tipo: 'a_pagar',
+                    status: 'pendente',
+                    categoria,
+                    compra_parcelada_id: compraMae.id
+                });
             }
+
             const { error: erroLancamentos } = await clienteSupabase.from('lancamentos_futuros').insert(lancamentos);
+            
             if (erroLancamentos) {
                 await clienteSupabase.from('compras_parceladas').delete().eq('id', compraMae.id);
                 throw erroLancamentos;
             }
+
             comprasParceladasCache.push(compraMae);
             lancamentos.forEach(l => lancamentosFuturosCache.push(l));
             lancamentosFuturosCache.sort((a, b) => new Date(a.data_vencimento) - new Date(b.data_vencimento));
+            
             closeModal();
             showToast('Compra parcelada registrada com sucesso!');
             mesesVisiveis = 3;
             renderLancamentosFuturos();
+
         } catch (error) {
             console.error("Erro ao salvar compra parcelada:", error);
             showToast(error.message, 'error');
@@ -682,7 +737,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!conta) { showToast("Conta não encontrada.", "error"); return; }
         const transacoesDaConta = transacoesCache.filter(t => t.conta_id === conta.id);
         const saldoAtual = transacoesDaConta.reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, conta.saldo_inicial);
-        const content = `<div class="card-header"><div class="card-header-title"><h2>Ajustar Saldo da Conta</h2></div></div><p style="margin-bottom: 1rem;"><strong>Conta:</strong> ${conta.nome}</p><div style="margin-bottom: 1.5rem;"><span style="font-size: 0.9rem; color: var(--text-secondary);">Saldo Atual Calculado</span><p style="font-size: 1.5rem; font-weight: 600; margin: 0;">${formatarMoeda(saldoAtual)}</p></div><form id="formAjusteSaldo"><input type="hidden" id="ajuste_conta_id" value="${accountId}"><input type="hidden" id="ajuste_saldo_atual" value="${saldoAtual}"><div class="form-group"><label for="ajuste_novo_saldo">Informe o Novo Saldo Correto</label><input type="number" step="0.01" id="ajuste_novo_saldo" value="${saldoAtual.toFixed(2)}" required></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button type="submit" class="btn">Salvar Ajuste</button></div></form>`;
+        const content = `<div class="card-header"><div class="card-header-title"><h2>Ajustar Saldo da Conta</h2></div></div><p style="margin-bottom: 1rem;"><strong>Conta:</strong> ${conta.nome}</p><div style="margin-bottom: 1.5rem;"><span style="font-size: 0.9rem; color: var(--text-secondary);">Saldo Atual Calculado</span><p style="font-size: 1.5rem; font-weight: 600; margin: 0;">${formatarMoeda(saldoAtual)}</p></div><form id="formAjusteSaldo"><input type="hidden" id="ajuste_conta_id" value="${accountId}"><input type="hidden" id="ajuste_saldo_atual" value="${saldoAtual}"><div class="form-group"><label for="ajuste_novo_saldo">Informe o Novo Saldo Correto</label><input type="number" step="0.01" id="ajuste_novo_saldo" value="${saldoAtual.toFixed(2)}" required></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="window.app.closeModal()">Cancelar</button><button type="submit" class="btn">Salvar Ajuste</button></div></form>`;
         openModal(content);
         document.getElementById('formAjusteSaldo').addEventListener('submit', salvarAjusteDeSaldo);
     };
@@ -720,7 +775,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- INICIALIZAÇÃO E EVENT LISTENERS ---
     const initializeApp = async () => {
-        window.app = { openAccountModal, deletarConta, openBillModal, deletarLancamentoFuturo, openPayBillModal, renderHistoricoTransacoes, openBalanceAdjustmentModal, openTransactionModal, deletarTransacao, aplicarFiltrosHistorico };
+        window.app = { openAccountModal, deletarConta, openBillModal, deletarLancamentoFuturo, openPayBillModal, renderHistoricoTransacoes, openBalanceAdjustmentModal, openTransactionModal, deletarTransacao, aplicarFiltrosHistorico, closeModal };
 
         document.getElementById('theme-switcher').addEventListener('click', () => {
             const currentTheme = document.documentElement.getAttribute('data-theme');
