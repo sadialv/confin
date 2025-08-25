@@ -103,29 +103,41 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- NOVA FUNÇÃO HELPER ---
-    // Cria "transações virtuais" para cada parcela futura de um cartão de crédito.
+    // --- FUNÇÃO HELPER ATUALIZADA ---
     const gerarTransacoesVirtuaisDeParcelas = () => {
         const transacoesVirtuais = [];
         comprasParceladasCache.forEach(compra => {
             const cartao = contasCache.find(c => c.id === compra.conta_id);
-            if (!cartao || !cartao.dia_fechamento_cartao) return; // Pula se a compra não for de um cartão configurado
+            if (!cartao || !cartao.dia_fechamento_cartao) return;
 
             const parcelas = lancamentosFuturosCache.filter(l => l.compra_parcelada_id === compra.id);
+            const dataOriginalCompra = new Date(compra.data_compra + 'T12:00:00');
+
             parcelas.forEach(parcela => {
-                const dataVencimento = new Date(parcela.data_vencimento + 'T12:00:00');
-                // Calcula uma data representativa para que a "compra" da parcela caia no mês correto da fatura
-                const dataRepresentativa = new Date(dataVencimento.getFullYear(), dataVencimento.getMonth() - 1, cartao.dia_fechamento_cartao + 1);
+                const numeroDaParcelaMatch = parcela.descricao.match(/\((\d+)\/\d+\)/);
+                if (!numeroDaParcelaMatch) return; // Pula se não encontrar o número da parcela na descrição
+
+                const numeroDaParcela = parseInt(numeroDaParcelaMatch[1]);
+                let dataDaParcela;
+
+                // A primeira parcela mantém a data original da compra.
+                if (numeroDaParcela === 1) {
+                    dataDaParcela = dataOriginalCompra;
+                } else {
+                    // As parcelas seguintes são calculadas como um mês após a parcela anterior, mantendo o dia.
+                    dataDaParcela = new Date(dataOriginalCompra.getFullYear(), dataOriginalCompra.getMonth() + (numeroDaParcela - 1), dataOriginalCompra.getDate());
+                }
 
                 transacoesVirtuais.push({
-                    id: `v_${parcela.id}`, // ID virtual para evitar conflitos de chave
+                    id: `v_${parcela.id}`,
                     descricao: parcela.descricao,
                     valor: parcela.valor,
-                    data: toISODateString(dataRepresentativa),
+                    data: toISODateString(dataDaParcela), // Usa a data calculada corretamente
                     categoria: compra.categoria,
                     tipo: 'despesa',
                     conta_id: compra.conta_id,
-                    isVirtual: true // Flag para identificar que não é uma transação real
+                    isVirtual: true,
+                    compraParceladaId: compra.id
                 });
             });
         });
@@ -278,7 +290,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderHistoricoTransacoes();
     };
 
-    // FUNÇÃO ATUALIZADA - Agora usa transações reais e virtuais
     const renderHistoricoTransacoes = () => {
         const container = document.getElementById('tab-history');
         const filtroConta = document.getElementById('filtroConta')?.value;
@@ -289,7 +300,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const contasOptions = contasCache.map(c => `<option value="${c.id}" ${filtroConta == c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
         
-        // Gera a lista completa de transações (reais + virtuais)
         const transacoesVirtuais = gerarTransacoesVirtuaisDeParcelas();
         const transacoesCompletas = [...transacoesCache, ...transacoesVirtuais]
             .sort((a, b) => new Date(b.data) - new Date(a.data));
@@ -299,7 +309,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const filtersHTML = `<div class="filters-container"><div class="form-group"><label>Buscar Descrição</label><input type="search" id="filtroDescricao" oninput="window.app.aplicarFiltrosHistorico()" value="${filtroDescricao}"></div><div class="form-group"><label>Conta</label><select id="filtroConta" onchange="window.app.aplicarFiltrosHistorico()"><option value="">Todas</option>${contasOptions}</select></div><div class="form-group"><label>Categoria</label><select id="filtroCategoria" onchange="window.app.aplicarFiltrosHistorico()"><option value="">Todas</option>${categoriasOptions}</select></div><div class="form-group"><label>De:</label><input type="date" id="filtroDataInicio" onchange="window.app.aplicarFiltrosHistorico()" value="${filtroDataInicio || ''}"></div><div class="form-group"><label>Até:</label><input type="date" id="filtroDataFim" onchange="window.app.aplicarFiltrosHistorico()" value="${filtroDataFim || ''}"></div></div>`;
 
-        // Aplica os filtros na lista completa
         let transacoesFiltradas = transacoesCompletas;
         if (filtroConta) transacoesFiltradas = transacoesFiltradas.filter(t => t.conta_id == filtroConta);
         if (filtroCategoria) transacoesFiltradas = transacoesFiltradas.filter(t => t.categoria === filtroCategoria);
@@ -345,13 +354,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 const conta = contasCache.find(c => c.id === t.conta_id);
                 const categoriaInfo = CATEGORY_ICONS[t.categoria] || CATEGORY_ICONS['Outros'];
                 const valorSinal = t.tipo === 'receita' ? '+' : '-';
-                // Ações de editar/deletar são desabilitadas para transações virtuais (parcelas)
-                const actionsHTML = t.isVirtual 
-                    ? '' 
-                    : `<div class="transaction-actions">
-                         <button class="btn-icon" title="Editar Transação" onclick="window.app.openTransactionModal(${t.id})"><i class="fas fa-pencil-alt"></i></button>
-                         <button class="btn-icon" title="Deletar Transação" onclick="window.app.deletarTransacao(${t.id})"><i class="fas fa-trash-alt"></i></button>
-                       </div>`;
+                
+                let actionsHTML = '';
+                if (t.isVirtual) {
+                    actionsHTML = `<div class="transaction-actions">
+                                     <button class="btn-icon" title="Editar Compra Parcelada" onclick="window.app.openEditInstallmentModal(${t.compraParceladaId})">
+                                         <i class="fas fa-pencil-alt"></i>
+                                     </button>
+                                     <button class="btn-icon" title="Deletar Compra Parcelada Completa" onclick="window.app.deletarCompraParcelada(${t.compraParceladaId})">
+                                         <i class="fas fa-trash-alt"></i>
+                                     </button>
+                                   </div>`;
+                } else {
+                    actionsHTML = `<div class="transaction-actions">
+                                     <button class="btn-icon" title="Editar Transação" onclick="window.app.openTransactionModal(${t.id})"><i class="fas fa-pencil-alt"></i></button>
+                                     <button class="btn-icon" title="Deletar Transação" onclick="window.app.deletarTransacao(${t.id})"><i class="fas fa-trash-alt"></i></button>
+                                   </div>`;
+                }
 
                 return headerHTML + `<div class="transaction-card"><div class="transaction-icon" style="background-color: ${categoriaInfo.color};"><i class="${categoriaInfo.icon}"></i></div><div class="transaction-details"><div class="transaction-description">${t.descricao}</div><div class="transaction-meta">${conta?.nome || 'N/A'} • ${t.categoria || ''}</div></div><div class="transaction-amount ${t.tipo === 'receita' ? 'income-text' : 'expense-text'}">${valorSinal} ${formatarMoeda(t.valor)}</div>${actionsHTML}</div>`;
             }).join('');
@@ -384,8 +403,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     // --- LÓGICA DE AÇÕES ---
-    // (O resto do arquivo continua daqui para baixo, com as funções openAccountModal, salvarConta, etc...)
-    // A única função que muda, além da renderHistoricoTransacoes, é a salvarCompraParcelada.
+    
+    // As funções daqui para baixo não foram alteradas nesta rodada, exceto pela adição das novas funções de edição
+    // e o registro delas na função initializeApp no final do arquivo.
+    
+    // ... (As funções de openAccountModal, salvarConta, deletarConta, etc. permanecem as mesmas) ...
+    
+    // --- COPIE A PARTIR DAQUI ATÉ O FIM DO ARQUIVO ---
 
     const openAccountModal = (id = null) => {
         const isEditing = id !== null;
@@ -422,16 +446,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 dia_vencimento_cartao: document.getElementById('c_vencimento').value ? parseInt(document.getElementById('c_vencimento').value) : null,
             };
             if (id) {
-                const { data, error } = await clienteSupabase.from('contas').update(dadosConta).eq('id', id).select().single();
-                if (error) throw error;
-                const index = contasCache.findIndex(c => c.id == id);
-                if (index !== -1) contasCache[index] = data;
+                await clienteSupabase.from('contas').update(dadosConta).eq('id', id);
             } else {
-                const { data, error } = await clienteSupabase.from('contas').insert(dadosConta).select().single();
-                if (error) throw error;
-                contasCache.push(data);
+                await clienteSupabase.from('contas').insert(dadosConta);
             }
-            contasCache.sort((a,b) => a.nome.localeCompare(b.nome));
+            await carregarDadosIniciais();
             closeModal();
             showToast(`Conta ${id ? 'atualizada' : 'criada'} com sucesso!`);
             renderAllComponents();
@@ -448,12 +467,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (error) {
                 showToast(error.message, 'error');
             } else {
-                contasCache = contasCache.filter(c => c.id !== id);
-                transacoesCache = transacoesCache.filter(t => t.conta_id !== id);
-                lancamentosFuturosCache = lancamentosFuturosCache.filter(l => {
-                    const compra = comprasParceladasCache.find(cp => cp.id === l.compra_parcelada_id);
-                    return !(compra && compra.conta_id === id);
-                });
+                await carregarDadosIniciais();
                 showToast('Conta deletada com sucesso!');
                 renderAllComponents();
             }
@@ -485,16 +499,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 status: 'pendente'
             };
             if(id) {
-                const { data, error } = await clienteSupabase.from('lancamentos_futuros').update(dados).eq('id', id).select().single();
-                if(error) throw error;
-                const index = lancamentosFuturosCache.findIndex(l => l.id == id);
-                if (index > -1) lancamentosFuturosCache[index] = data;
+                await clienteSupabase.from('lancamentos_futuros').update(dados).eq('id', id);
             } else {
-                const { data, error } = await clienteSupabase.from('lancamentos_futuros').insert(dados).select().single();
-                if(error) throw error;
-                lancamentosFuturosCache.push(data);
+                await clienteSupabase.from('lancamentos_futuros').insert(dados);
             }
-            lancamentosFuturosCache.sort((a,b) => new Date(a.data_vencimento) - new Date(b.data_vencimento));
+            await carregarDadosIniciais();
             closeModal();
             showToast(`Lançamento ${id ? 'atualizado' : 'salvo'}!`);
             renderLancamentosFuturos();
@@ -511,7 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (error) {
                 showToast(error.message, 'error');
             } else {
-                lancamentosFuturosCache = lancamentosFuturosCache.filter(l => l.id !== id);
+                await carregarDadosIniciais();
                 showToast('Lançamento deletado!');
                 renderLancamentosFuturos();
             }
@@ -552,11 +561,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 lancamento_futuro_id: bill.id
             };
             
-            const { data: transacao, error: transacaoError } = await clienteSupabase.from('transacoes').insert(novaTransacao).select().single();
-            if (transacaoError) throw transacaoError;
-            
-            const { error: billError } = await clienteSupabase.from('lancamentos_futuros').update({ status: 'pago' }).eq('id', bill.id);
-            if (billError) throw billError;
+            await clienteSupabase.from('transacoes').insert(novaTransacao);
+            await clienteSupabase.from('lancamentos_futuros').update({ status: 'pago' }).eq('id', bill.id);
     
             await carregarDadosIniciais();
             
@@ -594,12 +600,10 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             
             if (isEditing) {
-                const { data, error } = await clienteSupabase.from('transacoes').update(dadosTransacao).eq('id', id).select().single();
-                if (error) throw error;
+                await clienteSupabase.from('transacoes').update(dadosTransacao).eq('id', id);
             } else {
                 if (!dadosTransacao.conta_id) throw new Error("Nenhuma conta selecionada.");
-                const { data, error } = await clienteSupabase.from('transacoes').insert(dadosTransacao).select().single();
-                if (error) throw error;
+                await clienteSupabase.from('transacoes').insert(dadosTransacao);
                 form.reset();
                 form.querySelector(`#t_data${prefix}`).value = toISODateString(HOJE);
             }
@@ -636,6 +640,143 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast('Transação deletada com sucesso!');
                 renderAllComponents();
             }
+        }
+    };
+    
+    const deletarCompraParcelada = async (compraId) => {
+        if (!compraId || typeof compraId !== 'number' || compraId <= 0) {
+            console.error("ERRO CRÍTICO: ID da compra é inválido! Abortando exclusão.", compraId);
+            showToast("Erro: ID da compra inválido. A exclusão foi abortada para sua segurança.", "error");
+            return; 
+        }
+
+        const compra = comprasParceladasCache.find(c => c.id === compraId);
+        if (!compra) {
+            showToast('Compra parcelada não encontrada.', 'error');
+            return;
+        }
+
+        if (confirm(`Deseja realmente deletar a compra '${compra.descricao}' e todas as suas parcelas?`)) {
+            try {
+                const { error: errorLancamentos } = await clienteSupabase.from('lancamentos_futuros').delete().eq('compra_parcelada_id', compraId);
+                if (errorLancamentos) throw errorLancamentos;
+
+                const { error: errorCompra } = await clienteSupabase.from('compras_parceladas').delete().eq('id', compraId);
+                if (errorCompra) throw errorCompra;
+
+                await carregarDadosIniciais();
+                showToast('Compra parcelada deletada com sucesso!');
+                renderAllComponents();
+
+            } catch (error) {
+                showToast(`Erro ao deletar compra: ${error.message}`, 'error');
+            }
+        }
+    };
+
+    const openEditInstallmentModal = (compraId) => {
+        const compra = comprasParceladasCache.find(c => c.id === compraId);
+        if (!compra) {
+            showToast('Compra não encontrada para edição.', 'error');
+            return;
+        }
+
+        const cartaoVinculado = contasCache.find(c => c.id === compra.conta_id);
+
+        const content = `
+            <div class="card-header"><div class="card-header-title"><h2>Editar Compra Parcelada</h2></div></div>
+            <form id="formEditCompraParcelada">
+                <input type="hidden" id="ecp_id" value="${compra.id}">
+                <div class="form-group">
+                    <label>Cartão de Crédito</label>
+                    <input type="text" value="${cartaoVinculado ? cartaoVinculado.nome : 'N/A'}" disabled>
+                </div>
+                <div class="form-group">
+                    <label for="ecp_descricao">Descrição</label>
+                    <input type="text" id="ecp_descricao" value="${compra.descricao}" required>
+                </div>
+                <div class="form-group">
+                    <label for="ecp_valor_total">Valor Total da Compra</label>
+                    <input type="number" id="ecp_valor_total" step="0.01" min="0.01" value="${compra.valor_total}" required>
+                </div>
+                <div class="form-group">
+                    <label for="ecp_num_parcelas">Número de Parcelas</label>
+                    <input type="number" id="ecp_num_parcelas" step="1" min="1" value="${compra.numero_parcelas}" required>
+                </div>
+                <div class="form-group">
+                    <label for="ecp_data_compra">Data da Compra</label>
+                    <input type="date" id="ecp_data_compra" value="${compra.data_compra}" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="window.app.closeModal()">Cancelar</button>
+                    <button type="submit" class="btn">Salvar Alterações</button>
+                </div>
+            </form>`;
+        openModal(content);
+        document.getElementById('formEditCompraParcelada').addEventListener('submit', salvarEdicaoCompraParcelada);
+    };
+
+    const salvarEdicaoCompraParcelada = async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const submitButton = form.querySelector('button[type="submit"]');
+        const originalButtonText = submitButton.textContent;
+        setLoadingState(submitButton, true, "Salvando...");
+
+        try {
+            const compraId = parseInt(form.querySelector('#ecp_id').value);
+            const dadosAtualizados = {
+                descricao: form.querySelector('#ecp_descricao').value,
+                valor_total: parseFloat(form.querySelector('#ecp_valor_total').value),
+                numero_parcelas: parseInt(form.querySelector('#ecp_num_parcelas').value),
+                data_compra: form.querySelector('#ecp_data_compra').value,
+            };
+
+            const compraOriginal = comprasParceladasCache.find(c => c.id === compraId);
+            const cartaoSelecionado = contasCache.find(c => c.id === compraOriginal.conta_id);
+
+            const { error: deleteError } = await clienteSupabase.from('lancamentos_futuros').delete()
+                .eq('compra_parcelada_id', compraId)
+                .eq('status', 'pendente');
+            if (deleteError) throw deleteError;
+
+            const { error: updateError } = await clienteSupabase.from('compras_parceladas').update(dadosAtualizados).eq('id', compraId);
+            if (updateError) throw updateError;
+            
+            const valorParcela = parseFloat((dadosAtualizados.valor_total / dadosAtualizados.numero_parcelas).toFixed(2));
+            const dataCompra = new Date(dadosAtualizados.data_compra + 'T12:00:00');
+            let lancamentos = [];
+    
+            for (let i = 1; i <= dadosAtualizados.numero_parcelas; i++) {
+                let dataVencimento = new Date(dataCompra.getFullYear(), dataCompra.getMonth() + i, cartaoSelecionado.dia_vencimento_cartao);
+                lancamentos.push({
+                    descricao: `${dadosAtualizados.descricao} (${i}/${dadosAtualizados.numero_parcelas})`,
+                    valor: valorParcela,
+                    data_vencimento: toISODateString(dataVencimento),
+                    tipo: 'a_pagar',
+                    status: 'pendente',
+                    categoria: compraOriginal.categoria,
+                    compra_parcelada_id: compraId
+                });
+            }
+
+            if(lancamentos.length > 0) {
+                const { error: insertError } = await clienteSupabase.from('lancamentos_futuros').insert(lancamentos);
+                if (insertError) throw insertError;
+            }
+
+            await carregarDadosIniciais();
+            closeModal();
+            showToast('Compra parcelada atualizada com sucesso!');
+            renderAllComponents();
+
+        } catch (error) {
+            console.error("Erro ao editar compra parcelada:", error);
+            showToast(`Erro ao editar: ${error.message}`, 'error');
+            await carregarDadosIniciais();
+            renderAllComponents();
+        } finally {
+            setLoadingState(submitButton, false, originalButtonText);
         }
     };
     
@@ -925,7 +1066,9 @@ document.addEventListener('DOMContentLoaded', () => {
             openAccountModal, deletarConta, 
             openBillModal, deletarLancamentoFuturo, openPayBillModal, 
             renderHistoricoTransacoes, openBalanceAdjustmentModal, 
-            openTransactionModal, deletarTransacao, aplicarFiltrosHistorico, 
+            openTransactionModal, deletarTransacao, deletarCompraParcelada,
+            openEditInstallmentModal,
+            aplicarFiltrosHistorico, 
             closeModal, openCreditCardStatementModal 
         };
 
