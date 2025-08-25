@@ -1,5 +1,3 @@
-// A função 'renderHistoricoTransacoes' foi totalmente reescrita para corrigir a exibição de datas vazias.
-// As demais funções permanecem como na versão anterior.
 document.addEventListener('DOMContentLoaded', () => {
     // --- CONFIGURAÇÃO E ESTADO GLOBAL ---
     const SUPABASE_URL = 'https://fjrpiikhbsvauzbdugtd.supabase.co';
@@ -9,10 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const HOJE = new Date();
     HOJE.setHours(0, 0, 0, 0);
 
-    let contasCache = [], transacoesCache = [], lancamentosFuturosCache = [], comprasParceladasCache = [], expenseChart = null;
+    let contasCache = [], transacoesCache = [], lancamentosFuturosCache = [], comprasParceladasCache = [], summaryChart = null;
     let mesesVisiveis = 3; 
-    let transacoesVisiveisCount = 20;
-    const ITENS_POR_PAGINA = 20;
+    
     const CATEGORIAS_PADRAO = ['Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Lazer', 'Educação', 'Salário', 'Investimentos', 'Contas', 'Ajustes', 'Pagamento de Fatura', 'Outros', 'Compras'];
     
     const CATEGORY_ICONS = {
@@ -28,7 +25,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- FUNÇÕES UTILITÁRIAS ---
     const formatarMoeda = (valor) => (valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    const getSelectedMonth = () => document.getElementById('filtroMes')?.value || new Date(HOJE).toISOString().slice(0, 7);
     
     const applyTheme = (theme) => {
         document.documentElement.setAttribute('data-theme', theme);
@@ -73,11 +69,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('modal-container').classList.remove('active');
         document.getElementById('modal-content-area').innerHTML = '';
     };
-    const switchTab = (clickedButton) => {
+    const switchTab = (clickedButton, parentContainer) => {
         const tabName = clickedButton.dataset.tab;
-        document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
-        document.querySelectorAll('.tab-button').forEach(tb => tb.classList.remove('active'));
-        document.getElementById(tabName).classList.add('active');
+        parentContainer.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+        parentContainer.querySelectorAll('.tab-button').forEach(tb => tb.classList.remove('active'));
+        parentContainer.querySelector(`#${tabName}`).classList.add('active');
         clickedButton.classList.add('active');
     };
     
@@ -112,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const cartao = contasCache.find(c => c.id === compra.conta_id);
             if (!cartao || !cartao.dia_fechamento_cartao) return;
 
-            const parcelas = lancamentosFuturosCache.filter(l => l.compra_parcelada_id === compra.id);
+            const parcelas = lancamentosFuturosCache.filter(l => l.compra_parcelada_id === compra.id && l.status === 'pendente');
             const dataOriginalCompra = new Date(compra.data_compra + 'T12:00:00');
 
             parcelas.forEach(parcela => {
@@ -147,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- FUNÇÕES DE RENDERIZAÇÃO ---
     const renderAllComponents = () => {
         renderContas();
-        renderSummary();
+        renderSummary(); 
         renderLancamentosFuturos();
         aplicarFiltrosHistorico();
         renderFormTransacaoRapida();
@@ -187,45 +183,133 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const renderSummary = () => {
-        const mesSelecionado = getSelectedMonth();
-        const transacoesDoMes = transacoesCache.filter(t => t.data && t.data.startsWith(mesSelecionado));
-        const totalReceitas = transacoesDoMes.filter(t => t.tipo === 'receita').reduce((s, t) => s + t.valor, 0);
-        const totalDespesas = transacoesDoMes.filter(t => t.tipo === 'despesa').reduce((s, t) => s + t.valor, 0);
-        
-        const summaryContainer = document.getElementById('summary-container');
-        summaryContainer.innerHTML = `
-            <div class="form-group">
-                <label>Mês de Referência</label>
-                <input type="month" id="filtroMes" value="${mesSelecionado}">
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                <div><h4><i class="fas fa-arrow-up income-text"></i> Receitas</h4><p class="income-text" style="font-size:1.25rem; font-weight:600;">${formatarMoeda(totalReceitas)}</p></div>
-                <div><h4><i class="fas fa-arrow-down expense-text"></i> Despesas</h4><p class="expense-text" style="font-size:1.25rem; font-weight:600;">${formatarMoeda(totalDespesas)}</p></div>
-            </div>
-            <div style="height: 200px; margin-top: 1.5rem;"><canvas id="expenseChart"></canvas></div>`;
-        
-        document.getElementById('filtroMes').addEventListener('change', renderSummary);
-        renderExpenseChart(transacoesDoMes);
+        const tabContainer = document.getElementById('dashboard-tab-buttons');
+        if (!tabContainer.dataset.initialized) {
+            renderVisaoMensal();
+            renderVisaoAnual();
+            tabContainer.dataset.initialized = true;
+        }
+    
+        tabContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('tab-button')) {
+                const dashboardCard = document.querySelector('.card:has(#dashboard-tab-buttons)');
+                switchTab(e.target, dashboardCard);
+            }
+        });
     };
-
-    const renderExpenseChart = (transactions) => {
-        const ctx = document.getElementById('expenseChart')?.getContext('2d');
-        if (!ctx) return;
-        if (expenseChart) expenseChart.destroy();
+    
+    const renderVisaoMensal = () => {
+        const container = document.getElementById('dashboard-monthly');
+        const mesSelecionado = document.getElementById('dashboard-month-filter')?.value || new Date().toISOString().slice(0, 7);
         
-        const expensesByCategory = transactions
-            .filter(t => t.tipo === 'despesa' && t.categoria !== 'Pagamento de Fatura')
+        const transacoesVirtuais = gerarTransacoesVirtuaisDeParcelas();
+        const transacoesCompletas = [...transacoesCache, ...transacoesVirtuais];
+        const transacoesDoMes = transacoesCompletas.filter(t => t.data && t.data.startsWith(mesSelecionado));
+        
+        const receitas = transacoesDoMes.filter(t => t.tipo === 'receita').reduce((sum, t) => sum + t.valor, 0);
+        const despesas = transacoesDoMes.filter(t => t.tipo === 'despesa').reduce((sum, t) => sum + t.valor, 0);
+        const saldo = receitas - despesas;
+        const comprometimento = receitas > 0 ? ((despesas / receitas) * 100).toFixed(0) : 0;
+
+        container.innerHTML = `
+            <div class="dashboard-controls">
+                <input type="month" id="dashboard-month-filter" value="${mesSelecionado}">
+            </div>
+            <div class="dashboard-kpis">
+                <div class="kpi-item"><h4>Receitas</h4><p class="income-text">${formatarMoeda(receitas)}</p></div>
+                <div class="kpi-item"><h4>Despesas</h4><p class="expense-text">${formatarMoeda(despesas)}</p></div>
+                <div class="kpi-item"><h4>Saldo do Mês</h4><p style="color: ${saldo >= 0 ? 'var(--income-color)' : 'var(--expense-color)'}">${formatarMoeda(saldo)}</p></div>
+                <div class="kpi-item"><h4>Comprometimento</h4><p>${comprometimento}%</p></div>
+            </div>
+            <div class="dashboard-chart-container"><canvas id="summary-chart-monthly"></canvas></div>`;
+        
+        document.getElementById('dashboard-month-filter').addEventListener('change', renderVisaoMensal);
+        
+        const ctx = document.getElementById('summary-chart-monthly')?.getContext('2d');
+        if (summaryChart) {
+            summaryChart.destroy();
+            summaryChart = null;
+        }
+        
+        const despesasPorCategoria = transacoesDoMes
+            .filter(t => t.tipo === 'despesa')
             .reduce((acc, t) => {
                 acc[t.categoria] = (acc[t.categoria] || 0) + t.valor;
                 return acc;
             }, {});
+
+        summaryChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(despesasPorCategoria),
+                datasets: [{ data: Object.values(despesasPorCategoria), backgroundColor: Object.keys(despesasPorCategoria).map(cat => CATEGORY_ICONS[cat]?.color || '#cccccc') }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'right' } } }
+        });
+    };
+
+    const renderVisaoAnual = () => {
+        const container = document.getElementById('dashboard-yearly');
+        const anoSelecionado = parseInt(document.getElementById('dashboard-year-filter')?.value) || new Date().getFullYear();
+
+        const transacoesVirtuais = gerarTransacoesVirtuaisDeParcelas();
+        const transacoesCompletas = [...transacoesCache, ...transacoesVirtuais];
+        const transacoesDoAno = transacoesCompletas.filter(t => t.data && t.data.startsWith(anoSelecionado));
+
+        let receitasPorMes = Array(12).fill(0);
+        let despesasPorMes = Array(12).fill(0);
+        let mesesComReceita = new Set();
+
+        transacoesDoAno.forEach(t => {
+            const mes = new Date(t.data + 'T12:00:00').getMonth(); // 0-11
+            if (t.tipo === 'receita') {
+                receitasPorMes[mes] += t.valor;
+                mesesComReceita.add(mes);
+            } else if (t.tipo === 'despesa') {
+                despesasPorMes[mes] += t.valor;
+            }
+        });
         
-        const labels = Object.keys(expensesByCategory);
-        const data = Object.values(expensesByCategory);
+        const totalReceitasAno = receitasPorMes.reduce((a, b) => a + b, 0);
+        const totalDespesasAno = despesasPorMes.reduce((a, b) => a + b, 0);
+        const balancoAnual = totalReceitasAno - totalDespesasAno;
+        const mediaDespesas = totalDespesasAno / 12;
+        const mediaReceitas = mesesComReceita.size > 0 ? totalReceitasAno / mesesComReceita.size : 0;
         
-        if (labels.length === 0) return;
+        const dividasFuturas = lancamentosFuturosCache.filter(l => l.status === 'pendente' && l.tipo === 'a_pagar').reduce((sum, l) => sum + l.valor, 0);
+        const grauEndividamento = mediaReceitas > 0 ? (dividasFuturas / mediaReceitas).toFixed(1) : 'N/A';
         
-        expenseChart = new Chart(ctx, { type: 'doughnut', data: { labels: labels, datasets: [{ data: data, backgroundColor: ['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6', '#8b5cf6'], hoverOffset: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12 } } } } });
+        container.innerHTML = `
+             <div class="dashboard-controls">
+                <input type="number" id="dashboard-year-filter" value="${anoSelecionado}" min="2020" max="2050" style="width: 120px;">
+            </div>
+            <div class="dashboard-kpis">
+                <div class="kpi-item"><h4>Balanço Anual</h4><p style="color: ${balancoAnual >= 0 ? 'var(--income-color)' : 'var(--expense-color)'}">${formatarMoeda(balancoAnual)}</p></div>
+                <div class="kpi-item"><h4>Média/Mês (Despesas)</h4><p class="expense-text">${formatarMoeda(mediaDespesas)}</p></div>
+                 <div class="kpi-item"><h4>Dívidas Futuras</h4><p>${formatarMoeda(dividasFuturas)}</p></div>
+                <div class="kpi-item"><h4>Grau de Endividamento</h4><p>${grauEndividamento} meses</p></div>
+            </div>
+            <div class="dashboard-chart-container"><canvas id="summary-chart-yearly"></canvas></div>`;
+        
+        document.getElementById('dashboard-year-filter').addEventListener('change', renderVisaoAnual);
+
+        const ctx = document.getElementById('summary-chart-yearly')?.getContext('2d');
+        if (summaryChart) {
+            summaryChart.destroy();
+            summaryChart = null;
+        }
+
+        summaryChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+                datasets: [
+                    { label: 'Receitas', data: receitasPorMes, backgroundColor: 'rgba(75, 192, 192, 0.5)', borderColor: 'rgb(75, 192, 192)', borderWidth: 1 },
+                    { label: 'Despesas', data: despesasPorMes, backgroundColor: 'rgba(255, 99, 132, 0.5)', borderColor: 'rgb(255, 99, 132)', borderWidth: 1 }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+        });
     };
 
     const renderLancamentosFuturos = () => {
@@ -272,10 +356,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 return `<div class="bill-item ${isVencido ? 'overdue' : ''}"><div class="transaction-icon" style="background-color: ${categoriaInfo.color};"><i class="${categoriaInfo.icon}"></i></div><div class="bill-details"><div>${l.descricao}</div><div class="transaction-meta">Vence em: ${new Date(l.data_vencimento + 'T03:00:00Z').toLocaleDateString('pt-BR')}</div></div><div class="transaction-amount ${corValor}">${formatarMoeda(l.valor)}</div><div class="bill-actions"><button class="btn" style="width:auto; font-size: 0.8rem; padding: 0.25rem 0.5rem;" onclick="window.app.openPayBillModal(${l.id})">${l.tipo === 'a_pagar' ? 'Pagar' : 'Receber'}</button><button class="btn-icon" title="Editar Lançamento" onclick="window.app.openBillModal(${l.id})"><i class="fas fa-pencil-alt"></i></button><button class="btn-icon" title="Deletar Lançamento" onclick="window.app.deletarLancamentoFuturo(${l.id})"><i class="fas fa-trash-alt"></i></button></div></div>`;
             }).join('');
             
-            const isOpen = monthKey === getSelectedMonth() ? 'open' : '';
+            const isOpen = monthKey === toISODateString(new Date()).substring(0, 7);
             const clickHandler = `this.parentElement.classList.toggle('open'); const content = this.nextElementSibling; content.style.maxHeight = this.parentElement.classList.contains('open') ? content.scrollHeight + 'px' : null;`;
             
-            accordionHTML += `<div class="monthly-group ${isOpen}">
+            accordionHTML += `<div class="monthly-group ${isOpen ? 'open' : ''}">
                                 <div class="monthly-header" onclick="${clickHandler}">
                                     <h3>${monthName}</h3>
                                     ${summaryHTML}
@@ -309,7 +393,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderHistoricoTransacoes();
     };
 
-    // FUNÇÃO ATUALIZADA - Lógica de renderização corrigida para não criar cabeçalhos de data vazios
     const renderHistoricoTransacoes = () => {
         const container = document.getElementById('tab-history');
         const filtroConta = document.getElementById('filtroConta')?.value;
@@ -460,12 +543,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const contasOptions = contasCache.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
         const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option>${c}</option>`).join('');
-        form.innerHTML = `<div class="form-group"><label>Descrição</label><input type="text" id="t_descricao_main" required></div><div class="form-group"><label>Valor</label><input type="number" id="t_valor_main" step="0.01" required></div><div class="form-group"><label>Conta</label><select id="t_conta_id_main" required>${contasOptions}</select></div><div class="form-group"><label>Categoria</label><select id="t_categoria_main" required>${categoriasOptions}</select></div><div class="form-group"><label>Data</label><input type="date" id="t_data_main" value="${toISODateString(HOJE)}" required></div><div class="form-group"><label>Tipo</label><select id="t_tipo_main"><option value="despesa">Despesa</option><option value="receita">Receita</option></select></div><button type="submit" class="btn">Adicionar</button>`;
+        form.innerHTML = `<div class="form-group"><label>Descrição</label><input type="text" id="t_descricao_main" required></div><div class="form-group"><label>Valor</label><input type="number" id="t_valor_main" step="0.01" required></div><div class="form-group"><label>Conta</label><select id="t_conta_id_main" required>${contasOptions}</select></div><div class="form-group"><label>Categoria</label><select id="t_categoria_main" required>${categoriasOptions}</select></div><div class="form-group"><label>Data</label><input type="date" id="t_data_main" value="${toISODateString(HOJE)}" required></div><div class="form-group"><label>Tipo</label><select id="t_tipo_main"><option value="despesa">Despesa</option><option value="receita">Receita</option></select></div><button type="submit" class="btn">Adicionar</button></div>`;
     };
     
     // --- LÓGICA DE AÇÕES ---
-    
-    // O restante das funções permanece o mesmo
     const openAccountModal = (id = null) => {
         const isEditing = id !== null;
         const conta = isEditing ? contasCache.find(c => c.id == id) : {};
@@ -560,8 +641,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             await carregarDadosIniciais();
             closeModal();
-            showToast(`Lançamento ${id ? 'atualizado' : 'salvo'}!`);
-            renderLancamentosFuturos();
+            showToast(`Lançamento ${id ? 'atualizado' : 'salvo'} com sucesso!`);
+            renderAllComponents();
         } catch(error) {
             showToast(error.message, 'error');
         } finally {
@@ -920,96 +1001,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    const openChoiceModal = () => {
-        const content = `<div class="card-header"><div class="card-header-title"><h2>Extrato do Mês</h2></div></div><p>Como você gostaria de ver o extrato para o mês selecionado no resumo?</p><div class="form-actions" style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem;"><button id="btn-choice-modal" class="btn">Ver Resumo Detalhado</button><button id="btn-choice-filter" class="btn btn-secondary">Filtrar Histórico de Transações</button></div>`;
-        openModal(content);
-        document.getElementById('btn-choice-modal').addEventListener('click', openStatementModal);
-        document.getElementById('btn-choice-filter').addEventListener('click', filterHistoryByMonth);
-    };
-
-    const openStatementModal = () => {
-        const month = getSelectedMonth();
-        const transacoesDoMes = transacoesCache.filter(t => t.data && t.data.startsWith(month));
-        const totalReceitas = transacoesDoMes.filter(t => t.tipo === 'receita').reduce((s, t) => s + t.valor, 0);
-        const totalDespesas = transacoesDoMes.filter(t => t.tipo === 'despesa').reduce((s, t) => s + t.valor, 0);
-        const saldo = totalReceitas - totalDespesas;
-        const corSaldo = saldo >= 0 ? 'income-text' : 'expense-text';
-        let transactionsHTML = '<p>Nenhuma transação encontrada para este mês.</p>';
-        if (transacoesDoMes.length > 0) {
-            transactionsHTML = transacoesDoMes.sort((a, b) => new Date(a.data) - new Date(b.data)).map(t => {
-                const conta = contasCache.find(c => c.id === t.conta_id);
-                const dataFormatada = new Date(t.data + 'T03:00:00Z').toLocaleDateString('pt-BR');
-                const corValor = t.tipo === 'receita' ? 'income-text' : 'expense-text';
-                return `<div class="transaction-card" style="padding: 0.75rem 0;"><div class="transaction-details"><div class="transaction-description">${t.descricao}</div><div class="transaction-meta">${dataFormatada} • ${conta?.nome || ''}</div></div><div class="transaction-amount ${corValor}">${formatarMoeda(t.valor)}</div></div>`;
-            }).join('');
-        }
-        const [ano, mesNum] = month.split('-');
-        const nomeMes = new Date(ano, mesNum - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
-        const content = `<div class="card-header"><div class="card-header-title"><h2>Extrato de ${nomeMes}</h2></div></div><div class="filtered-summary"><span>Receitas: <strong class="income-text">${formatarMoeda(totalReceitas)}</strong></span><span>Despesas: <strong class="expense-text">${formatarMoeda(totalDespesas)}</strong></span><span>Saldo: <strong class="${corSaldo}">${formatarMoeda(saldo)}</strong></span></div><div style="max-height: 45vh; overflow-y: auto; padding-right: 1rem;">${transactionsHTML}</div>`;
-        openModal(content);
-    };
-
-    const filterHistoryByMonth = () => {
-        const monthStr = getSelectedMonth();
-        const [year, month] = monthStr.split('-').map(Number);
-        const startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0);
-        const tabButton = document.querySelector('.tab-button[data-tab="tab-history"]');
-        switchTab(tabButton);
-        const filtroInicio = document.getElementById('filtroDataInicio');
-        const filtroFim = document.getElementById('filtroDataFim');
-        const filtroConta = document.getElementById('filtroConta');
-        const filtroCategoria = document.getElementById('filtroCategoria');
-        const filtroDescricao = document.getElementById('filtroDescricao');
-        if (filtroInicio) filtroInicio.value = toISODateString(startDate);
-        if (filtroFim) filtroFim.value = toISODateString(endDate);
-        if (filtroConta) filtroConta.value = '';
-        if (filtroCategoria) filtroCategoria.value = '';
-        if (filtroDescricao) filtroDescricao.value = '';
-        aplicarFiltrosHistorico();
-        closeModal();
-        showToast(`Histórico filtrado para ${monthStr}.`, 'info');
-    };
-
-    const openBalanceAdjustmentModal = (accountId) => {
-        const conta = contasCache.find(c => c.id === accountId);
-        if (!conta) { showToast("Conta não encontrada.", "error"); return; }
-        const transacoesDaConta = transacoesCache.filter(t => t.conta_id === conta.id);
-        const saldoAtual = transacoesDaConta.reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, conta.saldo_inicial);
-        const content = `<div class="card-header"><div class="card-header-title"><h2>Ajustar Saldo da Conta</h2></div></div><p style="margin-bottom: 1rem;"><strong>Conta:</strong> ${conta.nome}</p><div style="margin-bottom: 1.5rem;"><span style="font-size: 0.9rem; color: var(--text-secondary);">Saldo Atual Calculado</span><p style="font-size: 1.5rem; font-weight: 600; margin: 0;">${formatarMoeda(saldoAtual)}</p></div><form id="formAjusteSaldo"><input type="hidden" id="ajuste_conta_id" value="${accountId}"><input type="hidden" id="ajuste_saldo_atual" value="${saldoAtual}"><div class="form-group"><label for="ajuste_novo_saldo">Informe o Novo Saldo Correto</label><input type="number" step="0.01" id="ajuste_novo_saldo" value="${saldoAtual.toFixed(2)}" required></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="window.app.closeModal()">Cancelar</button><button type="submit" class="btn">Salvar Ajuste</button></div></form>`;
-        openModal(content);
-        document.getElementById('formAjusteSaldo').addEventListener('submit', salvarAjusteDeSaldo);
-    };
-
-    const salvarAjusteDeSaldo = async (e) => {
-        e.preventDefault();
-        const form = e.target;
-        const submitButton = form.querySelector('button[type="submit"]');
-        const originalButtonText = submitButton.textContent;
-        setLoadingState(submitButton, true, "Ajustando...");
-        try {
-            const accountId = parseInt(form.querySelector('#ajuste_conta_id').value);
-            const saldoAtual = parseFloat(form.querySelector('#ajuste_saldo_atual').value);
-            const novoSaldo = parseFloat(form.querySelector('#ajuste_novo_saldo').value);
-            const diferenca = novoSaldo - saldoAtual;
-            if (Math.abs(diferenca) < 0.01) {
-                showToast("O novo saldo é igual ao atual. Nenhum ajuste necessário.", "info");
-                closeModal();
-                return;
-            }
-            const novaTransacao = { descricao: "Ajuste de Saldo", valor: Math.abs(diferenca), data: toISODateString(new Date()), tipo: diferenca > 0 ? 'receita' : 'despesa', categoria: 'Ajustes', conta_id: accountId, };
-            await clienteSupabase.from('transacoes').insert(novaTransacao);
-            await carregarDadosIniciais();
-            closeModal();
-            showToast("Saldo ajustado com sucesso através de uma nova transação!");
-            renderAllComponents();
-        } catch (error) {
-            showToast(error.message, "error");
-        } finally {
-            setLoadingState(submitButton, false, originalButtonText);
-        }
-    };
-
     const openCreditCardStatementModal = (accountId) => {
         const conta = contasCache.find(c => c.id === accountId);
         if (!conta || conta.tipo !== 'Cartão de Crédito' || !conta.dia_fechamento_cartao || !conta.dia_vencimento_cartao) {
@@ -1063,7 +1054,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const nomeMes = fatura.dataVencimento.toLocaleString('pt-BR', { month: 'long' });
                 const isActive = index === 0 ? 'active' : '';
         
-                tabsHTML += `<button class="statement-tab-button ${isActive}" data-target="fatura-${chave}">${nomeMes}</button>`;
+                tabsHTML += `<button class="tab-button ${isActive}" data-target="fatura-${chave}">${nomeMes}</button>`;
                 
                 const totalFatura = fatura.transacoes.reduce((sum, t) => sum + t.valor, 0);
                 
@@ -1078,7 +1069,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>`;
                     }).join('');
         
-                contentsHTML += `<div class="statement-tab-content ${isActive}" id="fatura-${chave}">
+                contentsHTML += `<div class="tab-content ${isActive}" id="fatura-${chave}">
                     <div class="invoice-summary">
                         <div>
                             <span>Total da Fatura</span>
@@ -1095,24 +1086,58 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     
         const modalContent = `
-            <div class="statement-modal-header">
-                <h3>${conta.nome}</h3>
-                <p>Extrato de Faturas</p>
-            </div>
-            <div class="statement-tabs">${tabsHTML}</div>
+            <div class="card-header"><div class="card-header-title"><h2>Extrato de Faturas</h2></div></div>
+            <div class="tab-buttons">${tabsHTML}</div>
             <div class="statement-content-wrapper">${contentsHTML}</div>
         `;
         
         openModal(modalContent);
         
-        document.querySelectorAll('.statement-tab-button').forEach(button => {
-            button.addEventListener('click', () => {
-                document.querySelectorAll('.statement-tab-button').forEach(btn => btn.classList.remove('active'));
-                document.querySelectorAll('.statement-tab-content').forEach(content => content.classList.remove('active'));
-                button.classList.add('active');
-                document.getElementById(button.dataset.target).classList.add('active');
+        document.querySelectorAll('.modal-content .tab-button').forEach(button => {
+            button.addEventListener('click', (e) => {
+                switchTab(e.target, document.querySelector('.modal-content'));
             });
         });
+    };
+    
+    // --- FUNÇÕES RESTAURADAS ---
+    const openBalanceAdjustmentModal = (accountId) => {
+        const conta = contasCache.find(c => c.id === accountId);
+        if (!conta) { showToast("Conta não encontrada.", "error"); return; }
+        const transacoesDaConta = transacoesCache.filter(t => t.conta_id === conta.id);
+        const saldoAtual = transacoesDaConta.reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, conta.saldo_inicial);
+        const content = `<div class="card-header"><div class="card-header-title"><h2>Ajustar Saldo da Conta</h2></div></div><p style="margin-bottom: 1rem;"><strong>Conta:</strong> ${conta.nome}</p><div style="margin-bottom: 1.5rem;"><span style="font-size: 0.9rem; color: var(--text-secondary);">Saldo Atual Calculado</span><p style="font-size: 1.5rem; font-weight: 600; margin: 0;">${formatarMoeda(saldoAtual)}</p></div><form id="formAjusteSaldo"><input type="hidden" id="ajuste_conta_id" value="${accountId}"><input type="hidden" id="ajuste_saldo_atual" value="${saldoAtual}"><div class="form-group"><label for="ajuste_novo_saldo">Informe o Novo Saldo Correto</label><input type="number" step="0.01" id="ajuste_novo_saldo" value="${saldoAtual.toFixed(2)}" required></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="window.app.closeModal()">Cancelar</button><button type="submit" class="btn">Salvar Ajuste</button></div></form>`;
+        openModal(content);
+        document.getElementById('formAjusteSaldo').addEventListener('submit', salvarAjusteDeSaldo);
+    };
+
+    const salvarAjusteDeSaldo = async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const submitButton = form.querySelector('button[type="submit"]');
+        const originalButtonText = submitButton.textContent;
+        setLoadingState(submitButton, true, "Ajustando...");
+        try {
+            const accountId = parseInt(form.querySelector('#ajuste_conta_id').value);
+            const saldoAtual = parseFloat(form.querySelector('#ajuste_saldo_atual').value);
+            const novoSaldo = parseFloat(form.querySelector('#ajuste_novo_saldo').value);
+            const diferenca = novoSaldo - saldoAtual;
+            if (Math.abs(diferenca) < 0.01) {
+                showToast("O novo saldo é igual ao atual. Nenhum ajuste necessário.", "info");
+                closeModal();
+                return;
+            }
+            const novaTransacao = { descricao: "Ajuste de Saldo", valor: Math.abs(diferenca), data: toISODateString(new Date()), tipo: diferenca > 0 ? 'receita' : 'despesa', categoria: 'Ajustes', conta_id: accountId, };
+            await clienteSupabase.from('transacoes').insert(novaTransacao);
+            await carregarDadosIniciais();
+            closeModal();
+            showToast("Saldo ajustado com sucesso através de uma nova transação!");
+            renderAllComponents();
+        } catch (error) {
+            showToast(error.message, "error");
+        } finally {
+            setLoadingState(submitButton, false, originalButtonText);
+        }
     };
 
     // --- INICIALIZAÇÃO E EVENT LISTENERS ---
@@ -1131,15 +1156,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const currentTheme = document.documentElement.getAttribute('data-theme');
             applyTheme(currentTheme === 'light' ? 'dark' : 'light');
         });
-        document.getElementById('tab-buttons-container').addEventListener('click', (e) => {
-            if (e.target.classList.contains('tab-button')) switchTab(e.target);
+        document.getElementById('main-tab-buttons').addEventListener('click', (e) => {
+            if (e.target.classList.contains('tab-button')) {
+                switchTab(e.target, e.currentTarget.parentElement);
+            }
         });
         document.getElementById('form-transacao-rapida').addEventListener('submit', salvarTransacao);
         
         document.getElementById('btn-add-account').addEventListener('click', () => openAccountModal());
         document.getElementById('btn-open-installment').addEventListener('click', openInstallmentPurchaseModal);
         document.getElementById('btn-open-bill').addEventListener('click', () => openBillModal());
-        document.getElementById('btn-statement').addEventListener('click', openChoiceModal);
         
         applyTheme(localStorage.getItem('confin-theme') || 'light');
         await carregarDadosIniciais();
