@@ -111,9 +111,10 @@ document.addEventListener('DOMContentLoaded', () => {
         renderFormTransacaoRapida();
     };
 
+    // FUNÇÃO ATUALIZADA
     const renderContas = () => {
         const container = document.getElementById('accounts-container');
-        if(!contasCache || contasCache.length === 0) {
+        if (!contasCache || contasCache.length === 0) {
             container.innerHTML = '<p style="text-align:center; color: var(--text-secondary);">Nenhuma conta cadastrada.</p>';
             return;
         }
@@ -121,9 +122,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const transacoesDaConta = transacoesCache.filter(t => t.conta_id === conta.id);
             const saldo = transacoesDaConta.reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, conta.saldo_inicial);
             const corSaldo = saldo >= 0 ? 'var(--income-color)' : 'var(--expense-color)';
-            const botaoAjusteHTML = (conta.tipo === 'Conta Corrente' || conta.tipo === 'Poupança')
-                ? `<button class="btn-icon" title="Ajustar Saldo" onclick="window.app.openBalanceAdjustmentModal(${conta.id})"><i class="fas fa-calculator"></i></button>`
-                : '';
+            
+            let botoesEspecificos = '';
+            if (conta.tipo === 'Conta Corrente' || conta.tipo === 'Poupança') {
+                botoesEspecificos = `<button class="btn-icon" title="Ajustar Saldo" onclick="window.app.openBalanceAdjustmentModal(${conta.id})"><i class="fas fa-calculator"></i></button>`;
+            } else if (conta.tipo === 'Cartão de Crédito') {
+                botoesEspecificos = `<button class="btn-icon" title="Ver Fatura" onclick="window.app.openCreditCardStatementModal(${conta.id})"><i class="fas fa-file-invoice"></i></button>`;
+            }
+    
             return `<div class="account-item">
                         <div class="account-details">
                             <span class="account-name">${conta.nome}</span>
@@ -131,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <div class="account-actions">
                             <span class="account-balance" style="color: ${corSaldo}; margin-right: 0.5rem;">${formatarMoeda(saldo)}</span>
-                            ${botaoAjusteHTML}
+                            ${botoesEspecificos}
                             <button class="btn-icon" title="Editar Conta" onclick="window.app.openAccountModal(${conta.id})"><i class="fas fa-pencil-alt"></i></button>
                             <button class="btn-icon" title="Deletar Conta" onclick="window.app.deletarConta(${conta.id})"><i class="fas fa-trash-alt"></i></button>
                         </div>
@@ -263,7 +269,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filtroDataFim) transacoesFiltradas = transacoesFiltradas.filter(t => t.data <= filtroDataFim);
         if (filtroDescricao) transacoesFiltradas = transacoesFiltradas.filter(t => t.descricao.toLowerCase().includes(filtroDescricao));
         
-        // --- INÍCIO DA LÓGICA DO RESUMO ---
         const totalReceitasFiltradas = transacoesFiltradas
             .filter(t => t.tipo === 'receita')
             .reduce((acc, t) => acc + t.valor, 0);
@@ -284,7 +289,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span>Saldo: <strong class="${corSaldo}">${formatarMoeda(saldoFiltrado)}</strong></span>
                 </div>`;
         }
-        // --- FIM DA LÓGICA DO RESUMO ---
 
         const transacoesParaRenderizar = transacoesFiltradas.slice(0, transacoesVisiveisCount);
 
@@ -773,9 +777,120 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // NOVA FUNÇÃO
+    const openCreditCardStatementModal = (accountId) => {
+        const conta = contasCache.find(c => c.id === accountId);
+        if (!conta || conta.tipo !== 'Cartão de Crédito' || !conta.dia_fechamento_cartao || !conta.dia_vencimento_cartao) {
+            showToast("Esta conta não é um cartão de crédito ou não possui dia de fechamento/vencimento configurado.", "error");
+            return;
+        }
+    
+        const transacoesDoCartao = transacoesCache.filter(t => t.conta_id === accountId && t.tipo === 'despesa');
+    
+        if (transacoesDoCartao.length === 0) {
+            showToast("Nenhuma despesa encontrada para este cartão.", "info");
+            return;
+        }
+        
+        // Agrupa transações por fatura
+        const faturas = transacoesDoCartao.reduce((acc, t) => {
+            const dataTransacao = new Date(t.data + 'T12:00:00');
+            const diaTransacao = dataTransacao.getDate();
+            
+            let anoFatura = dataTransacao.getFullYear();
+            let mesFatura = dataTransacao.getMonth(); // 0-11
+    
+            if (diaTransacao > conta.dia_fechamento_cartao) {
+                mesFatura += 1;
+            }
+            
+            const dataVencimento = new Date(anoFatura, mesFatura + 1, conta.dia_vencimento_cartao);
+            const chaveFatura = `${dataVencimento.getFullYear()}-${(dataVencimento.getMonth() + 1).toString().padStart(2, '0')}`;
+    
+            if (!acc[chaveFatura]) {
+                acc[chaveFatura] = {
+                    transacoes: [],
+                    dataVencimento: dataVencimento,
+                    dataFechamento: new Date(dataVencimento.getFullYear(), dataVencimento.getMonth(), conta.dia_fechamento_cartao)
+                };
+            }
+            acc[chaveFatura].transacoes.push(t);
+            return acc;
+        }, {});
+        
+        const chavesFaturasOrdenadas = Object.keys(faturas).sort().reverse();
+        
+        // Monta o HTML do Modal
+        let tabsHTML = '';
+        let contentsHTML = '';
+        
+        chavesFaturasOrdenadas.forEach((chave, index) => {
+            const fatura = faturas[chave];
+            const nomeMes = fatura.dataVencimento.toLocaleString('pt-BR', { month: 'long' });
+            const isActive = index === 0 ? 'active' : '';
+    
+            tabsHTML += `<button class="statement-tab-button ${isActive}" data-target="fatura-${chave}">${nomeMes}</button>`;
+            
+            const totalFatura = fatura.transacoes.reduce((sum, t) => sum + t.valor, 0);
+            
+            const transacoesHTML = fatura.transacoes
+                .sort((a, b) => new Date(a.data) - new Date(b.data))
+                .map(t => {
+                    const dataFormatada = new Date(t.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+                    return `<div class="transaction-row">
+                                <span class="transaction-row-date">${dataFormatada}</span>
+                                <span class="transaction-row-desc">${t.descricao}</span>
+                                <span class="transaction-row-amount">${formatarMoeda(t.valor)}</span>
+                            </div>`;
+                }).join('');
+    
+            contentsHTML += `<div class="statement-tab-content ${isActive}" id="fatura-${chave}">
+                <div class="invoice-summary">
+                    <div>
+                        <span>Total da Fatura</span>
+                        <strong class="expense-text">${formatarMoeda(totalFatura)}</strong>
+                    </div>
+                    <div>
+                        <span>Vencimento</span>
+                        <strong>${fatura.dataVencimento.toLocaleDateString('pt-BR')}</strong>
+                    </div>
+                </div>
+                <div class="transaction-list">${transacoesHTML}</div>
+            </div>`;
+        });
+    
+        const modalContent = `
+            <div class="statement-modal-header">
+                <h3>${conta.nome}</h3>
+                <p>Extrato de Faturas</p>
+            </div>
+            <div class="statement-tabs">${tabsHTML}</div>
+            <div class="statement-content-wrapper">${contentsHTML}</div>
+        `;
+        
+        openModal(modalContent);
+        
+        // Adiciona o event listener para as abas
+        document.querySelectorAll('.statement-tab-button').forEach(button => {
+            button.addEventListener('click', () => {
+                document.querySelectorAll('.statement-tab-button').forEach(btn => btn.classList.remove('active'));
+                document.querySelectorAll('.statement-tab-content').forEach(content => content.classList.remove('active'));
+                button.classList.add('active');
+                document.getElementById(button.dataset.target).classList.add('active');
+            });
+        });
+    };
+
     // --- INICIALIZAÇÃO E EVENT LISTENERS ---
     const initializeApp = async () => {
-        window.app = { openAccountModal, deletarConta, openBillModal, deletarLancamentoFuturo, openPayBillModal, renderHistoricoTransacoes, openBalanceAdjustmentModal, openTransactionModal, deletarTransacao, aplicarFiltrosHistorico, closeModal };
+        // REGISTRO ATUALIZADO
+        window.app = { 
+            openAccountModal, deletarConta, 
+            openBillModal, deletarLancamentoFuturo, openPayBillModal, 
+            renderHistoricoTransacoes, openBalanceAdjustmentModal, 
+            openTransactionModal, deletarTransacao, aplicarFiltrosHistorico, 
+            closeModal, openCreditCardStatementModal 
+        };
 
         document.getElementById('theme-switcher').addEventListener('click', () => {
             const currentTheme = document.documentElement.getAttribute('data-theme');
