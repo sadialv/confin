@@ -1,3 +1,5 @@
+// A função 'renderHistoricoTransacoes' foi totalmente reescrita para corrigir a exibição de datas vazias.
+// As demais funções permanecem como na versão anterior.
 document.addEventListener('DOMContentLoaded', () => {
     // --- CONFIGURAÇÃO E ESTADO GLOBAL ---
     const SUPABASE_URL = 'https://fjrpiikhbsvauzbdugtd.supabase.co';
@@ -103,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- FUNÇÃO HELPER ATUALIZADA ---
+    // --- FUNÇÃO HELPER ---
     const gerarTransacoesVirtuaisDeParcelas = () => {
         const transacoesVirtuais = [];
         comprasParceladasCache.forEach(compra => {
@@ -115,16 +117,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             parcelas.forEach(parcela => {
                 const numeroDaParcelaMatch = parcela.descricao.match(/\((\d+)\/\d+\)/);
-                if (!numeroDaParcelaMatch) return; // Pula se não encontrar o número da parcela na descrição
+                if (!numeroDaParcelaMatch) return;
 
                 const numeroDaParcela = parseInt(numeroDaParcelaMatch[1]);
                 let dataDaParcela;
 
-                // A primeira parcela mantém a data original da compra.
                 if (numeroDaParcela === 1) {
                     dataDaParcela = dataOriginalCompra;
                 } else {
-                    // As parcelas seguintes são calculadas como um mês após a parcela anterior, mantendo o dia.
                     dataDaParcela = new Date(dataOriginalCompra.getFullYear(), dataOriginalCompra.getMonth() + (numeroDaParcela - 1), dataOriginalCompra.getDate());
                 }
 
@@ -132,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     id: `v_${parcela.id}`,
                     descricao: parcela.descricao,
                     valor: parcela.valor,
-                    data: toISODateString(dataDaParcela), // Usa a data calculada corretamente
+                    data: toISODateString(dataDaParcela),
                     categoria: compra.categoria,
                     tipo: 'despesa',
                     conta_id: compra.conta_id,
@@ -253,6 +253,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const [year, month] = monthKey.split('-');
             const monthName = new Date(year, month - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
             
+            const totalAPagar = items.filter(l => l.tipo === 'a_pagar').reduce((acc, l) => acc + l.valor, 0);
+            const totalAReceber = items.filter(l => l.tipo === 'a_receber').reduce((acc, l) => acc + l.valor, 0);
+            const saldoMes = totalAReceber - totalAPagar;
+            const corSaldo = saldoMes >= 0 ? 'income-text' : 'expense-text';
+            
+            const summaryHTML = `
+                <div class="monthly-summary">
+                    ${totalAReceber > 0 ? `<span>A receber: <strong class="income-text">${formatarMoeda(totalAReceber)}</strong></span>` : ''}
+                    ${totalAPagar > 0 ? `<span>A pagar: <strong class="expense-text">${formatarMoeda(totalAPagar)}</strong></span>` : ''}
+                    <span>Saldo: <strong class="${corSaldo}">${formatarMoeda(saldoMes)}</strong></span>
+                </div>`;
+
             let contentHTML = items.map(l => {
                 const isVencido = new Date(l.data_vencimento) < HOJE;
                 const corValor = l.tipo === 'a_receber' ? 'income-text' : 'expense-text';
@@ -262,7 +274,15 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const isOpen = monthKey === getSelectedMonth() ? 'open' : '';
             const clickHandler = `this.parentElement.classList.toggle('open'); const content = this.nextElementSibling; content.style.maxHeight = this.parentElement.classList.contains('open') ? content.scrollHeight + 'px' : null;`;
-            accordionHTML += `<div class="monthly-group ${isOpen}"><div class="monthly-header" onclick="${clickHandler}"><h3>${monthName}</h3><i class="fas fa-chevron-down chevron-icon"></i></div><div class="monthly-content">${contentHTML}</div></div>`;
+            
+            accordionHTML += `<div class="monthly-group ${isOpen}">
+                                <div class="monthly-header" onclick="${clickHandler}">
+                                    <h3>${monthName}</h3>
+                                    ${summaryHTML}
+                                    <i class="fas fa-chevron-down chevron-icon"></i>
+                                </div>
+                                <div class="monthly-content">${contentHTML}</div>
+                              </div>`;
         }
         
         container.innerHTML = accordionHTML;
@@ -286,10 +306,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const aplicarFiltrosHistorico = () => {
-        transacoesVisiveisCount = ITENS_POR_PAGINA;
         renderHistoricoTransacoes();
     };
 
+    // FUNÇÃO ATUALIZADA - Lógica de renderização corrigida para não criar cabeçalhos de data vazios
     const renderHistoricoTransacoes = () => {
         const container = document.getElementById('tab-history');
         const filtroConta = document.getElementById('filtroConta')?.value;
@@ -314,16 +334,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filtroCategoria) transacoesFiltradas = transacoesFiltradas.filter(t => t.categoria === filtroCategoria);
         if (filtroDataInicio) transacoesFiltradas = transacoesFiltradas.filter(t => t.data >= filtroDataInicio);
         if (filtroDataFim) transacoesFiltradas = transacoesFiltradas.filter(t => t.data <= filtroDataFim);
-        if (filtroDescricao) transacoesFiltradas = transacoesFiltradas.filter(t => t.descricao.toLowerCase().includes(filtroDescricao));
+        if (filtroDescricao) {
+            const comprasParceladasFiltradas = comprasParceladasCache
+                .filter(c => c.descricao.toLowerCase().includes(filtroDescricao))
+                .map(c => c.id);
+
+            transacoesFiltradas = transacoesFiltradas.filter(t => 
+                t.descricao.toLowerCase().includes(filtroDescricao) || 
+                (t.isVirtual && comprasParceladasFiltradas.includes(t.compraParceladaId))
+            );
+        }
         
-        const totalReceitasFiltradas = transacoesFiltradas
-            .filter(t => t.tipo === 'receita')
-            .reduce((acc, t) => acc + t.valor, 0);
-
-        const totalDespesasFiltradas = transacoesFiltradas
-            .filter(t => t.tipo === 'despesa')
-            .reduce((acc, t) => acc + t.valor, 0);
-
+        const totalReceitasFiltradas = transacoesFiltradas.filter(t => t.tipo === 'receita').reduce((acc, t) => acc + t.valor, 0);
+        const totalDespesasFiltradas = transacoesFiltradas.filter(t => t.tipo === 'despesa').reduce((acc, t) => acc + t.valor, 0);
         const saldoFiltrado = totalReceitasFiltradas - totalDespesasFiltradas;
         const corSaldo = saldoFiltrado >= 0 ? 'income-text' : 'expense-text';
 
@@ -337,58 +360,96 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`;
         }
 
-        const transacoesParaRenderizar = transacoesFiltradas.slice(0, transacoesVisiveisCount);
-
-        let listHTML;
-        if (transacoesParaRenderizar.length === 0) {
+        let listHTML = '';
+        if (transacoesFiltradas.length === 0) {
             listHTML = '<p style="text-align:center; color: var(--text-secondary); padding: 2rem 0;">Nenhuma transação encontrada.</p>';
         } else {
             let diaAtual = null;
-            listHTML = transacoesParaRenderizar.map(t => {
-                let headerHTML = '';
-                if (t.data !== diaAtual) {
-                    diaAtual = t.data;
-                    const dataFormatada = new Date(diaAtual + 'T03:00:00Z').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
-                    headerHTML = `<div class="date-header">${dataFormatada}</div>`;
-                }
-                const conta = contasCache.find(c => c.id === t.conta_id);
-                const categoriaInfo = CATEGORY_ICONS[t.categoria] || CATEGORY_ICONS['Outros'];
-                const valorSinal = t.tipo === 'receita' ? '+' : '-';
-                
-                let actionsHTML = '';
+            const comprasProcessadas = new Set();
+
+            for(const t of transacoesFiltradas) {
+                let itemHTML = '';
+                let itemDate = t.data;
+                let deveRenderizar = false;
+
                 if (t.isVirtual) {
-                    actionsHTML = `<div class="transaction-actions">
-                                     <button class="btn-icon" title="Editar Compra Parcelada" onclick="window.app.openEditInstallmentModal(${t.compraParceladaId})">
-                                         <i class="fas fa-pencil-alt"></i>
-                                     </button>
-                                     <button class="btn-icon" title="Deletar Compra Parcelada Completa" onclick="window.app.deletarCompraParcelada(${t.compraParceladaId})">
-                                         <i class="fas fa-trash-alt"></i>
-                                     </button>
-                                   </div>`;
+                    if (!comprasProcessadas.has(t.compraParceladaId)) {
+                        deveRenderizar = true;
+                        comprasProcessadas.add(t.compraParceladaId);
+                        
+                        const compraMae = comprasParceladasCache.find(c => c.id === t.compraParceladaId);
+                        const todasAsParcelasVirtuais = transacoesCompletas.filter(item => item.isVirtual && item.compraParceladaId === t.compraParceladaId);
+                        const conta = contasCache.find(c => c.id === compraMae.conta_id);
+                        const categoriaInfo = CATEGORY_ICONS[compraMae.categoria] || CATEGORY_ICONS['Outros'];
+
+                        const parcelasHTML = todasAsParcelasVirtuais.map(parcela => {
+                            return `<div class="transaction-card" style="padding-left: 2.5rem; border-top: 1px solid var(--border-color);">
+                                        <div class="transaction-details" style="gap: 1rem;">
+                                            <span style="font-size: 0.8rem; color: var(--text-secondary);">${new Date(parcela.data + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+                                            <div class="transaction-description">${parcela.descricao}</div>
+                                        </div>
+                                        <div class="transaction-amount expense-text">${formatarMoeda(parcela.valor)}</div>
+                                    </div>`;
+                        }).join('');
+
+                        const clickHandler = `this.parentElement.classList.toggle('open'); const content = this.nextElementSibling; content.style.maxHeight = this.parentElement.classList.contains('open') ? content.scrollHeight + 'px' : null;`;
+
+                        itemHTML = `
+                        <div class="monthly-group" style="margin-bottom: 0; border-radius: 0; border-left: none; border-right: none; border-top: none;">
+                            <div class="monthly-header transaction-card" onclick="${clickHandler}" style="padding: 1rem 0; margin:0; background: none; border-bottom: none;">
+                                <div class="transaction-icon" style="background-color: ${categoriaInfo.color};"><i class="${categoriaInfo.icon}"></i></div>
+                                <div class="transaction-details">
+                                    <div class="transaction-description">${compraMae.descricao}</div>
+                                    <div class="transaction-meta">${conta?.nome || 'N/A'} • ${compraMae.categoria}</div>
+                                </div>
+                                <div class="transaction-amount">
+                                    ${compraMae.numero_parcelas}x ${formatarMoeda(compraMae.valor_total / compraMae.numero_parcelas)}
+                                </div>
+                                <div class="transaction-actions">
+                                    <button class="btn-icon" title="Editar Compra Parcelada" onclick="event.stopPropagation(); window.app.openEditInstallmentModal(${compraMae.id})"><i class="fas fa-pencil-alt"></i></button>
+                                    <button class="btn-icon" title="Deletar Compra Parcelada Completa" onclick="event.stopPropagation(); window.app.deletarCompraParcelada(${compraMae.id})"><i class="fas fa-trash-alt"></i></button>
+                                </div>
+                                 <i class="fas fa-chevron-down chevron-icon"></i>
+                            </div>
+                            <div class="monthly-content">${parcelasHTML}</div>
+                        </div>`;
+                    }
                 } else {
-                    actionsHTML = `<div class="transaction-actions">
-                                     <button class="btn-icon" title="Editar Transação" onclick="window.app.openTransactionModal(${t.id})"><i class="fas fa-pencil-alt"></i></button>
-                                     <button class="btn-icon" title="Deletar Transação" onclick="window.app.deletarTransacao(${t.id})"><i class="fas fa-trash-alt"></i></button>
-                                   </div>`;
+                    deveRenderizar = true;
+                    itemHTML = renderTransactionCard(t);
                 }
 
-                return headerHTML + `<div class="transaction-card"><div class="transaction-icon" style="background-color: ${categoriaInfo.color};"><i class="${categoriaInfo.icon}"></i></div><div class="transaction-details"><div class="transaction-description">${t.descricao}</div><div class="transaction-meta">${conta?.nome || 'N/A'} • ${t.categoria || ''}</div></div><div class="transaction-amount ${t.tipo === 'receita' ? 'income-text' : 'expense-text'}">${valorSinal} ${formatarMoeda(t.valor)}</div>${actionsHTML}</div>`;
-            }).join('');
+                if (deveRenderizar) {
+                    if (itemDate !== diaAtual) {
+                        diaAtual = itemDate;
+                        const dataFormatada = new Date(diaAtual + 'T03:00:00Z').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+                        listHTML += `<div class="date-header">${dataFormatada}</div>`;
+                    }
+                    listHTML += itemHTML;
+                }
+            }
         }
         
-        container.innerHTML = filtersHTML + summaryHTML + listHTML;
+        container.innerHTML = filtersHTML + summaryHTML + `<div class="transaction-list-container">${listHTML}</div>`;
+    };
 
-        if (transacoesVisiveisCount < transacoesFiltradas.length) {
-            const loadMoreButton = document.createElement('button');
-            loadMoreButton.textContent = 'Carregar Mais Transações';
-            loadMoreButton.className = 'btn btn-secondary';
-            loadMoreButton.style.marginTop = '1.5rem';
-            loadMoreButton.onclick = () => {
-                transacoesVisiveisCount += ITENS_POR_PAGINA;
-                renderHistoricoTransacoes();
-            };
-            container.appendChild(loadMoreButton);
-        }
+    const renderTransactionCard = (t) => {
+        const conta = contasCache.find(c => c.id === t.conta_id);
+        const categoriaInfo = CATEGORY_ICONS[t.categoria] || CATEGORY_ICONS['Outros'];
+        const valorSinal = t.tipo === 'receita' ? '+' : '-';
+        const actionsHTML = `<div class="transaction-actions">
+                                <button class="btn-icon" title="Editar Transação" onclick="window.app.openTransactionModal(${t.id})"><i class="fas fa-pencil-alt"></i></button>
+                                <button class="btn-icon" title="Deletar Transação" onclick="window.app.deletarTransacao(${t.id})"><i class="fas fa-trash-alt"></i></button>
+                            </div>`;
+        return `<div class="transaction-card">
+                    <div class="transaction-icon" style="background-color: ${categoriaInfo.color};"><i class="${categoriaInfo.icon}"></i></div>
+                    <div class="transaction-details">
+                        <div class="transaction-description">${t.descricao}</div>
+                        <div class="transaction-meta">${conta?.nome || 'N/A'} • ${t.categoria || ''}</div>
+                    </div>
+                    <div class="transaction-amount ${t.tipo === 'receita' ? 'income-text' : 'expense-text'}">${valorSinal} ${formatarMoeda(t.valor)}</div>
+                    ${actionsHTML}
+                </div>`;
     };
 
     const renderFormTransacaoRapida = () => {
@@ -404,13 +465,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- LÓGICA DE AÇÕES ---
     
-    // As funções daqui para baixo não foram alteradas nesta rodada, exceto pela adição das novas funções de edição
-    // e o registro delas na função initializeApp no final do arquivo.
-    
-    // ... (As funções de openAccountModal, salvarConta, deletarConta, etc. permanecem as mesmas) ...
-    
-    // --- COPIE A PARTIR DAQUI ATÉ O FIM DO ARQUIVO ---
-
+    // O restante das funções permanece o mesmo
     const openAccountModal = (id = null) => {
         const isEditing = id !== null;
         const conta = isEditing ? contasCache.find(c => c.id == id) : {};
