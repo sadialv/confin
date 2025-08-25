@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let mesesVisiveis = 3; 
     let transacoesVisiveisCount = 20;
     const ITENS_POR_PAGINA = 20;
-    const CATEGORIAS_PADRAO = ['Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Lazer', 'Educação', 'Salário', 'Investimentos', 'Contas', 'Ajustes', 'Outros', 'Compras'];
+    const CATEGORIAS_PADRAO = ['Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Lazer', 'Educação', 'Salário', 'Investimentos', 'Contas', 'Ajustes', 'Pagamento de Fatura', 'Outros', 'Compras'];
     
     const CATEGORY_ICONS = {
         'Alimentação': { icon: 'fas fa-utensils', color: '#f97316' }, 'Transporte': { icon: 'fas fa-car', color: '#3b82f6' },
@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Salário': { icon: 'fas fa-dollar-sign', color: '#22c55e' }, 'Investimentos': { icon: 'fas fa-chart-line', color: '#eab308' },
         'Contas': { icon: 'fas fa-file-invoice', color: '#64748b' }, 'Compras': { icon: 'fas fa-shopping-bag', color: '#d946ef' },
         'Ajustes': { icon: 'fas fa-sliders-h', color: '#78716c' },
+        'Pagamento de Fatura': { icon: 'fas fa-receipt', color: '#0ea5e9' },
         'Outros': { icon: 'fas fa-ellipsis-h', color: '#94a3b8' }
     };
     
@@ -101,6 +102,35 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast(`Erro ao carregar dados: ${error.message}`, 'error');
         }
     };
+
+    // --- NOVA FUNÇÃO HELPER ---
+    // Cria "transações virtuais" para cada parcela futura de um cartão de crédito.
+    const gerarTransacoesVirtuaisDeParcelas = () => {
+        const transacoesVirtuais = [];
+        comprasParceladasCache.forEach(compra => {
+            const cartao = contasCache.find(c => c.id === compra.conta_id);
+            if (!cartao || !cartao.dia_fechamento_cartao) return; // Pula se a compra não for de um cartão configurado
+
+            const parcelas = lancamentosFuturosCache.filter(l => l.compra_parcelada_id === compra.id);
+            parcelas.forEach(parcela => {
+                const dataVencimento = new Date(parcela.data_vencimento + 'T12:00:00');
+                // Calcula uma data representativa para que a "compra" da parcela caia no mês correto da fatura
+                const dataRepresentativa = new Date(dataVencimento.getFullYear(), dataVencimento.getMonth() - 1, cartao.dia_fechamento_cartao + 1);
+
+                transacoesVirtuais.push({
+                    id: `v_${parcela.id}`, // ID virtual para evitar conflitos de chave
+                    descricao: parcela.descricao,
+                    valor: parcela.valor,
+                    data: toISODateString(dataRepresentativa),
+                    categoria: compra.categoria,
+                    tipo: 'despesa',
+                    conta_id: compra.conta_id,
+                    isVirtual: true // Flag para identificar que não é uma transação real
+                });
+            });
+        });
+        return transacoesVirtuais;
+    };
     
     // --- FUNÇÕES DE RENDERIZAÇÃO ---
     const renderAllComponents = () => {
@@ -111,7 +141,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderFormTransacaoRapida();
     };
 
-    // FUNÇÃO ATUALIZADA
     const renderContas = () => {
         const container = document.getElementById('accounts-container');
         if (!contasCache || contasCache.length === 0) {
@@ -172,10 +201,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!ctx) return;
         if (expenseChart) expenseChart.destroy();
         
-        const expensesByCategory = transactions.filter(t => t.tipo === 'despesa').reduce((acc, t) => {
-            acc[t.categoria] = (acc[t.categoria] || 0) + t.valor;
-            return acc;
-        }, {});
+        const expensesByCategory = transactions
+            .filter(t => t.tipo === 'despesa' && t.categoria !== 'Pagamento de Fatura')
+            .reduce((acc, t) => {
+                acc[t.categoria] = (acc[t.categoria] || 0) + t.valor;
+                return acc;
+            }, {});
         
         const labels = Object.keys(expensesByCategory);
         const data = Object.values(expensesByCategory);
@@ -224,7 +255,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         container.innerHTML = accordionHTML;
 
-        // Ativa o acordeão para o mês atual, se estiver aberto
         const openGroupContent = container.querySelector('.monthly-group.open .monthly-content');
         if (openGroupContent) {
             openGroupContent.style.maxHeight = openGroupContent.scrollHeight + "px";
@@ -248,6 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderHistoricoTransacoes();
     };
 
+    // FUNÇÃO ATUALIZADA - Agora usa transações reais e virtuais
     const renderHistoricoTransacoes = () => {
         const container = document.getElementById('tab-history');
         const filtroConta = document.getElementById('filtroConta')?.value;
@@ -257,12 +288,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const filtroDescricao = document.getElementById('filtroDescricao')?.value.toLowerCase() || '';
 
         const contasOptions = contasCache.map(c => `<option value="${c.id}" ${filtroConta == c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
-        const uniqueCategories = [...new Set(transacoesCache.map(t => t.categoria).filter(Boolean))].sort();
+        
+        // Gera a lista completa de transações (reais + virtuais)
+        const transacoesVirtuais = gerarTransacoesVirtuaisDeParcelas();
+        const transacoesCompletas = [...transacoesCache, ...transacoesVirtuais]
+            .sort((a, b) => new Date(b.data) - new Date(a.data));
+
+        const uniqueCategories = [...new Set(transacoesCompletas.map(t => t.categoria).filter(Boolean))].sort();
         const categoriasOptions = uniqueCategories.map(c => `<option value="${c}" ${filtroCategoria == c ? 'selected' : ''}>${c}</option>`).join('');
         
         const filtersHTML = `<div class="filters-container"><div class="form-group"><label>Buscar Descrição</label><input type="search" id="filtroDescricao" oninput="window.app.aplicarFiltrosHistorico()" value="${filtroDescricao}"></div><div class="form-group"><label>Conta</label><select id="filtroConta" onchange="window.app.aplicarFiltrosHistorico()"><option value="">Todas</option>${contasOptions}</select></div><div class="form-group"><label>Categoria</label><select id="filtroCategoria" onchange="window.app.aplicarFiltrosHistorico()"><option value="">Todas</option>${categoriasOptions}</select></div><div class="form-group"><label>De:</label><input type="date" id="filtroDataInicio" onchange="window.app.aplicarFiltrosHistorico()" value="${filtroDataInicio || ''}"></div><div class="form-group"><label>Até:</label><input type="date" id="filtroDataFim" onchange="window.app.aplicarFiltrosHistorico()" value="${filtroDataFim || ''}"></div></div>`;
 
-        let transacoesFiltradas = transacoesCache;
+        // Aplica os filtros na lista completa
+        let transacoesFiltradas = transacoesCompletas;
         if (filtroConta) transacoesFiltradas = transacoesFiltradas.filter(t => t.conta_id == filtroConta);
         if (filtroCategoria) transacoesFiltradas = transacoesFiltradas.filter(t => t.categoria === filtroCategoria);
         if (filtroDataInicio) transacoesFiltradas = transacoesFiltradas.filter(t => t.data >= filtroDataInicio);
@@ -307,7 +345,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const conta = contasCache.find(c => c.id === t.conta_id);
                 const categoriaInfo = CATEGORY_ICONS[t.categoria] || CATEGORY_ICONS['Outros'];
                 const valorSinal = t.tipo === 'receita' ? '+' : '-';
-                const actionsHTML = `<div class="transaction-actions"><button class="btn-icon" title="Editar Transação" onclick="window.app.openTransactionModal(${t.id})"><i class="fas fa-pencil-alt"></i></button><button class="btn-icon" title="Deletar Transação" onclick="window.app.deletarTransacao(${t.id})"><i class="fas fa-trash-alt"></i></button></div>`;
+                // Ações de editar/deletar são desabilitadas para transações virtuais (parcelas)
+                const actionsHTML = t.isVirtual 
+                    ? '' 
+                    : `<div class="transaction-actions">
+                         <button class="btn-icon" title="Editar Transação" onclick="window.app.openTransactionModal(${t.id})"><i class="fas fa-pencil-alt"></i></button>
+                         <button class="btn-icon" title="Deletar Transação" onclick="window.app.deletarTransacao(${t.id})"><i class="fas fa-trash-alt"></i></button>
+                       </div>`;
+
                 return headerHTML + `<div class="transaction-card"><div class="transaction-icon" style="background-color: ${categoriaInfo.color};"><i class="${categoriaInfo.icon}"></i></div><div class="transaction-details"><div class="transaction-description">${t.descricao}</div><div class="transaction-meta">${conta?.nome || 'N/A'} • ${t.categoria || ''}</div></div><div class="transaction-amount ${t.tipo === 'receita' ? 'income-text' : 'expense-text'}">${valorSinal} ${formatarMoeda(t.valor)}</div>${actionsHTML}</div>`;
             }).join('');
         }
@@ -339,6 +384,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     // --- LÓGICA DE AÇÕES ---
+    // (O resto do arquivo continua daqui para baixo, com as funções openAccountModal, salvarConta, etc...)
+    // A única função que muda, além da renderHistoricoTransacoes, é a salvarCompraParcelada.
+
     const openAccountModal = (id = null) => {
         const isEditing = id !== null;
         const conta = isEditing ? contasCache.find(c => c.id == id) : {};
@@ -415,7 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const openBillModal = (id = null) => {
         const isEditing = id !== null;
         const bill = isEditing ? lancamentosFuturosCache.find(l => l.id == id) : {};
-        const content = `<div class="card-header"><div class="card-header-title"><h2>${isEditing ? 'Editar' : 'Novo'} Lançamento</h2></div></div><form id="formBill"><input type="hidden" id="b_id" value="${bill.id || ''}"><div class="form-group"><label>Descrição</label><input id="b_descricao" type="text" value="${bill.descricao || ''}" required></div><div class="form-group"><label>Valor</label><input id="b_valor" type="number" step="0.01" value="${bill.valor || ''}" required></div><div class="form-group"><label>Data de Vencimento</label><input id="b_vencimento" type="date" value="${bill.data_vencimento || toISODateString(new Date())}" required></div><div class="form-group"><label>Categoria</label><select id="b_categoria">${CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${bill.categoria === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div><div class="form-group"><label>Tipo</label><select id="b_tipo"><option value="a_pagar" ${bill.tipo === 'a_pagar' ? 'selected' : ''}>Conta a Pagar</option><option value="a_receber" ${bill.tipo === 'a_receber' ? 'selected' : ''}>Conta a Receber</option></select></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="window.app.closeModal()">Cancelar</button><button type="submit" class="btn">${isEditing ? 'Salvar' : 'Adicionar'}</button></div></form>`;
+        const content = `<div class="card-header"><div class="card-header-title"><h2>${isEditing ? 'Editar' : 'Novo'} Lançamento</h2></div></div><form id="formBill"><input type="hidden" id="b_id" value="${bill.id || ''}"><div class="form-group"><label>Descrição</label><input id="b_descricao" type="text" value="${bill.descricao || ''}" required></div><div class="form-group"><label>Valor</label><input type="number" step="0.01" value="${bill.valor || ''}" required></div><div class="form-group"><label>Data de Vencimento</label><input id="b_vencimento" type="date" value="${bill.data_vencimento || toISODateString(new Date())}" required></div><div class="form-group"><label>Categoria</label><select id="b_categoria">${CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${bill.categoria === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div><div class="form-group"><label>Tipo</label><select id="b_tipo"><option value="a_pagar" ${bill.tipo === 'a_pagar' ? 'selected' : ''}>Conta a Pagar</option><option value="a_receber" ${bill.tipo === 'a_receber' ? 'selected' : ''}>Conta a Receber</option></select></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="window.app.closeModal()">Cancelar</button><button type="submit" class="btn">${isEditing ? 'Salvar' : 'Adicionar'}</button></div></form>`;
         openModal(content);
         document.getElementById('formBill').addEventListener('submit', salvarLancamentoFuturo);
     };
@@ -485,19 +533,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const submitButton = form.querySelector('button[type="submit"]');
         const originalText = submitButton.textContent;
         setLoadingState(submitButton, true, 'Confirmando...');
-
+    
         try {
             const billId = form.querySelector('#pay_bill_id').value;
             const bill = lancamentosFuturosCache.find(b => b.id == billId);
             const contaId = form.querySelector('#pc_conta_id').value;
             const dataPagamento = form.querySelector('#pc_data').value;
             
+            const isInstallmentPayment = !!bill.compra_parcelada_id;
+            
             const novaTransacao = {
-                descricao: bill.descricao,
+                descricao: isInstallmentPayment ? `Pagamento Fatura: ${bill.descricao}` : bill.descricao,
                 valor: bill.valor,
                 data: dataPagamento,
                 tipo: bill.tipo === 'a_pagar' ? 'despesa' : 'receita',
-                categoria: bill.categoria,
+                categoria: isInstallmentPayment ? 'Pagamento de Fatura' : bill.categoria,
                 conta_id: contaId,
                 lancamento_futuro_id: bill.id
             };
@@ -507,16 +557,13 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const { error: billError } = await clienteSupabase.from('lancamentos_futuros').update({ status: 'pago' }).eq('id', bill.id);
             if (billError) throw billError;
-
-            transacoesCache.unshift(transacao);
-            transacoesCache.sort((a,b) => new Date(b.data) - new Date(a.data));
-            const billIndex = lancamentosFuturosCache.findIndex(l => l.id == billId);
-            if(billIndex > -1) lancamentosFuturosCache.splice(billIndex, 1);
+    
+            await carregarDadosIniciais();
             
             closeModal();
             showToast('Operação confirmada com sucesso!');
             renderAllComponents();
-
+    
         } catch(error) {
             showToast('Erro ao processar operação: ' + error.message, 'error');
         } finally {
@@ -549,18 +596,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isEditing) {
                 const { data, error } = await clienteSupabase.from('transacoes').update(dadosTransacao).eq('id', id).select().single();
                 if (error) throw error;
-                const index = transacoesCache.findIndex(tr => tr.id == id);
-                if (index > -1) transacoesCache[index] = data;
             } else {
                 if (!dadosTransacao.conta_id) throw new Error("Nenhuma conta selecionada.");
                 const { data, error } = await clienteSupabase.from('transacoes').insert(dadosTransacao).select().single();
                 if (error) throw error;
-                transacoesCache.unshift(data);
                 form.reset();
                 form.querySelector(`#t_data${prefix}`).value = toISODateString(HOJE);
             }
 
-            transacoesCache.sort((a, b) => new Date(b.data) - new Date(a.data));
+            await carregarDadosIniciais();
             if(isEditing) closeModal();
             showToast(`Transação ${isEditing ? 'atualizada' : 'adicionada'} com sucesso!`);
             renderAllComponents();
@@ -588,11 +632,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (error) {
                 showToast(error.message, 'error');
             } else {
-                transacoesCache = transacoesCache.filter(t => t.id !== id);
+                await carregarDadosIniciais();
                 showToast('Transação deletada com sucesso!');
-                renderContas();
-                renderSummary();
-                aplicarFiltrosHistorico();
+                renderAllComponents();
             }
         }
     };
@@ -604,7 +646,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         const cartoesOptions = cartoesDeCredito.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
-        const categoriasOptions = CATEGORIAS_PADRAO.filter(c => c !== 'Salário').map(c => `<option value="${c}" ${c === 'Compras' ? 'selected' : ''}>${c}</option>`).join('');
+        const categoriasOptions = CATEGORIAS_PADRAO.filter(c => c !== 'Salário' && c !== 'Pagamento de Fatura').map(c => `<option value="${c}" ${c === 'Compras' ? 'selected' : ''}>${c}</option>`).join('');
         const content = `<div class="card-header"><div class="card-header-title"><h2>Registrar Compra Parcelada</h2></div></div><form id="formCompraParcelada"><div class="form-group"><label for="cp_descricao">Descrição</label><input type="text" id="cp_descricao" required></div><div class="form-group"><label for="cp_valor_total">Valor Total da Compra</label><input type="number" id="cp_valor_total" step="0.01" min="0.01" required></div><div class="form-group"><label for="cp_num_parcelas">Número de Parcelas</label><input type="number" id="cp_num_parcelas" step="1" min="1" value="1" required></div><div class="form-group"><label for="cp_data_compra">Data da Compra</label><input type="date" id="cp_data_compra" value="${toISODateString(new Date())}" required></div><div class="form-group"><label for="cp_conta_id">Cartão de Crédito</label><select id="cp_conta_id" required>${cartoesOptions}</select></div><div class="form-group"><label for="cp_categoria">Categoria</label><select id="cp_categoria" required>${categoriasOptions}</select></div><div class="form-actions"><button type="button" class="btn btn-secondary" onclick="window.app.closeModal()">Cancelar</button><button type="submit" class="btn">Salvar Compra</button></div></form>`;
         openModal(content);
         document.getElementById('formCompraParcelada').addEventListener('submit', salvarCompraParcelada);
@@ -621,14 +663,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const valorTotal = parseFloat(document.getElementById('cp_valor_total').value);
             const numParcelas = parseInt(document.getElementById('cp_num_parcelas').value);
             const dataCompraStr = document.getElementById('cp_data_compra').value;
-            const contaId = document.getElementById('cp_conta_id').value;
+            const contaId = parseInt(document.getElementById('cp_conta_id').value);
             const categoria = document.getElementById('cp_categoria').value;
-            const cartaoSelecionado = contasCache.find(c => c.id == contaId);
-
+            const cartaoSelecionado = contasCache.find(c => c.id === contaId);
+    
             if (!cartaoSelecionado || !cartaoSelecionado.dia_vencimento_cartao) {
                 throw new Error('O cartão de crédito selecionado não possui um dia de vencimento configurado.');
             }
-
+    
             const { data: compraMae, error: erroCompra } = await clienteSupabase
                 .from('compras_parceladas')
                 .insert({
@@ -643,11 +685,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 .single();
             
             if (erroCompra) throw erroCompra;
-
+    
             const valorParcela = parseFloat((valorTotal / numParcelas).toFixed(2));
             const dataCompra = new Date(dataCompraStr + 'T12:00:00');
             let lancamentos = [];
-
+    
             for (let i = 1; i <= numParcelas; i++) {
                 let dataVencimento = new Date(dataCompra.getFullYear(), dataCompra.getMonth() + i, cartaoSelecionado.dia_vencimento_cartao);
                 lancamentos.push({
@@ -660,23 +702,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     compra_parcelada_id: compraMae.id
                 });
             }
-
+    
             const { error: erroLancamentos } = await clienteSupabase.from('lancamentos_futuros').insert(lancamentos);
             
             if (erroLancamentos) {
                 await clienteSupabase.from('compras_parceladas').delete().eq('id', compraMae.id);
                 throw erroLancamentos;
             }
-
-            comprasParceladasCache.push(compraMae);
-            lancamentos.forEach(l => lancamentosFuturosCache.push(l));
-            lancamentosFuturosCache.sort((a, b) => new Date(a.data_vencimento) - new Date(b.data_vencimento));
-            
+    
+            await carregarDadosIniciais();
+    
             closeModal();
             showToast('Compra parcelada registrada com sucesso!');
-            mesesVisiveis = 3;
-            renderLancamentosFuturos();
-
+            renderAllComponents();
+    
         } catch (error) {
             console.error("Erro ao salvar compra parcelada:", error);
             showToast(error.message, 'error');
@@ -763,10 +802,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             const novaTransacao = { descricao: "Ajuste de Saldo", valor: Math.abs(diferenca), data: toISODateString(new Date()), tipo: diferenca > 0 ? 'receita' : 'despesa', categoria: 'Ajustes', conta_id: accountId, };
-            const { data, error } = await clienteSupabase.from('transacoes').insert(novaTransacao).select().single();
-            if (error) throw error;
-            transacoesCache.unshift(data);
-            transacoesCache.sort((a, b) => new Date(b.data) - new Date(a.data));
+            await clienteSupabase.from('transacoes').insert(novaTransacao);
+            await carregarDadosIniciais();
             closeModal();
             showToast("Saldo ajustado com sucesso através de uma nova transação!");
             renderAllComponents();
@@ -777,7 +814,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // NOVA FUNÇÃO
     const openCreditCardStatementModal = (accountId) => {
         const conta = contasCache.find(c => c.id === accountId);
         if (!conta || conta.tipo !== 'Cartão de Crédito' || !conta.dia_fechamento_cartao || !conta.dia_vencimento_cartao) {
@@ -785,20 +821,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
     
-        const transacoesDoCartao = transacoesCache.filter(t => t.conta_id === accountId && t.tipo === 'despesa');
+        const transacoesReais = transacoesCache.filter(t => t.conta_id === accountId && t.tipo === 'despesa');
+        const transacoesVirtuais = gerarTransacoesVirtuaisDeParcelas().filter(t => t.conta_id === accountId);
+        const todasAsDespesasDoCartao = [...transacoesReais, ...transacoesVirtuais];
     
-        if (transacoesDoCartao.length === 0) {
+        if (todasAsDespesasDoCartao.length === 0) {
             showToast("Nenhuma despesa encontrada para este cartão.", "info");
             return;
         }
         
-        // Agrupa transações por fatura
-        const faturas = transacoesDoCartao.reduce((acc, t) => {
+        const faturas = todasAsDespesasDoCartao.reduce((acc, t) => {
             const dataTransacao = new Date(t.data + 'T12:00:00');
             const diaTransacao = dataTransacao.getDate();
             
             let anoFatura = dataTransacao.getFullYear();
-            let mesFatura = dataTransacao.getMonth(); // 0-11
+            let mesFatura = dataTransacao.getMonth();
     
             if (diaTransacao > conta.dia_fechamento_cartao) {
                 mesFatura += 1;
@@ -811,7 +848,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 acc[chaveFatura] = {
                     transacoes: [],
                     dataVencimento: dataVencimento,
-                    dataFechamento: new Date(dataVencimento.getFullYear(), dataVencimento.getMonth(), conta.dia_fechamento_cartao)
                 };
             }
             acc[chaveFatura].transacoes.push(t);
@@ -820,44 +856,47 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const chavesFaturasOrdenadas = Object.keys(faturas).sort().reverse();
         
-        // Monta o HTML do Modal
         let tabsHTML = '';
         let contentsHTML = '';
         
-        chavesFaturasOrdenadas.forEach((chave, index) => {
-            const fatura = faturas[chave];
-            const nomeMes = fatura.dataVencimento.toLocaleString('pt-BR', { month: 'long' });
-            const isActive = index === 0 ? 'active' : '';
-    
-            tabsHTML += `<button class="statement-tab-button ${isActive}" data-target="fatura-${chave}">${nomeMes}</button>`;
-            
-            const totalFatura = fatura.transacoes.reduce((sum, t) => sum + t.valor, 0);
-            
-            const transacoesHTML = fatura.transacoes
-                .sort((a, b) => new Date(a.data) - new Date(b.data))
-                .map(t => {
-                    const dataFormatada = new Date(t.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-                    return `<div class="transaction-row">
-                                <span class="transaction-row-date">${dataFormatada}</span>
-                                <span class="transaction-row-desc">${t.descricao}</span>
-                                <span class="transaction-row-amount">${formatarMoeda(t.valor)}</span>
-                            </div>`;
-                }).join('');
-    
-            contentsHTML += `<div class="statement-tab-content ${isActive}" id="fatura-${chave}">
-                <div class="invoice-summary">
-                    <div>
-                        <span>Total da Fatura</span>
-                        <strong class="expense-text">${formatarMoeda(totalFatura)}</strong>
+        if (chavesFaturasOrdenadas.length === 0) {
+            contentsHTML = '<p style="text-align:center; color: var(--text-secondary);">Nenhuma fatura para exibir.</p>';
+        } else {
+            chavesFaturasOrdenadas.forEach((chave, index) => {
+                const fatura = faturas[chave];
+                const nomeMes = fatura.dataVencimento.toLocaleString('pt-BR', { month: 'long' });
+                const isActive = index === 0 ? 'active' : '';
+        
+                tabsHTML += `<button class="statement-tab-button ${isActive}" data-target="fatura-${chave}">${nomeMes}</button>`;
+                
+                const totalFatura = fatura.transacoes.reduce((sum, t) => sum + t.valor, 0);
+                
+                const transacoesHTML = fatura.transacoes
+                    .sort((a, b) => new Date(a.data) - new Date(b.data))
+                    .map(t => {
+                        const dataFormatada = new Date(t.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+                        return `<div class="transaction-row">
+                                    <span class="transaction-row-date">${dataFormatada}</span>
+                                    <span class="transaction-row-desc">${t.descricao}</span>
+                                    <span class="transaction-row-amount">${formatarMoeda(t.valor)}</span>
+                                </div>`;
+                    }).join('');
+        
+                contentsHTML += `<div class="statement-tab-content ${isActive}" id="fatura-${chave}">
+                    <div class="invoice-summary">
+                        <div>
+                            <span>Total da Fatura</span>
+                            <strong class="expense-text">${formatarMoeda(totalFatura)}</strong>
+                        </div>
+                        <div>
+                            <span>Vencimento</span>
+                            <strong>${fatura.dataVencimento.toLocaleDateString('pt-BR')}</strong>
+                        </div>
                     </div>
-                    <div>
-                        <span>Vencimento</span>
-                        <strong>${fatura.dataVencimento.toLocaleDateString('pt-BR')}</strong>
-                    </div>
-                </div>
-                <div class="transaction-list">${transacoesHTML}</div>
-            </div>`;
-        });
+                    <div class="transaction-list">${transacoesHTML}</div>
+                </div>`;
+            });
+        }
     
         const modalContent = `
             <div class="statement-modal-header">
@@ -870,7 +909,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         openModal(modalContent);
         
-        // Adiciona o event listener para as abas
         document.querySelectorAll('.statement-tab-button').forEach(button => {
             button.addEventListener('click', () => {
                 document.querySelectorAll('.statement-tab-button').forEach(btn => btn.classList.remove('active'));
@@ -883,7 +921,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- INICIALIZAÇÃO E EVENT LISTENERS ---
     const initializeApp = async () => {
-        // REGISTRO ATUALIZADO
         window.app = { 
             openAccountModal, deletarConta, 
             openBillModal, deletarLancamentoFuturo, openPayBillModal, 
