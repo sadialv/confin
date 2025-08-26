@@ -1,31 +1,361 @@
-// js/utils.js
+/* GERAL E VARIÁVEIS DE TEMA */
+:root {
+    --bg-primary: #f0f2f5;
+    --bg-card: #ffffff;
+    --text-primary: #1c1e21;
+    --text-secondary: #606770;
+    --border-color: #dce1e7;
+    --accent-color: #0d6efd;
+    --accent-color-hover: #0b5ed7;
+    --income-color: #10b981;
+    --expense-color: #ef4444;
+    --overdue-color: rgba(255, 235, 59, 0.1);
+    --overdue-text: #f59e0b;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
 
-export const CATEGORIAS_PADRAO = ['Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Lazer', 'Educação', 'Salário', 'Investimentos', 'Contas', 'Ajustes', 'Pagamento de Fatura', 'Outros', 'Compras'];
+[data-theme="dark"] {
+    --bg-primary: #18191a;
+    --bg-card: #242526;
+    --text-primary: #e4e6eb;
+    --text-secondary: #b0b3b8;
+    --border-color: #3a3b3c;
+    --accent-color: #2d88ff;
+    --accent-color-hover: #1b74e8;
+}
 
-export const CATEGORY_ICONS = {
-    'Alimentação': { icon: 'fas fa-utensils', color: '#f97316' },
-    'Transporte': { icon: 'fas fa-car', color: '#3b82f6' },
-    'Moradia': { icon: 'fas fa-home', color: '#10b981' },
-    'Saúde': { icon: 'fas fa-heartbeat', color: '#ef4444' },
-    'Lazer': { icon: 'fas fa-film', color: '#8b5cf6' },
-    'Educação': { icon: 'fas fa-graduation-cap', color: '#14b8a6' },
-    'Salário': { icon: 'fas fa-dollar-sign', color: '#22c55e' },
-    'Investimentos': { icon: 'fas fa-chart-line', color: '#eab308' },
-    'Contas': { icon: 'fas fa-file-invoice', color: '#64748b' },
-    'Compras': { icon: 'fas fa-shopping-bag', color: '#d946ef' },
-    'Ajustes': { icon: 'fas fa-sliders-h', color: '#78716c' },
-    'Pagamento de Fatura': { icon: 'fas fa-receipt', color: '#0ea5e9' },
-    'Outros': { icon: 'fas fa-ellipsis-h', color: '#94a3b8' }
-};
+body {
+    font-family: 'Poppins', sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    margin: 0;
+    transition: background-color 0.3s, color 0.3s;
+}
 
-export const formatarMoeda = (valor) => (valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+/* HEADER */
+header {
+    background-color: var(--bg-card);
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
+}
 
-export const toISODateString = (date) => new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--accent-color);
+}
 
-export const HOJE = new Date();
-HOJE.setHours(0, 0, 0, 0);
+/* THEME SWITCHER */
+.theme-switcher {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.theme-toggle {
+    width: 40px;
+    height: 20px;
+    background-color: var(--border-color);
+    border-radius: 10px;
+    cursor: pointer;
+    position: relative;
+    transition: background-color 0.3s;
+}
+.theme-toggle-circle {
+    width: 16px;
+    height: 16px;
+    background-color: white;
+    border-radius: 50%;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.3s;
+}
+[data-theme="dark"] .theme-toggle-circle {
+    transform: translateX(20px);
+}
+[data-theme="dark"] .fa-sun { color: #888; }
+[data-theme="light"] .fa-moon { color: #888; }
 
-export const applyTheme = (theme) => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('confin-theme', theme);
-};
+
+/* LAYOUT PRINCIPAL */
+.app-container {
+    display: flex;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+aside {
+    flex: 0 0 320px;
+}
+
+main {
+    flex: 1;
+}
+
+/* COMPONENTES (CARD, BUTTONS, TABS) */
+.card {
+    background-color: var(--bg-card);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.card-header-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.card-header-title h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.btn {
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+.btn:hover {
+    background-color: var(--accent-color-hover);
+}
+
+.btn-secondary {
+    background-color: var(--text-secondary);
+}
+.btn-secondary:hover {
+    opacity: 0.8;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.5rem;
+    border-radius: 50%;
+}
+.btn-icon:hover {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+
+.tab-buttons {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 2px solid var(--border-color);
+    margin-bottom: 1.5rem;
+}
+.tab-button {
+    background: none;
+    border: none;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+}
+.tab-button.active {
+    color: var(--accent-color);
+    border-bottom-color: var(--accent-color);
+}
+.tab-content {
+    display: none;
+}
+.tab-content.active {
+    display: block;
+}
+
+
+/* CONTAS */
+.account-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+.account-item:last-child {
+    border-bottom: none;
+}
+.account-name {
+    font-weight: 500;
+}
+.account-type {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+.account-actions {
+    display: flex;
+    align-items: center;
+}
+
+/* PAINEL FINANCEIRO (LANÇAMENTOS) */
+.monthly-group {
+    margin-bottom: 1rem;
+}
+.monthly-header {
+    background-color: var(--bg-primary);
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+.monthly-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+.monthly-summary {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.9rem;
+}
+.monthly-content {
+    padding: 0.5rem 0;
+}
+
+/* HISTÓRICO DE TRANSAÇÕES */
+.transaction-card, .bill-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+.transaction-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 1rem;
+}
+.transaction-details {
+    flex: 1;
+}
+.transaction-description {
+    font-weight: 500;
+    display: block;
+}
+.transaction-meta {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+.income-text { color: var(--income-color); }
+.expense-text { color: var(--expense-color); }
+
+/* FORMULÁRIOS */
+.form-group {
+    margin-bottom: 1rem;
+}
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+.form-group input, .form-group select {
+    width: 100%;
+    padding: 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    box-sizing: border-box;
+}
+
+/* MODAL */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+    z-index: 1000;
+}
+.modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+.modal-content {
+    background-color: var(--bg-card);
+    padding: 2rem;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    position: relative;
+}
+.modal-close-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+/* TOAST (NOTIFICAÇÕES) */
+.toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1001;
+}
+.toast {
+    background-color: var(--income-color);
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    opacity: 0;
+    transform: translateX(100%);
+    transition: opacity 0.3s, transform 0.3s;
+}
+.toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+.toast.error {
+    background-color: var(--expense-color);
+}
