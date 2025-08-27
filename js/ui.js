@@ -3,6 +3,7 @@ import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, HOJE
 import { getState, getContaPorId, getContas } from './state.js';
 
 let summaryChart = null;
+let annualChart = null;
 
 // --- GERAL ---
 export const showToast = (message, type = 'success') => {
@@ -42,6 +43,7 @@ export const renderAllComponents = () => {
     renderHistoricoTransacoes();
     renderFormTransacaoRapida();
 };
+
 export const renderContas = () => {
     const container = document.getElementById('accounts-container');
     const { contas, transacoes } = getState();
@@ -55,12 +57,13 @@ export const renderContas = () => {
                     </div>
                     <span class="account-balance ${saldo >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldo)}</span>
                     <div class="account-actions">
-                        <button class="btn-icon" data-action="editar-conta" data-id="${conta.id}"><i class="fas fa-edit"></i></button>
-                        <button class="btn-icon" data-action="deletar-conta" data-id="${conta.id}"><i class="fas fa-trash"></i></button>
+                        <button class="btn-icon" data-action="editar-conta" data-id="${conta.id}" title="Editar"><i class="fas fa-edit"></i></button>
+                        <button class="btn-icon" data-action="deletar-conta" data-id="${conta.id}" title="Deletar"><i class="fas fa-trash"></i></button>
                     </div>
                 </div>`;
     }).join('');
 };
+
 export const renderVisaoMensal = () => {
     const container = document.getElementById('dashboard-monthly');
     const mes = document.getElementById('dashboard-month-filter')?.value || new Date().toISOString().slice(0, 7);
@@ -73,7 +76,7 @@ export const renderVisaoMensal = () => {
         <div class="dashboard-kpis">
             <div class="kpi-item"><h4>Receitas</h4><p class="income-text">${formatarMoeda(receitas)}</p></div>
             <div class="kpi-item"><h4>Despesas</h4><p class="expense-text">${formatarMoeda(despesas)}</p></div>
-            <div class="kpi-item"><h4>Saldo</h4><p>${formatarMoeda(receitas - despesas)}</p></div>
+            <div class="kpi-item"><h4>Saldo</h4><p class="${(receitas - despesas) >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(receitas - despesas)}</p></div>
         </div>
         <div class="dashboard-chart-container"><canvas id="summary-chart-monthly"></canvas></div>`;
     document.getElementById('dashboard-month-filter').addEventListener('change', renderVisaoMensal);
@@ -90,11 +93,45 @@ export const renderVisaoMensal = () => {
                 labels: Object.keys(despesasPorCat),
                 datasets: [{ data: Object.values(despesasPorCat), backgroundColor: CHART_COLORS }]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'right' } } }
         });
     }
 };
-export const renderVisaoAnual = () => { /* ... código simplificado se necessário ... */ };
+
+export const renderVisaoAnual = () => {
+    const container = document.getElementById('dashboard-yearly');
+    const ano = parseInt(document.getElementById('dashboard-year-filter')?.value) || new Date().getFullYear();
+    const { transacoes } = getState();
+    const transacoesAno = transacoes.filter(t => t.data?.startsWith(ano));
+
+    let receitasPorMes = Array(12).fill(0);
+    let despesasPorMes = Array(12).fill(0);
+    transacoesAno.forEach(t => {
+        const mes = new Date(t.data + 'T12:00:00').getMonth();
+        if (t.tipo === 'receita') receitasPorMes[mes] += t.valor;
+        else despesasPorMes[mes] += t.valor;
+    });
+
+    container.innerHTML = `<input type="number" id="dashboard-year-filter" value="${ano}" min="2020" max="2050" style="margin-bottom: 1rem; width: 100px;"><div class="dashboard-chart-container"><canvas id="annual-chart"></canvas></div>`;
+    document.getElementById('dashboard-year-filter').addEventListener('change', renderVisaoAnual);
+
+    if (annualChart) annualChart.destroy();
+    const ctx = document.getElementById('annual-chart')?.getContext('2d');
+    if (ctx) {
+        annualChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+                datasets: [
+                    { label: 'Receitas', data: receitasPorMes, backgroundColor: 'rgba(0, 135, 90, 0.7)' },
+                    { label: 'Despesas', data: despesasPorMes, backgroundColor: 'rgba(222, 53, 11, 0.7)' }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+        });
+    }
+};
+
 export const renderLancamentosFuturos = () => {
     const container = document.getElementById('tab-bills');
     const { lancamentosFuturos, comprasParceladas } = getState();
@@ -111,6 +148,7 @@ export const renderLancamentosFuturos = () => {
         ${lancamentos.map(l => renderBillItem(l, comprasParceladas)).join('')}`
     ).join('');
 };
+
 const renderBillItem = (bill, compras) => {
     let cat = bill.categoria;
     if (bill.compra_parcelada_id) {
@@ -127,11 +165,49 @@ const renderBillItem = (bill, compras) => {
                 <span class="transaction-value ${bill.tipo === 'a_pagar' ? 'expense-text' : 'income-text'}">${formatarMoeda(bill.valor)}</span>
                 <div class="bill-actions">
                     <button class="btn btn-small" data-action="pagar-conta" data-id="${bill.id}">Pagar</button>
-                    <button class="btn-icon" data-action="deletar-lancamento" data-id="${bill.id}"><i class="fas fa-trash"></i></button>
+                    <button class="btn-icon" data-action="deletar-lancamento" data-id="${bill.id}" title="Deletar"><i class="fas fa-trash"></i></button>
                 </div>
             </div>`;
 };
-export const renderHistoricoTransacoes = () => { /* ...código simplificado ... */ };
+
+export const renderHistoricoTransacoes = () => {
+    const container = document.getElementById('tab-history');
+    const { transacoes } = getState();
+    if (!transacoes.length) { container.innerHTML = '<p class="placeholder">Nenhuma transação.</p>'; return; }
+
+    const agrupados = transacoes.reduce((acc, t) => {
+        const data = new Date(t.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+        if (!acc[data]) acc[data] = [];
+        acc[data].push(t);
+        return acc;
+    }, {});
+
+    container.innerHTML = Object.entries(agrupados).map(([data, transacoesDoDia]) => `
+        <div class="monthly-header">${data}</div>
+        ${transacoesDoDia.map(renderTransactionCard).join('')}
+    `).join('');
+};
+
+const renderTransactionCard = (t) => {
+    const conta = getContaPorId(t.conta_id);
+    const icon = CATEGORY_ICONS[t.categoria] || CATEGORY_ICONS['Outros'];
+    return `
+        <div class="transaction-card">
+            <div class="transaction-icon-wrapper" style="background-color:${icon.color};"><i class="${icon.icon}"></i></div>
+            <div>
+                <div class="transaction-description">${t.descricao}</div>
+                <div class="transaction-meta">${t.categoria} | ${conta ? conta.nome : ''}</div>
+            </div>
+            <span class="transaction-value ${t.tipo === 'despesa' ? 'expense-text' : 'income-text'}">
+                ${t.tipo === 'despesa' ? '-' : ''} ${formatarMoeda(t.valor)}
+            </span>
+            <div class="transaction-actions">
+                <button class="btn-icon" data-action="deletar-transacao" data-id="${t.id}" title="Deletar"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>
+    `;
+};
+
 export const renderFormTransacaoRapida = () => {
     document.getElementById('form-transacao-rapida').innerHTML = `
         <div class="form-group"><label for="t-desc">Descrição</label><input type="text" id="t-desc" name="descricao" required></div>
@@ -140,11 +216,11 @@ export const renderFormTransacaoRapida = () => {
         <div class="form-group"><label for="t-conta">Conta</label><select id="t-conta" name="conta_id">${getContas().map(c=>`<option value="${c.id}">${c.nome}</option>`).join('')}</select></div>
         <div class="form-group"><label for="t-cat">Categoria</label><select id="t-cat" name="categoria">${CATEGORIAS_PADRAO.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div>
         <div class="form-group"><label for="t-data">Data</label><input type="date" id="t-data" name="data" value="${toISODateString(new Date())}" required></div>
-        <button type="submit" class="btn">Salvar</button>`;
+        <button type="submit" class="btn">Salvar Transação</button>`;
 };
 
 // --- MODAIS ---
-export const getAccountModalContent = (id=null) => { const c = id ? getContaPorId(id) : {}; return `<h2>${id?'Editar':'Nova'} Conta</h2><form id="form-conta" data-id="${id||''}"><div class="form-group"><label>Nome</label><input name="nome" value="${c.nome||''}" required></div><div class="form-group"><label>Tipo</label><select name="tipo"><option>Conta Corrente</option><option>Cartão de Crédito</option></select></div><div class="form-group"><label>Saldo Inicial</label><input name="saldo_inicial" type="number" value="${c.saldo_inicial||0}" ${id?'disabled':''}></div><button type="submit" class="btn">Salvar</button></form>`; };
+export const getAccountModalContent = (id=null) => { const c = id ? getContaPorId(id) : {}; return `<h2>${id?'Editar':'Nova'} Conta</h2><form id="form-conta" data-id="${id||''}"><div class="form-group"><label>Nome</label><input name="nome" value="${c.nome||''}" required></div><div class="form-group"><label>Tipo</label><select name="tipo" id="conta-tipo"><option>Conta Corrente</option><option>Cartão de Crédito</option></select></div><div class="form-group"><label>Saldo Inicial</label><input name="saldo_inicial" type="number" step="0.01" value="${c.saldo_inicial||0}" ${id?'disabled':''}></div><button type="submit" class="btn">Salvar</button></form>`; };
 export const getBillModalContent = (id=null) => { return `<h2>${id?'Editar':'Novo'} Lançamento Futuro</h2><form id="form-lancamento" data-id="${id||''}"></form>`; };
 export const getPayBillModalContent = (billId) => { const bill = getState().lancamentosFuturos.find(b=>b.id===billId); return `<h2>Pagar ${bill.descricao}</h2><form id="form-pagamento" data-bill-id="${bill.id}" data-valor="${bill.valor}" data-desc="${bill.descricao}" data-cat="${bill.categoria}"><p>${formatarMoeda(bill.valor)}</p><div class="form-group"><label>Data Pgto.</label><input type="date" name="data" value="${toISODateString(new Date())}"></div><div class="form-group"><label>Pagar com</label><select name="conta_id">${getContas().filter(c=>c.tipo!=='Cartão de Crédito').map(c=>`<option value="${c.id}">${c.nome}</option>`).join('')}</select></div><button class="btn" type="submit">Confirmar</button></form>`; };
 export const getInstallmentPurchaseModalContent = () => { return `<h2>Nova Compra Parcelada</h2><form id="form-compra-parcelada"></form>`; };
