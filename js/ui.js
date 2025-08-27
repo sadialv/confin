@@ -1,65 +1,39 @@
 // js/ui.js
-
-import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, HOJE } from './utils.js';
+import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, HOJE, CHART_COLORS } from './utils.js';
 import { getState, getContaPorId, getContas } from './state.js';
 
 let summaryChart = null;
 
-// --- FUNÇÕES GERAIS DE UI ---
-
+// --- GERAL ---
 export const showToast = (message, type = 'success') => {
-    const toastContainer = document.getElementById('toast-container');
-    if (!toastContainer) return;
+    const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.textContent = message;
-    toastContainer.appendChild(toast);
-    setTimeout(() => toast.classList.add('show'), 10);
-    setTimeout(() => {
-        toast.classList.remove('show');
-        toast.addEventListener('transitionend', () => toast.remove());
-    }, 3000);
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
 };
-
 export const setLoadingState = (button, isLoading, originalText = 'Salvar') => {
-    if (!button) return;
-    if (isLoading) {
-        button.disabled = true;
-        button.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Salvando...`;
-    } else {
-        button.disabled = false;
-        button.innerHTML = originalText;
-    }
+    if(!button) return;
+    button.disabled = isLoading;
+    button.innerHTML = isLoading ? `<i class="fas fa-spinner fa-spin"></i>` : originalText;
 };
-
 export const openModal = (content) => {
-    const modalHTML = `<button class="modal-close-btn" id="modal-close-btn">×</button>${content}`;
-    const modalContentArea = document.getElementById('modal-content-area');
-    modalContentArea.innerHTML = modalHTML;
+    const modalContent = `<button class="modal-close-btn" id="modal-close-btn">&times;</button>${content}`;
+    document.getElementById('modal-content-area').innerHTML = modalContent;
     document.getElementById('modal-container').classList.add('active');
     document.getElementById('modal-close-btn').addEventListener('click', closeModal);
 };
-
-export const closeModal = () => {
-    document.getElementById('modal-container').classList.remove('active');
-    document.getElementById('modal-content-area').innerHTML = '';
+export const closeModal = () => document.getElementById('modal-container').classList.remove('active');
+export const switchTab = (button, parentSelector) => {
+    const parent = document.querySelector(parentSelector);
+    parent.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+    parent.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    button.classList.add('active');
+    parent.querySelector(`#${button.dataset.tab}`).classList.add('active');
 };
 
-export const switchTab = (clickedButton, parentContainerSelector) => {
-    const tabName = clickedButton.dataset.tab;
-    const parentContainer = document.querySelector(parentContainerSelector);
-    if (!parentContainer) return;
-
-    parentContainer.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
-    parentContainer.querySelectorAll('.tab-button').forEach(tb => tb.classList.remove('active'));
-
-    const tabContent = parentContainer.querySelector(`#${tabName}`);
-    if (tabContent) tabContent.classList.add('active');
-    clickedButton.classList.add('active');
-};
-
-// --- FUNÇÕES DE RENDERIZAÇÃO ---
-
+// --- RENDERIZAÇÃO ---
 export const renderAllComponents = () => {
     renderContas();
     renderVisaoMensal();
@@ -68,103 +42,109 @@ export const renderAllComponents = () => {
     renderHistoricoTransacoes();
     renderFormTransacaoRapida();
 };
-
 export const renderContas = () => {
     const container = document.getElementById('accounts-container');
     const { contas, transacoes } = getState();
-
-    if (!contas || contas.length === 0) {
-        container.innerHTML = '<p style="text-align:center; color: var(--text-secondary);">Nenhuma conta cadastrada.</p>';
-        return;
-    }
-
+    if (!contas.length) { container.innerHTML = '<p class="placeholder">Nenhuma conta.</p>'; return; }
     container.innerHTML = contas.map(conta => {
-        const transacoesDaConta = transacoes.filter(t => t.conta_id === conta.id);
-        const saldo = transacoesDaConta.reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, conta.saldo_inicial);
-        const corSaldo = saldo >= 0 ? 'var(--income-color)' : 'var(--expense-color)';
-        
-        let botoesEspecificos = '';
-        if (conta.tipo === 'Conta Corrente' || conta.tipo === 'Poupança') {
-             botoesEspecificos = `<button class="btn-icon" data-action="ajustar-saldo" data-id="${conta.id}" title="Ajustar Saldo"><i class="fas fa-calculator"></i></button>`;
-        } else if (conta.tipo === 'Cartão de Crédito') {
-            botoesEspecificos = `<button class="btn-icon" data-action="ver-fatura" data-id="${conta.id}" title="Ver Fatura"><i class="fas fa-file-invoice"></i></button>`;
-        }
-
+        const saldo = transacoes.filter(t => t.conta_id === conta.id).reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, conta.saldo_inicial);
         return `<div class="account-item">
-                    <div class="account-details">
-                        <span class="account-name">${conta.nome}</span>
-                        <span class="account-type">${conta.tipo}</span>
+                    <div>
+                        <div class="account-name">${conta.nome}</div>
+                        <div class="account-type">${conta.tipo}</div>
                     </div>
+                    <span class="account-balance ${saldo >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldo)}</span>
                     <div class="account-actions">
-                        <span class="account-balance" style="color: ${corSaldo};">${formatarMoeda(saldo)}</span>
-                        ${botoesEspecificos}
-                        <button class="btn-icon" data-action="editar-conta" data-id="${conta.id}" title="Editar"><i class="fas fa-edit"></i></button>
-                        <button class="btn-icon" data-action="deletar-conta" data-id="${conta.id}" title="Deletar"><i class="fas fa-trash"></i></button>
+                        <button class="btn-icon" data-action="editar-conta" data-id="${conta.id}"><i class="fas fa-edit"></i></button>
+                        <button class="btn-icon" data-action="deletar-conta" data-id="${conta.id}"><i class="fas fa-trash"></i></button>
                     </div>
                 </div>`;
     }).join('');
 };
-
 export const renderVisaoMensal = () => {
     const container = document.getElementById('dashboard-monthly');
-    const mesSelecionado = document.getElementById('dashboard-month-filter')?.value || new Date().toISOString().slice(0, 7);
-    
+    const mes = document.getElementById('dashboard-month-filter')?.value || new Date().toISOString().slice(0, 7);
     const { transacoes } = getState();
-    const transacoesDoMes = transacoes.filter(t => t.data && t.data.startsWith(mesSelecionado));
-    
-    const receitas = transacoesDoMes.filter(t => t.tipo === 'receita').reduce((sum, t) => sum + t.valor, 0);
-    const despesas = transacoesDoMes.filter(t => t.tipo === 'despesa').reduce((sum, t) => sum + t.valor, 0);
-    const saldo = receitas - despesas;
-
+    const transacoesMes = transacoes.filter(t => t.data?.startsWith(mes));
+    const receitas = transacoesMes.filter(t => t.tipo === 'receita').reduce((s, t) => s + t.valor, 0);
+    const despesas = transacoesMes.filter(t => t.tipo === 'despesa').reduce((s, t) => s + t.valor, 0);
     container.innerHTML = `
-        <div class="dashboard-controls" style="margin-bottom: 1rem;">
-            <input type="month" id="dashboard-month-filter" value="${mesSelecionado}">
+        <input type="month" id="dashboard-month-filter" value="${mes}" style="margin-bottom: 1rem;">
+        <div class="dashboard-kpis">
+            <div class="kpi-item"><h4>Receitas</h4><p class="income-text">${formatarMoeda(receitas)}</p></div>
+            <div class="kpi-item"><h4>Despesas</h4><p class="expense-text">${formatarMoeda(despesas)}</p></div>
+            <div class="kpi-item"><h4>Saldo</h4><p>${formatarMoeda(receitas - despesas)}</p></div>
         </div>
         <div class="dashboard-chart-container"><canvas id="summary-chart-monthly"></canvas></div>`;
-    
     document.getElementById('dashboard-month-filter').addEventListener('change', renderVisaoMensal);
-    
-    const ctx = document.getElementById('summary-chart-monthly')?.getContext('2d');
     if (summaryChart) summaryChart.destroy();
-    
-    const despesasPorCategoria = transacoesDoMes
-        .filter(t => t.tipo === 'despesa')
-        .reduce((acc, t) => {
-            acc[t.categoria] = (acc[t.categoria] || 0) + t.valor;
-            return acc;
-        }, {});
-
-    if (ctx) {
+    const ctx = document.getElementById('summary-chart-monthly')?.getContext('2d');
+    const despesasPorCat = transacoesMes.filter(t => t.tipo === 'despesa').reduce((acc, t) => {
+        acc[t.categoria] = (acc[t.categoria] || 0) + t.valor;
+        return acc;
+    }, {});
+    if(ctx) {
         summaryChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels: Object.keys(despesasPorCategoria),
-                datasets: [{ 
-                    data: Object.values(despesasPorCategoria), 
-                    backgroundColor: Object.keys(despesasPorCategoria).map(cat => CATEGORY_ICONS[cat]?.color || '#cccccc'),
-                    borderColor: 'var(--bg-card)',
-                    borderWidth: 4
-                }]
+                labels: Object.keys(despesasPorCat),
+                datasets: [{ data: Object.values(despesasPorCat), backgroundColor: CHART_COLORS }]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'right' } } }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
         });
     }
 };
-
-export const renderVisaoAnual = () => { /* Código completo da função aqui... */ };
-
-export const renderLancamentosFuturos = () => { /* Código completo da função aqui... */ };
-
-const renderBillItem = (bill, comprasParceladas) => { /* Código completo da função aqui... */ };
-
-export const renderHistoricoTransacoes = () => { /* Código completo da função aqui... */ };
-
-const renderTransactionCard = (t) => { /* Código completo da função aqui... */ };
-
-export const renderFormTransacaoRapida = () => { /* Código completo da função aqui... */ };
+export const renderVisaoAnual = () => { /* ... código simplificado se necessário ... */ };
+export const renderLancamentosFuturos = () => {
+    const container = document.getElementById('tab-bills');
+    const { lancamentosFuturos, comprasParceladas } = getState();
+    const pendentes = lancamentosFuturos.filter(l => l.status === 'pendente');
+    if (!pendentes.length) { container.innerHTML = '<p class="placeholder">Nenhum lançamento futuro.</p>'; return; }
+    const agrupados = pendentes.reduce((acc, l) => {
+        const mes = new Date(l.data_vencimento + 'T12:00:00').toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        if (!acc[mes]) acc[mes] = [];
+        acc[mes].push(l);
+        return acc;
+    }, {});
+    container.innerHTML = Object.entries(agrupados).map(([mes, lancamentos]) => `
+        <div class="monthly-header">${mes}</div>
+        ${lancamentos.map(l => renderBillItem(l, comprasParceladas)).join('')}`
+    ).join('');
+};
+const renderBillItem = (bill, compras) => {
+    let cat = bill.categoria;
+    if (bill.compra_parcelada_id) {
+        const c = compras.find(c => c.id === bill.compra_parcelada_id);
+        if(c) cat = c.categoria;
+    }
+    const icon = CATEGORY_ICONS[cat] || CATEGORY_ICONS['Outros'];
+    return `<div class="bill-item">
+                <div class="transaction-icon-wrapper" style="background-color:${icon.color};"><i class="${icon.icon}"></i></div>
+                <div>
+                    <div class="transaction-description">${bill.descricao}</div>
+                    <div class="transaction-meta">Vence em: ${new Date(bill.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}</div>
+                </div>
+                <span class="transaction-value ${bill.tipo === 'a_pagar' ? 'expense-text' : 'income-text'}">${formatarMoeda(bill.valor)}</span>
+                <div class="bill-actions">
+                    <button class="btn btn-small" data-action="pagar-conta" data-id="${bill.id}">Pagar</button>
+                    <button class="btn-icon" data-action="deletar-lancamento" data-id="${bill.id}"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>`;
+};
+export const renderHistoricoTransacoes = () => { /* ...código simplificado ... */ };
+export const renderFormTransacaoRapida = () => {
+    document.getElementById('form-transacao-rapida').innerHTML = `
+        <div class="form-group"><label for="t-desc">Descrição</label><input type="text" id="t-desc" name="descricao" required></div>
+        <div class="form-group"><label for="t-valor">Valor</label><input type="number" id="t-valor" name="valor" step="0.01" required></div>
+        <div class="form-group"><label for="t-tipo">Tipo</label><select id="t-tipo" name="tipo"><option value="despesa">Despesa</option><option value="receita">Receita</option></select></div>
+        <div class="form-group"><label for="t-conta">Conta</label><select id="t-conta" name="conta_id">${getContas().map(c=>`<option value="${c.id}">${c.nome}</option>`).join('')}</select></div>
+        <div class="form-group"><label for="t-cat">Categoria</label><select id="t-cat" name="categoria">${CATEGORIAS_PADRAO.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div>
+        <div class="form-group"><label for="t-data">Data</label><input type="date" id="t-data" name="data" value="${toISODateString(new Date())}" required></div>
+        <button type="submit" class="btn">Salvar</button>`;
+};
 
 // --- MODAIS ---
-export const getAccountModalContent = (id = null) => { /* Código completo da função aqui... */ };
-export const getBillModalContent = (id = null) => { /* Código completo da função aqui... */ };
-export const getPayBillModalContent = (billId) => { /* Código completo da função aqui... */ };
-export const getInstallmentPurchaseModalContent = () => { /* Código completo da função aqui... */ };
+export const getAccountModalContent = (id=null) => { const c = id ? getContaPorId(id) : {}; return `<h2>${id?'Editar':'Nova'} Conta</h2><form id="form-conta" data-id="${id||''}"><div class="form-group"><label>Nome</label><input name="nome" value="${c.nome||''}" required></div><div class="form-group"><label>Tipo</label><select name="tipo"><option>Conta Corrente</option><option>Cartão de Crédito</option></select></div><div class="form-group"><label>Saldo Inicial</label><input name="saldo_inicial" type="number" value="${c.saldo_inicial||0}" ${id?'disabled':''}></div><button type="submit" class="btn">Salvar</button></form>`; };
+export const getBillModalContent = (id=null) => { return `<h2>${id?'Editar':'Novo'} Lançamento Futuro</h2><form id="form-lancamento" data-id="${id||''}"></form>`; };
+export const getPayBillModalContent = (billId) => { const bill = getState().lancamentosFuturos.find(b=>b.id===billId); return `<h2>Pagar ${bill.descricao}</h2><form id="form-pagamento" data-bill-id="${bill.id}" data-valor="${bill.valor}" data-desc="${bill.descricao}" data-cat="${bill.categoria}"><p>${formatarMoeda(bill.valor)}</p><div class="form-group"><label>Data Pgto.</label><input type="date" name="data" value="${toISODateString(new Date())}"></div><div class="form-group"><label>Pagar com</label><select name="conta_id">${getContas().filter(c=>c.tipo!=='Cartão de Crédito').map(c=>`<option value="${c.id}">${c.nome}</option>`).join('')}</select></div><button class="btn" type="submit">Confirmar</button></form>`; };
+export const getInstallmentPurchaseModalContent = () => { return `<h2>Nova Compra Parcelada</h2><form id="form-compra-parcelada"></form>`; };
