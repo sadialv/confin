@@ -92,7 +92,8 @@ main { display: flex; flex-direction: column; gap: 1.5rem; }
 .modal-content { background-color: var(--bg-card); padding: 1.5rem; border-radius: var(--radius); width: 90%; max-width: 500px; position: relative; }
 .modal-close-btn { position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; color: var(--text-secondary); cursor: pointer; }
 .toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 1001; }
-.toast { color: white; padding: 1rem; border-radius: var(--radius); margin-top: 1rem; }
+.toast { color: white; padding: 1rem; border-radius: var(--radius); margin-top: 1rem; opacity: 0; transition: opacity 0.3s, transform 0.3s; transform: translateY(10px); }
+.toast.show { opacity: 1; transform: translateY(0); }
 .toast.success { background-color: var(--income-color); }
 .toast.error { background-color: var(--expense-color); }
 
