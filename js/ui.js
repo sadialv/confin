@@ -1,4 +1,3 @@
-// js/ui.js
 import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, HOJE, CHART_COLORS } from './utils.js';
 import { getState, getContaPorId, getContas } from './state.js';
 
@@ -146,14 +145,35 @@ export const renderLancamentosFuturos = (page = 1, filters = { mes: 'todos', pes
     const pendentes = lancamentosFuturos.filter(l => l.status === 'pendente');
     const pesquisaLower = filters.pesquisa.toLowerCase();
     const filtrados = pendentes.filter(l => (filters.mes === 'todos' || l.data_vencimento.startsWith(filters.mes)) && (filters.pesquisa === '' || l.descricao.toLowerCase().includes(pesquisaLower)));
-    const totalPagar = filtrados.filter(l => l.tipo === 'a_pagar').reduce((sum, l) => sum + l.valor, 0);
-    const totalReceber = filtrados.filter(l => l.tipo === 'a_receber').reduce((sum, l) => sum + l.valor, 0);
-    const summaryHTML = `<div class="summary-panel"><div class="summary-panel-item"><span class="label">Itens Filtrados</span><span class="value">${filtrados.length}</span></div><div class="summary-panel-item"><span class="label">Total a Pagar</span><span class="value expense-text">${formatarMoeda(totalPagar)}</span></div><div class="summary-panel-item"><span class="label">Total a Receber</span><span class="value income-text">${formatarMoeda(totalReceber)}</span></div></div>`;
+    
+    renderBillsSummary(filtrados);
+
     const totalPages = Math.ceil(filtrados.length / ITEMS_PER_PAGE);
     const itensPaginados = filtrados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
     const itensHTML = itensPaginados.length ? itensPaginados.map(l => renderBillItem(l, comprasParceladas)).join('') : '<p class="placeholder">Nenhum lançamento encontrado.</p>';
     const paginacaoHTML = totalPages > 1 ? `<div class="pagination-container"><button class="btn" data-action="prev-page-bills" ${page === 1 ? 'disabled' : ''}>&lt;</button><span class="pagination-info">${page} / ${totalPages}</span><button class="btn" data-action="next-page-bills" ${page >= totalPages ? 'disabled' : ''}>&gt;</button></div>` : '';
-    container.innerHTML = (filters.mes !== 'todos' || filters.pesquisa !== '') ? summaryHTML + itensHTML + paginacaoHTML : itensHTML + paginacaoHTML;
+    container.innerHTML = itensHTML + paginacaoHTML;
+};
+const renderBillsSummary = (bills) => {
+    const container = document.getElementById('bills-summary-panel');
+    const totalPagar = bills.filter(l => l.tipo === 'a_pagar').reduce((sum, l) => sum + l.valor, 0);
+    const totalReceber = bills.filter(l => l.tipo === 'a_receber').reduce((sum, l) => sum + l.valor, 0);
+    
+    container.innerHTML = `
+        <div class="summary-panel">
+            <div class="summary-panel-item">
+                <span class="label">Lançamentos na Tela</span>
+                <span class="value">${bills.length}</span>
+            </div>
+            <div class="summary-panel-item">
+                <span class="label">Total a Pagar (Visível)</span>
+                <span class="value expense-text">${formatarMoeda(totalPagar)}</span>
+            </div>
+            <div class="summary-panel-item">
+                <span class="label">Total a Receber (Visível)</span>
+                <span class="value income-text">${formatarMoeda(totalReceber)}</span>
+            </div>
+        </div>`;
 };
 const renderBillItem = (bill, compras) => {
     const isParcela = !!bill.compra_parcelada_id; let cat = bill.categoria;
@@ -173,15 +193,40 @@ export const renderHistoricoTransacoes = (page = 1, filters = { mes: 'todos', pe
     const { transacoes } = getState();
     const pesquisaLower = filters.pesquisa.toLowerCase();
     const filtrados = transacoes.filter(t => (filters.mes === 'todos' || t.data.startsWith(filters.mes)) && (filters.pesquisa === '' || t.descricao.toLowerCase().includes(pesquisaLower) || t.categoria.toLowerCase().includes(pesquisaLower) || getContaPorId(t.conta_id)?.nome.toLowerCase().includes(pesquisaLower)));
-    const totalReceitas = filtrados.filter(t => t.tipo === 'receita').reduce((sum, t) => sum + t.valor, 0);
-    const totalDespesas = filtrados.filter(t => t.tipo === 'despesa').reduce((sum, t) => sum + t.valor, 0);
-    const saldo = totalReceitas - totalDespesas;
-    const summaryHTML = `<div class="summary-panel"><div class="summary-panel-item"><span class="label">Itens Filtrados</span><span class="value">${filtrados.length}</span></div><div class="summary-panel-item"><span class="label">Receitas</span><span class="value income-text">${formatarMoeda(totalReceitas)}</span></div><div class="summary-panel-item"><span class="label">Despesas</span><span class="value expense-text">${formatarMoeda(totalDespesas)}</span></div><div class="summary-panel-item"><span class="label">Saldo</span><span class="value ${saldo >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldo)}</span></div></div>`;
+    
+    renderHistorySummary(filtrados);
+
     const totalPages = Math.ceil(filtrados.length / ITEMS_PER_PAGE);
     const itensPaginados = filtrados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
     const itensHTML = itensPaginados.length ? itensPaginados.map(renderTransactionCard).join('') : '<p class="placeholder">Nenhuma transação encontrada.</p>';
     const paginacaoHTML = totalPages > 1 ? `<div class="pagination-container"><button class="btn" data-action="prev-page-history" ${page === 1 ? 'disabled' : ''}>&lt;</button><span class="pagination-info">${page} / ${totalPages}</span><button class="btn" data-action="next-page-history" ${page >= totalPages ? 'disabled' : ''}>&gt;</button></div>` : '';
-    container.innerHTML = (filters.mes !== 'todos' || filters.pesquisa !== '') ? summaryHTML + itensHTML + paginacaoHTML : itensHTML + paginacaoHTML;
+    container.innerHTML = itensHTML + paginacaoHTML;
+};
+const renderHistorySummary = (transactions) => {
+    const container = document.getElementById('history-summary-panel');
+    const totalReceitas = transactions.filter(t => t.tipo === 'receita').reduce((sum, t) => sum + t.valor, 0);
+    const totalDespesas = transactions.filter(t => t.tipo === 'despesa').reduce((sum, t) => sum + t.valor, 0);
+    const saldo = totalReceitas - totalDespesas;
+
+    container.innerHTML = `
+        <div class="summary-panel">
+            <div class="summary-panel-item">
+                <span class="label">Transações na Tela</span>
+                <span class="value">${transactions.length}</span>
+            </div>
+            <div class="summary-panel-item">
+                <span class="label">Receitas (Visível)</span>
+                <span class="value income-text">${formatarMoeda(totalReceitas)}</span>
+            </div>
+            <div class="summary-panel-item">
+                <span class="label">Despesas (Visível)</span>
+                <span class="value expense-text">${formatarMoeda(totalDespesas)}</span>
+            </div>
+             <div class="summary-panel-item">
+                <span class="label">Saldo (Visível)</span>
+                <span class="value ${saldo >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldo)}</span>
+            </div>
+        </div>`;
 };
 const renderTransactionCard = (t) => {
     const conta = getContaPorId(t.conta_id); const icon = CATEGORY_ICONS[t.categoria] || CATEGORY_ICONS['Outros'];
