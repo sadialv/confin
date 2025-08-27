@@ -152,7 +152,8 @@ export const renderLancamentosFuturos = () => {
 
 const renderBillItem = (bill, compras) => {
     let cat = bill.categoria;
-    if (bill.compra_parcelada_id) {
+    const isParcela = !!bill.compra_parcelada_id;
+    if (isParcela) {
         const c = compras.find(c => c.id === bill.compra_parcelada_id);
         if(c) cat = c.categoria;
     }
@@ -166,6 +167,7 @@ const renderBillItem = (bill, compras) => {
                 <span class="transaction-value ${bill.tipo === 'a_pagar' ? 'expense-text' : 'income-text'}">${formatarMoeda(bill.valor)}</span>
                 <div class="bill-actions">
                     <button class="btn btn-small" data-action="pagar-conta" data-id="${bill.id}">Pagar</button>
+                    <button class="btn-icon" data-action="${isParcela ? 'editar-compra-parcelada' : 'editar-lancamento'}" data-id="${isParcela ? bill.compra_parcelada_id : bill.id}" title="Editar"><i class="fas fa-edit"></i></button>
                     <button class="btn-icon" data-action="deletar-lancamento" data-id="${bill.id}"><i class="fas fa-trash"></i></button>
                 </div>
             </div>`;
@@ -200,6 +202,7 @@ const renderTransactionCard = (t) => {
                 ${t.tipo === 'despesa' ? '-' : ''} ${formatarMoeda(t.valor)}
             </span>
             <div class="transaction-actions">
+                <button class="btn-icon" data-action="editar-transacao" data-id="${t.id}" title="Editar"><i class="fas fa-edit"></i></button>
                 <button class="btn-icon" data-action="deletar-transacao" data-id="${t.id}" title="Deletar"><i class="fas fa-trash"></i></button>
             </div>
         </div>
@@ -236,7 +239,57 @@ export const getAccountModalContent = (id=null) => {
         </form>`;
 };
 
-export const getBillModalContent = (id=null) => { return `<h2>${id?'Editar':'Novo'} Lançamento Futuro</h2><form id="form-lancamento" data-id="${id||''}"></form>`; };
+export const getBillModalContent = (id = null) => {
+    const { lancamentosFuturos } = getState();
+    const bill = id ? lancamentosFuturos.find(l => l.id === id) : {};
+    const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${bill.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
+
+    return `<h2>${id ? 'Editar' : 'Novo'} Lançamento</h2>
+        <form id="form-lancamento" data-id="${id || ''}">
+            <div class="form-group"><label>Descrição</label><input name="descricao" value="${bill.descricao || ''}" required></div>
+            <div class="form-group"><label>Valor</label><input name="valor" type="number" step="0.01" value="${bill.valor || ''}" required></div>
+            <div class="form-group"><label>Data Vencimento</label><input name="data_vencimento" type="date" value="${bill.data_vencimento || toISODateString(new Date())}" required></div>
+            <div class="form-group"><label>Categoria</label><select name="categoria">${categoriasOptions}</select></div>
+            <div class="form-group"><label>Tipo</label><select name="tipo"><option value="a_pagar" ${bill.tipo==='a_pagar'?'selected':''}>A Pagar</option><option value="a_receber" ${bill.tipo==='a_receber'?'selected':''}>A Receber</option></select></div>
+            <div style="text-align: right;"><button type="submit" class="btn">Salvar</button></div>
+        </form>`;
+};
+
+export const getTransactionModalContent = (id) => {
+    const { transacoes } = getState();
+    const transacao = transacoes.find(t => t.id === id);
+    if (!transacao) return `<p>Transação não encontrada.</p>`;
+    
+    const contasOptions = getContas().map(c => `<option value="${c.id}" ${transacao.conta_id === c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
+    const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${transacao.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
+
+    return `<h2>Editar Transação</h2>
+        <form id="form-edicao-transacao" data-id="${id}">
+            <div class="form-group"><label>Descrição</label><input name="descricao" value="${transacao.descricao}" required></div>
+            <div class="form-group"><label>Valor</label><input name="valor" type="number" step="0.01" value="${transacao.valor}" required></div>
+            <div class="form-group"><label>Data</label><input name="data" type="date" value="${transacao.data}" required></div>
+            <div class="form-group"><label>Conta</label><select name="conta_id">${contasOptions}</select></div>
+            <div class="form-group"><label>Categoria</label><select name="categoria">${categoriasOptions}</select></div>
+            <div class="form-group"><label>Tipo</label><select name="tipo"><option value="despesa" ${transacao.tipo==='despesa'?'selected':''}>Despesa</option><option value="receita" ${transacao.tipo==='receita'?'selected':''}>Receita</option></select></div>
+            <div style="text-align: right;"><button type="submit" class="btn">Salvar Alterações</button></div>
+        </form>`;
+};
+
+export const getInstallmentPurchaseEditModalContent = (compraId) => {
+    const { comprasParceladas } = getState();
+    const compra = comprasParceladas.find(c => c.id === compraId);
+    if (!compra) return `<p>Compra não encontrada.</p>`;
+
+    const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${compra.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
+
+    return `<h2>Editar Compra Parcelada</h2>
+        <p style="color: var(--text-secondary); font-size: 0.9rem;">A alteração na descrição e categoria será aplicada a todas as parcelas futuras.</p>
+        <form id="form-edicao-compra-parcelada" data-id="${compraId}">
+            <div class="form-group"><label>Descrição</label><input name="descricao" value="${compra.descricao}" required></div>
+            <div class="form-group"><label>Categoria</label><select name="categoria">${categoriasOptions}</select></div>
+            <div style="text-align: right;"><button type="submit" class="btn">Salvar Alterações</button></div>
+        </form>`;
+};
 
 export const getPayBillModalContent = (billId) => {
     const bill = getState().lancamentosFuturos.find(b=>b.id===billId);
