@@ -42,14 +42,12 @@ export const switchTab = (button, parentSelector) => {
 // --- RENDERIZAÇÃO ---
 export const renderAllComponents = () => {
     renderContas();
-    const activeDashboardTab = document.querySelector('#dashboard-tab-buttons .active')?.dataset.tab;
-    if (activeDashboardTab === 'dashboard-monthly') renderVisaoMensal();
-    if (activeDashboardTab === 'dashboard-yearly') renderVisaoAnual();
-    
-    const activeMainTab = document.querySelector('#main-tab-buttons .active')?.dataset.tab;
-    if (activeMainTab === 'tab-bills') renderLancamentosFuturos();
-    if (activeMainTab === 'tab-history') renderHistoricoTransacoes();
-
+    renderVisaoMensal();
+    renderVisaoAnual();
+    renderFilters('bills');
+    renderLancamentosFuturos();
+    renderFilters('history');
+    renderHistoricoTransacoes();
     renderFormTransacaoRapida();
 };
 export const renderContas = () => {
@@ -125,20 +123,34 @@ export const renderVisaoAnual = () => {
         });
     }
 };
+export const renderFilters = (type, filters = { mes: 'todos', pesquisa: '' }) => {
+    const isBills = type === 'bills';
+    const container = document.getElementById(isBills ? 'bills-filters-container' : 'history-filters-container');
+    const data = isBills ? getState().lancamentosFuturos.filter(l => l.status === 'pendente') : getState().transacoes;
+    const dateKey = isBills ? 'data_vencimento' : 'data';
+    const mesesDisponiveis = [...new Set(data.map(item => item[dateKey].substring(0, 7)))].sort().reverse();
+    const mesOptions = mesesDisponiveis.map(mes => {
+        const [ano, mesNum] = mes.split('-');
+        const nomeMes = new Date(ano, mesNum - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        return `<option value="${mes}" ${filters.mes === mes ? 'selected' : ''}>${nomeMes}</option>`;
+    }).join('');
+    container.innerHTML = `
+        <div class="filters-container">
+            <div class="form-group"><label>Mês</label><select id="${isBills ? 'bills' : 'history'}-month-filter"><option value="todos">Todos</option>${mesOptions}</select></div>
+            <div class="form-group"><label>Pesquisar</label><input type="search" id="${isBills ? 'bills' : 'history'}-search-input" value="${filters.pesquisa}"></div>
+        </div>`;
+};
 export const renderLancamentosFuturos = (page = 1, filters = { mes: 'todos', pesquisa: '' }) => {
-    const container = document.getElementById('tab-bills');
+    const container = document.getElementById('bills-list-container');
     const { lancamentosFuturos, comprasParceladas } = getState();
     const pendentes = lancamentosFuturos.filter(l => l.status === 'pendente');
-    const mesesDisponiveis = [...new Set(pendentes.map(l => l.data_vencimento.substring(0, 7)))].sort().reverse();
-    const mesOptions = mesesDisponiveis.map(mes => { const [ano, mesNum] = mes.split('-'); const nomeMes = new Date(ano, mesNum - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' }); return `<option value="${mes}" ${filters.mes === mes ? 'selected' : ''}>${nomeMes}</option>`; }).join('');
     const pesquisaLower = filters.pesquisa.toLowerCase();
     const filtrados = pendentes.filter(l => (filters.mes === 'todos' || l.data_vencimento.startsWith(filters.mes)) && (filters.pesquisa === '' || l.descricao.toLowerCase().includes(pesquisaLower)));
     const totalPages = Math.ceil(filtrados.length / ITEMS_PER_PAGE);
     const itensPaginados = filtrados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
-    const filtrosHTML = `<div class="filters-container"><div class="form-group"><label>Mês</label><select id="bills-month-filter"><option value="todos">Todos</option>${mesOptions}</select></div><div class="form-group"><label>Pesquisar</label><input type="search" id="bills-search-input" value="${filters.pesquisa}"></div></div>`;
     const itensHTML = itensPaginados.length ? itensPaginados.map(l => renderBillItem(l, comprasParceladas)).join('') : '<p class="placeholder">Nenhum lançamento encontrado.</p>';
     const paginacaoHTML = totalPages > 1 ? `<div class="pagination-container"><button class="btn" data-action="prev-page-bills" ${page === 1 ? 'disabled' : ''}>&lt;</button><span class="pagination-info">${page} / ${totalPages}</span><button class="btn" data-action="next-page-bills" ${page >= totalPages ? 'disabled' : ''}>&gt;</button></div>` : '';
-    container.innerHTML = filtrosHTML + itensHTML + paginacaoHTML;
+    container.innerHTML = itensHTML + paginacaoHTML;
 };
 const renderBillItem = (bill, compras) => {
     const isParcela = !!bill.compra_parcelada_id; let cat = bill.categoria;
@@ -154,18 +166,15 @@ const renderBillItem = (bill, compras) => {
             </div>`;
 };
 export const renderHistoricoTransacoes = (page = 1, filters = { mes: 'todos', pesquisa: '' }) => {
-    const container = document.getElementById('tab-history');
+    const container = document.getElementById('history-list-container');
     const { transacoes } = getState();
-    const mesesDisponiveis = [...new Set(transacoes.map(t => t.data.substring(0, 7)))].sort().reverse();
-    const mesOptions = mesesDisponiveis.map(mes => { const [ano, mesNum] = mes.split('-'); const nomeMes = new Date(ano, mesNum - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' }); return `<option value="${mes}" ${filters.mes === mes ? 'selected' : ''}>${nomeMes}</option>`; }).join('');
     const pesquisaLower = filters.pesquisa.toLowerCase();
     const filtrados = transacoes.filter(t => (filters.mes === 'todos' || t.data.startsWith(filters.mes)) && (filters.pesquisa === '' || t.descricao.toLowerCase().includes(pesquisaLower) || t.categoria.toLowerCase().includes(pesquisaLower) || getContaPorId(t.conta_id)?.nome.toLowerCase().includes(pesquisaLower)));
     const totalPages = Math.ceil(filtrados.length / ITEMS_PER_PAGE);
     const itensPaginados = filtrados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
-    const filtrosHTML = `<div class="filters-container"><div class="form-group"><label>Mês</label><select id="history-month-filter"><option value="todos">Todos</option>${mesOptions}</select></div><div class="form-group"><label>Pesquisar</label><input type="search" id="history-search-input" value="${filters.pesquisa}"></div></div>`;
     const itensHTML = itensPaginados.length ? itensPaginados.map(renderTransactionCard).join('') : '<p class="placeholder">Nenhuma transação encontrada.</p>';
     const paginacaoHTML = totalPages > 1 ? `<div class="pagination-container"><button class="btn" data-action="prev-page-history" ${page === 1 ? 'disabled' : ''}>&lt;</button><span class="pagination-info">${page} / ${totalPages}</span><button class="btn" data-action="next-page-history" ${page >= totalPages ? 'disabled' : ''}>&gt;</button></div>` : '';
-    container.innerHTML = filtrosHTML + itensHTML + paginacaoHTML;
+    container.innerHTML = itensHTML + paginacaoHTML;
 };
 const renderTransactionCard = (t) => {
     const conta = getContaPorId(t.conta_id); const icon = CATEGORY_ICONS[t.categoria] || CATEGORY_ICONS['Outros'];
