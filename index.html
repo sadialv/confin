@@ -56,16 +56,19 @@
             <div class="card">
                  <div class="card-header">
                     <div class="card-header-title"><h2>Painel Financeiro</h2></div>
-                    </div>
+                </div>
                 <div class="tab-buttons" id="main-tab-buttons">
                     <button class="tab-button active" data-tab="tab-bills">Contas a Pagar/Receber</button>
                     <button class="tab-button" data-tab="tab-history">Histórico de Transações</button>
                 </div>
+                
                 <div id="tab-bills" class="tab-content active">
+                    <div id="bills-summary-panel"></div>
                     <div id="bills-filters-container"></div>
                     <div id="bills-list-container"><p class="placeholder">Carregando...</p></div>
                 </div>
                 <div id="tab-history" class="tab-content">
+                    <div id="history-summary-panel"></div>
                     <div id="history-filters-container"></div>
                     <div id="history-list-container"><p class="placeholder">Carregando...</p></div>
                 </div>
