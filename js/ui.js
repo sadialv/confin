@@ -1,4 +1,3 @@
-// js/ui.js
 import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, HOJE, CHART_COLORS } from './utils.js';
 import { getState, getContaPorId, getContas } from './state.js';
 
@@ -20,7 +19,7 @@ export const setLoadingState = (button, isLoading, originalText = 'Salvar') => {
     button.innerHTML = isLoading ? `<i class="fas fa-spinner fa-spin"></i>` : originalText;
 };
 export const openModal = (content) => {
-    // Adiciona o botão de fechar genérico a todo modal
+    // Esta função adiciona o botão de fechar a QUALQUER conteúdo de modal
     const modalContent = `<button class="modal-close-btn" id="modal-close-btn">&times;</button>${content}`;
     document.getElementById('modal-content-area').innerHTML = modalContent;
     document.getElementById('modal-container').classList.add('active');
@@ -253,6 +252,11 @@ export const getPayBillModalContent = (billId) => {
 
 export const getInstallmentPurchaseModalContent = () => { return `<h2>Nova Compra Parcelada</h2><form id="form-compra-parcelada"></form>`; };
 
+/**
+ * ESTA É A VERSÃO CORRETA DA FUNÇÃO
+ * Ela retorna APENAS o conteúdo específico do modal, sem o botão de fechar.
+ * A função openModal() é quem adiciona o botão de fechar.
+ */
 export const getStatementModalContent = (contaId) => {
     const conta = getContaPorId(contaId);
     const { transacoes } = getState();
