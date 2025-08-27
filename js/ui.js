@@ -1,4 +1,3 @@
-// js/ui.js
 import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, HOJE, CHART_COLORS } from './utils.js';
 import { getState, getContaPorId, getContas } from './state.js';
 
@@ -128,7 +127,13 @@ export const renderFilters = (type, filters = { mes: 'todos', pesquisa: '' }) =>
     const container = document.getElementById(isBills ? 'bills-filters-container' : 'history-filters-container');
     const data = isBills ? getState().lancamentosFuturos.filter(l => l.status === 'pendente') : getState().transacoes;
     const dateKey = isBills ? 'data_vencimento' : 'data';
-    const mesesDisponiveis = [...new Set(data.map(item => item[dateKey].substring(0, 7)))].sort().reverse();
+    
+    const mesesDisponiveis = [...new Set(
+        data
+            .map(item => item[dateKey] ? item[dateKey].substring(0, 7) : null)
+            .filter(Boolean)
+    )].sort().reverse();
+
     const mesOptions = mesesDisponiveis.map(mes => {
         const [ano, mesNum] = mes.split('-');
         const nomeMes = new Date(ano, mesNum - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
