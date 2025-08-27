@@ -4,10 +4,12 @@ import { getState, getContaPorId, getContas } from './state.js';
 
 let summaryChart = null;
 let annualChart = null;
+const ITEMS_PER_PAGE = 10;
 
 // --- GERAL ---
 export const showToast = (message, type = 'success') => {
     const container = document.getElementById('toast-container');
+    if (!container) return;
     const toast = document.createElement('div');
     toast.className = `toast ${type} show`;
     toast.textContent = message;
@@ -40,13 +42,16 @@ export const switchTab = (button, parentSelector) => {
 // --- RENDERIZAÇÃO ---
 export const renderAllComponents = () => {
     renderContas();
-    renderVisaoMensal();
-    renderVisaoAnual();
-    renderLancamentosFuturos();
-    renderHistoricoTransacoes();
+    const activeDashboardTab = document.querySelector('#dashboard-tab-buttons .active')?.dataset.tab;
+    if (activeDashboardTab === 'dashboard-monthly') renderVisaoMensal();
+    if (activeDashboardTab === 'dashboard-yearly') renderVisaoAnual();
+    
+    const activeMainTab = document.querySelector('#main-tab-buttons .active')?.dataset.tab;
+    if (activeMainTab === 'tab-bills') renderLancamentosFuturos();
+    if (activeMainTab === 'tab-history') renderHistoricoTransacoes();
+
     renderFormTransacaoRapida();
 };
-
 export const renderContas = () => {
     const container = document.getElementById('accounts-container');
     const { contas, transacoes } = getState();
@@ -58,20 +63,21 @@ export const renderContas = () => {
             botoesEspecificos = `<button class="btn-icon" data-action="ver-fatura" data-id="${conta.id}" title="Ver Fatura"><i class="fas fa-file-invoice"></i></button>`;
         }
         return `<div class="account-item">
-                    <div>
+                    <div class="account-details">
                         <div class="account-name">${conta.nome}</div>
                         <div class="account-type">${conta.tipo}</div>
                     </div>
-                    <span class="account-balance ${saldo >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldo)}</span>
-                    <div class="account-actions">
-                        ${botoesEspecificos}
-                        <button class="btn-icon" data-action="editar-conta" data-id="${conta.id}" title="Editar"><i class="fas fa-edit"></i></button>
-                        <button class="btn-icon" data-action="deletar-conta" data-id="${conta.id}" title="Deletar"><i class="fas fa-trash"></i></button>
+                    <div class="account-balance-actions">
+                        <span class="account-balance ${saldo >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldo)}</span>
+                        <div class="account-actions">
+                            ${botoesEspecificos}
+                            <button class="btn-icon" data-action="editar-conta" data-id="${conta.id}" title="Editar"><i class="fas fa-edit"></i></button>
+                            <button class="btn-icon" data-action="deletar-conta" data-id="${conta.id}" title="Deletar"><i class="fas fa-trash"></i></button>
+                        </div>
                     </div>
                 </div>`;
     }).join('');
 };
-
 export const renderVisaoMensal = () => {
     const container = document.getElementById('dashboard-monthly');
     const mes = document.getElementById('dashboard-month-filter')?.value || new Date().toISOString().slice(0, 7);
@@ -90,33 +96,23 @@ export const renderVisaoMensal = () => {
     document.getElementById('dashboard-month-filter').addEventListener('change', renderVisaoMensal);
     if (summaryChart) summaryChart.destroy();
     const ctx = document.getElementById('summary-chart-monthly')?.getContext('2d');
-    const despesasPorCat = transacoesMes.filter(t => t.tipo === 'despesa').reduce((acc, t) => {
-        acc[t.categoria] = (acc[t.categoria] || 0) + t.valor;
-        return acc;
-    }, {});
+    const despesasPorCat = transacoesMes.filter(t => t.tipo === 'despesa').reduce((acc, t) => { acc[t.categoria] = (acc[t.categoria] || 0) + t.valor; return acc; }, {});
     if(ctx && Object.keys(despesasPorCat).length > 0) {
         summaryChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: Object.keys(despesasPorCat),
-                datasets: [{ data: Object.values(despesasPorCat), backgroundColor: CHART_COLORS }]
-            },
+            type: 'doughnut', data: { labels: Object.keys(despesasPorCat), datasets: [{ data: Object.values(despesasPorCat), backgroundColor: CHART_COLORS }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'right' } } }
         });
     }
 };
-
 export const renderVisaoAnual = () => {
     const container = document.getElementById('dashboard-yearly');
     const ano = parseInt(document.getElementById('dashboard-year-filter')?.value) || new Date().getFullYear();
     const { transacoes } = getState();
     const transacoesAno = transacoes.filter(t => t.data?.startsWith(ano));
-    let receitasPorMes = Array(12).fill(0);
-    let despesasPorMes = Array(12).fill(0);
+    let receitasPorMes = Array(12).fill(0); let despesasPorMes = Array(12).fill(0);
     transacoesAno.forEach(t => {
         const mes = new Date(t.data + 'T12:00:00').getMonth();
-        if (t.tipo === 'receita') receitasPorMes[mes] += t.valor;
-        else despesasPorMes[mes] += t.valor;
+        if (t.tipo === 'receita') receitasPorMes[mes] += t.valor; else despesasPorMes[mes] += t.valor;
     });
     container.innerHTML = `<input type="number" id="dashboard-year-filter" value="${ano}" min="2020" max="2050" style="margin-bottom: 1rem; width: 100px;"><div class="dashboard-chart-container"><canvas id="annual-chart"></canvas></div>`;
     document.getElementById('dashboard-year-filter').addEventListener('change', renderVisaoAnual);
@@ -124,97 +120,62 @@ export const renderVisaoAnual = () => {
     const ctx = document.getElementById('annual-chart')?.getContext('2d');
     if (ctx) {
         annualChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-                datasets: [
-                    { label: 'Receitas', data: receitasPorMes, backgroundColor: 'rgba(0, 135, 90, 0.7)' },
-                    { label: 'Despesas', data: despesasPorMes, backgroundColor: 'rgba(222, 53, 11, 0.7)' }
-                ]
-            },
+            type: 'bar', data: { labels: ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'], datasets: [{ label: 'Receitas', data: receitasPorMes, backgroundColor: 'rgba(0, 135, 90, 0.7)' },{ label: 'Despesas', data: despesasPorMes, backgroundColor: 'rgba(222, 53, 11, 0.7)' }] },
             options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
         });
     }
 };
-
-export const renderLancamentosFuturos = () => {
+export const renderLancamentosFuturos = (page = 1, filters = { mes: 'todos', pesquisa: '' }) => {
     const container = document.getElementById('tab-bills');
     const { lancamentosFuturos, comprasParceladas } = getState();
     const pendentes = lancamentosFuturos.filter(l => l.status === 'pendente');
-    if (!pendentes.length) { container.innerHTML = '<p class="placeholder">Nenhum lançamento futuro.</p>'; return; }
-    const agrupados = pendentes.reduce((acc, l) => {
-        const mes = new Date(l.data_vencimento + 'T12:00:00').toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
-        if (!acc[mes]) acc[mes] = [];
-        acc[mes].push(l);
-        return acc;
-    }, {});
-    container.innerHTML = Object.entries(agrupados).map(([mes, lancamentos]) => `
-        <div class="monthly-header">${mes}</div>
-        ${lancamentos.map(l => renderBillItem(l, comprasParceladas)).join('')}`
-    ).join('');
+    const mesesDisponiveis = [...new Set(pendentes.map(l => l.data_vencimento.substring(0, 7)))].sort().reverse();
+    const mesOptions = mesesDisponiveis.map(mes => { const [ano, mesNum] = mes.split('-'); const nomeMes = new Date(ano, mesNum - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' }); return `<option value="${mes}" ${filters.mes === mes ? 'selected' : ''}>${nomeMes}</option>`; }).join('');
+    const pesquisaLower = filters.pesquisa.toLowerCase();
+    const filtrados = pendentes.filter(l => (filters.mes === 'todos' || l.data_vencimento.startsWith(filters.mes)) && (filters.pesquisa === '' || l.descricao.toLowerCase().includes(pesquisaLower)));
+    const totalPages = Math.ceil(filtrados.length / ITEMS_PER_PAGE);
+    const itensPaginados = filtrados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+    const filtrosHTML = `<div class="filters-container"><div class="form-group"><label>Mês</label><select id="bills-month-filter"><option value="todos">Todos</option>${mesOptions}</select></div><div class="form-group"><label>Pesquisar</label><input type="search" id="bills-search-input" value="${filters.pesquisa}"></div></div>`;
+    const itensHTML = itensPaginados.length ? itensPaginados.map(l => renderBillItem(l, comprasParceladas)).join('') : '<p class="placeholder">Nenhum lançamento encontrado.</p>';
+    const paginacaoHTML = totalPages > 1 ? `<div class="pagination-container"><button class="btn" data-action="prev-page-bills" ${page === 1 ? 'disabled' : ''}>&lt;</button><span class="pagination-info">${page} / ${totalPages}</span><button class="btn" data-action="next-page-bills" ${page >= totalPages ? 'disabled' : ''}>&gt;</button></div>` : '';
+    container.innerHTML = filtrosHTML + itensHTML + paginacaoHTML;
 };
-
 const renderBillItem = (bill, compras) => {
-    let cat = bill.categoria;
-    const isParcela = !!bill.compra_parcelada_id;
-    if (isParcela) {
-        const c = compras.find(compra => compra.id === bill.compra_parcelada_id);
-        if(c) cat = c.categoria;
-    }
+    const isParcela = !!bill.compra_parcelada_id; let cat = bill.categoria;
+    if (isParcela) { const c = compras.find(compra => compra.id === bill.compra_parcelada_id); if(c) cat = c.categoria; }
     const icon = CATEGORY_ICONS[cat] || CATEGORY_ICONS['Outros'];
     const editAction = isParcela ? 'recriar-compra-parcelada' : 'editar-lancamento';
     const editId = isParcela ? bill.compra_parcelada_id : bill.id;
     return `<div class="bill-item">
                 <div class="transaction-icon-wrapper" style="background-color:${icon.color};"><i class="${icon.icon}"></i></div>
-                <div>
-                    <div class="transaction-description">${bill.descricao}</div>
-                    <div class="transaction-meta">Vence em: ${new Date(bill.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}</div>
-                </div>
+                <div><div class="transaction-description">${bill.descricao}</div><div class="transaction-meta">Vence em: ${new Date(bill.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}</div></div>
                 <span class="transaction-value ${bill.tipo === 'a_pagar' ? 'expense-text' : 'income-text'}">${formatarMoeda(bill.valor)}</span>
-                <div class="bill-actions">
-                    <button class="btn btn-small" data-action="pagar-conta" data-id="${bill.id}">Pagar</button>
-                    <button class="btn-icon" data-action="${editAction}" data-id="${editId}" title="Editar"><i class="fas fa-edit"></i></button>
-                    <button class="btn-icon" data-action="deletar-lancamento" data-id="${bill.id}" data-compra-id="${bill.compra_parcelada_id}"><i class="fas fa-trash"></i></button>
-                </div>
+                <div class="bill-actions"><button class="btn btn-small" data-action="pagar-conta" data-id="${bill.id}">Pagar</button><button class="btn-icon" data-action="${editAction}" data-id="${editId}" title="Editar"><i class="fas fa-edit"></i></button><button class="btn-icon" data-action="deletar-lancamento" data-id="${bill.id}" data-compra-id="${bill.compra_parcelada_id}"><i class="fas fa-trash"></i></button></div>
             </div>`;
 };
-
-export const renderHistoricoTransacoes = () => {
+export const renderHistoricoTransacoes = (page = 1, filters = { mes: 'todos', pesquisa: '' }) => {
     const container = document.getElementById('tab-history');
     const { transacoes } = getState();
-    if (!transacoes.length) { container.innerHTML = '<p class="placeholder">Nenhuma transação.</p>'; return; }
-    const agrupados = transacoes.reduce((acc, t) => {
-        const data = new Date(t.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
-        if (!acc[data]) acc[data] = [];
-        acc[data].push(t);
-        return acc;
-    }, {});
-    container.innerHTML = Object.entries(agrupados).map(([data, transacoesDoDia]) => `
-        <div class="monthly-header">${data}</div>
-        ${transacoesDoDia.map(renderTransactionCard).join('')}
-    `).join('');
+    const mesesDisponiveis = [...new Set(transacoes.map(t => t.data.substring(0, 7)))].sort().reverse();
+    const mesOptions = mesesDisponiveis.map(mes => { const [ano, mesNum] = mes.split('-'); const nomeMes = new Date(ano, mesNum - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' }); return `<option value="${mes}" ${filters.mes === mes ? 'selected' : ''}>${nomeMes}</option>`; }).join('');
+    const pesquisaLower = filters.pesquisa.toLowerCase();
+    const filtrados = transacoes.filter(t => (filters.mes === 'todos' || t.data.startsWith(filters.mes)) && (filters.pesquisa === '' || t.descricao.toLowerCase().includes(pesquisaLower) || t.categoria.toLowerCase().includes(pesquisaLower) || getContaPorId(t.conta_id)?.nome.toLowerCase().includes(pesquisaLower)));
+    const totalPages = Math.ceil(filtrados.length / ITEMS_PER_PAGE);
+    const itensPaginados = filtrados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+    const filtrosHTML = `<div class="filters-container"><div class="form-group"><label>Mês</label><select id="history-month-filter"><option value="todos">Todos</option>${mesOptions}</select></div><div class="form-group"><label>Pesquisar</label><input type="search" id="history-search-input" value="${filters.pesquisa}"></div></div>`;
+    const itensHTML = itensPaginados.length ? itensPaginados.map(renderTransactionCard).join('') : '<p class="placeholder">Nenhuma transação encontrada.</p>';
+    const paginacaoHTML = totalPages > 1 ? `<div class="pagination-container"><button class="btn" data-action="prev-page-history" ${page === 1 ? 'disabled' : ''}>&lt;</button><span class="pagination-info">${page} / ${totalPages}</span><button class="btn" data-action="next-page-history" ${page >= totalPages ? 'disabled' : ''}>&gt;</button></div>` : '';
+    container.innerHTML = filtrosHTML + itensHTML + paginacaoHTML;
 };
-
 const renderTransactionCard = (t) => {
-    const conta = getContaPorId(t.conta_id);
-    const icon = CATEGORY_ICONS[t.categoria] || CATEGORY_ICONS['Outros'];
+    const conta = getContaPorId(t.conta_id); const icon = CATEGORY_ICONS[t.categoria] || CATEGORY_ICONS['Outros'];
     return `<div class="transaction-card">
             <div class="transaction-icon-wrapper" style="background-color:${icon.color};"><i class="${icon.icon}"></i></div>
-            <div>
-                <div class="transaction-description">${t.descricao}</div>
-                <div class="transaction-meta">${t.categoria} | ${conta ? conta.nome : ''}</div>
-            </div>
-            <span class="transaction-value ${t.tipo === 'despesa' ? 'expense-text' : 'income-text'}">
-                ${t.tipo === 'despesa' ? '-' : ''} ${formatarMoeda(t.valor)}
-            </span>
-            <div class="transaction-actions">
-                <button class="btn-icon" data-action="editar-transacao" data-id="${t.id}" title="Editar"><i class="fas fa-edit"></i></button>
-                <button class="btn-icon" data-action="deletar-transacao" data-id="${t.id}" title="Deletar"><i class="fas fa-trash"></i></button>
-            </div>
-        </div>
-    `;
+            <div><div class="transaction-description">${t.descricao}</div><div class="transaction-meta">${t.categoria} | ${conta ? conta.nome : ''}</div></div>
+            <span class="transaction-value ${t.tipo === 'despesa' ? 'expense-text' : 'income-text'}">${t.tipo === 'despesa' ? '-' : ''} ${formatarMoeda(t.valor)}</span>
+            <div class="transaction-actions"><button class="btn-icon" data-action="editar-transacao" data-id="${t.id}" title="Editar"><i class="fas fa-edit"></i></button><button class="btn-icon" data-action="deletar-transacao" data-id="${t.id}" title="Deletar"><i class="fas fa-trash"></i></button></div>
+        </div>`;
 };
-
 export const renderFormTransacaoRapida = () => {
     document.getElementById('form-transacao-rapida').innerHTML = `
         <div class="form-group"><label>Descrição</label><input type="text" name="descricao" required></div>
@@ -225,8 +186,6 @@ export const renderFormTransacaoRapida = () => {
         <div class="form-group"><label>Data</label><input type="date" name="data" value="${toISODateString(new Date())}" required></div>
         <button type="submit" class="btn">Salvar Transação</button>`;
 };
-
-// --- MODAIS ---
 export const getAccountModalContent = (id=null) => {
     const conta = id ? getContaPorId(id) : {};
     const isCreditCard = conta?.tipo === 'Cartão de Crédito';
@@ -244,12 +203,10 @@ export const getAccountModalContent = (id=null) => {
             <div style="text-align: right; margin-top: 1.5rem;"><button type="submit" class="btn">Salvar</button></div>
         </form>`;
 };
-
 export const getBillModalContent = (id = null) => {
     const { lancamentosFuturos } = getState();
     const bill = id ? lancamentosFuturos.find(l => l.id === id) : {};
     const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${bill.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
-
     return `<h2>${id ? 'Editar' : 'Novo'} Lançamento</h2>
         <form id="form-lancamento" data-id="${id || ''}">
             <div class="form-group"><label>Descrição</label><input name="descricao" value="${bill.descricao || ''}" required></div>
@@ -260,15 +217,12 @@ export const getBillModalContent = (id = null) => {
             <div style="text-align: right;"><button type="submit" class="btn">Salvar</button></div>
         </form>`;
 };
-
 export const getTransactionModalContent = (id) => {
     const { transacoes } = getState();
     const transacao = transacoes.find(t => t.id === id);
     if (!transacao) return `<p>Transação não encontrada.</p>`;
-    
     const contasOptions = getContas().map(c => `<option value="${c.id}" ${transacao.conta_id === c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
     const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${transacao.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
-
     return `<h2>Editar Transação</h2>
         <form id="form-edicao-transacao" data-id="${id}">
             <div class="form-group"><label>Descrição</label><input name="descricao" value="${transacao.descricao}" required></div>
@@ -280,14 +234,11 @@ export const getTransactionModalContent = (id) => {
             <div style="text-align: right;"><button type="submit" class="btn">Salvar Alterações</button></div>
         </form>`;
 };
-
 export const getInstallmentPurchaseEditModalContent = (compraId) => {
     const { comprasParceladas } = getState();
     const compra = comprasParceladas.find(c => c.id === compraId);
     if (!compra) return `<p>Compra não encontrada.</p>`;
-
     const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${compra.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
-
     return `<h2>Editar Compra Parcelada</h2>
         <p style="color: var(--text-secondary); font-size: 0.9rem;">A alteração na descrição e categoria será aplicada a todas as parcelas futuras.</p>
         <form id="form-edicao-compra-parcelada" data-id="${compraId}">
@@ -296,7 +247,6 @@ export const getInstallmentPurchaseEditModalContent = (compraId) => {
             <div style="text-align: right;"><button type="submit" class="btn">Salvar Alterações</button></div>
         </form>`;
 };
-
 export const getPayBillModalContent = (billId) => {
     const bill = getState().lancamentosFuturos.find(b=>b.id===billId);
     return `<h2>Pagar ${bill.descricao}</h2>
@@ -307,12 +257,10 @@ export const getPayBillModalContent = (billId) => {
             <button class="btn" type="submit">Confirmar</button>
         </form>`;
 };
-
 export const getInstallmentPurchaseModalContent = (compraAEditar = null) => {
     const contasCartao = getContas().filter(c => c.tipo === 'Cartão de Crédito');
     const contasOptions = contasCartao.map(c => `<option value="${c.id}" ${compraAEditar?.conta_id === c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
     const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${compraAEditar?.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
-
     return `<h2>${compraAEditar ? 'Recriar' : 'Nova'} Compra Parcelada</h2>
         ${compraAEditar ? '<p class="placeholder" style="margin-bottom:1rem;">Ajuste os dados e salve. A compra antiga será substituída.</p>' : ''}
         <form id="form-compra-parcelada" data-compra-antiga-id="${compraAEditar?.id || ''}">
@@ -325,7 +273,6 @@ export const getInstallmentPurchaseModalContent = (compraAEditar = null) => {
             <div style="text-align: right;"><button type="submit" class="btn">${compraAEditar ? 'Salvar e Substituir' : 'Salvar Compra'}</button></div>
         </form>`;
 };
-
 export const getStatementModalContent = (contaId) => {
     const conta = getContaPorId(contaId);
     const { transacoes } = getState();
@@ -349,7 +296,6 @@ export const getStatementModalContent = (contaId) => {
             <p class="placeholder">Selecione um mês para ver os detalhes.</p>
         </div>`;
 };
-
 export const renderStatementDetails = (contaId, mesSelecionado) => {
     const container = document.getElementById('statement-details-container');
     if (!mesSelecionado) { container.innerHTML = '<p class="placeholder">Selecione um mês para ver os detalhes.</p>'; return; }
