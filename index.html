@@ -7,7 +7,7 @@
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     
@@ -30,7 +30,7 @@
                     <div class="card-header-title"><i class="fas fa-university"></i><h2>Minhas Contas</h2></div>
                     <button id="btn-add-account" class="btn-icon" title="Adicionar Conta"><i class="fas fa-plus"></i></button>
                 </div>
-                <div id="accounts-container"><p style="text-align:center; color: var(--text-secondary);">Carregando contas...</p></div>
+                <div id="accounts-container"><p style="text-align:center; color: var(--text-secondary);">Carregando...</p></div>
             </div>
             <div class="card" style="margin-top: 1.5rem;">
                 <div class="card-header"><div class="card-header-title"><i class="fas fa-plus-circle"></i><h2>Nova Transação</h2></div></div>
@@ -49,19 +49,16 @@
                     <button class="tab-button" data-tab="dashboard-yearly">Visão Anual</button>
                 </div>
             
-                <div id="dashboard-monthly" class="tab-content active">
-                    </div>
-            
-                <div id="dashboard-yearly" class="tab-content">
-                    </div>
+                <div id="dashboard-monthly" class="tab-content active"></div>
+                <div id="dashboard-yearly" class="tab-content"></div>
             </div>
 
             <div class="card" style="margin-top: 1.5rem;">
                  <div class="card-header">
                     <div class="card-header-title"><i class="fas fa-exchange-alt"></i><h2>Painel Financeiro</h2></div>
                     <div class="actions">
-                        <button id="btn-open-installment" class="btn btn-secondary btn-small"><i class="fas fa-credit-card"></i> Compra Parcelada</button>
-                        <button id="btn-open-bill" class="btn btn-small"><i class="fas fa-plus"></i> Lançamento Futuro</button>
+                        <button id="btn-open-installment" class="btn btn-secondary"><i class="fas fa-credit-card"></i> Compra Parcelada</button>
+                        <button id="btn-open-bill" class="btn"><i class="fas fa-plus"></i> Lançamento Futuro</button>
                     </div>
                 </div>
                 <div class="tab-buttons" id="main-tab-buttons">
