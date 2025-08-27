@@ -1,4 +1,3 @@
-// js/main.js
 import * as UI from './ui.js';
 import * as API from './api.js';
 import * as State from './state.js';
@@ -163,9 +162,17 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.addEventListener('click', e => {
             const target = e.target.closest('[data-action]');
             if(!target) return;
+            const action = target.dataset.action;
             const id = parseInt(target.dataset.id);
             const compraId = parseInt(target.dataset.compraId);
-            switch(target.dataset.action){
+
+            // Paginação
+            if (action === 'next-page-history' && historyCurrentPage < Math.ceil(State.getState().transacoes.length / 10)) UI.renderHistoricoTransacoes(++historyCurrentPage, historyFilters);
+            if (action === 'prev-page-history' && historyCurrentPage > 1) UI.renderHistoricoTransacoes(--historyCurrentPage, historyFilters);
+            if (action === 'next-page-bills') UI.renderLancamentosFuturos(++billsCurrentPage, billsFilters);
+            if (action === 'prev-page-bills') UI.renderLancamentosFuturos(--billsCurrentPage, billsFilters);
+
+            switch(action){
                 case 'editar-conta': 
                     UI.openModal(UI.getAccountModalContent(id)); 
                     document.getElementById('form-conta').addEventListener('submit',salvarConta); 
@@ -206,8 +213,32 @@ document.addEventListener('DOMContentLoaded', () => {
                     break;
             }
         });
+        
+        // CORREÇÃO: Listeners para os filtros
+        document.body.addEventListener('input', e => {
+            if (e.target.id === 'history-search-input') { 
+                historyFilters.pesquisa = e.target.value; 
+                historyCurrentPage = 1; 
+                UI.renderHistoricoTransacoes(historyCurrentPage, historyFilters); 
+            }
+            if (e.target.id === 'bills-search-input') { 
+                billsFilters.pesquisa = e.target.value; 
+                billsCurrentPage = 1; 
+                UI.renderLancamentosFuturos(billsCurrentPage, billsFilters); 
+            }
+        });
 
         document.body.addEventListener('change', e => {
+            if (e.target.id === 'history-month-filter') { 
+                historyFilters.mes = e.target.value; 
+                historyCurrentPage = 1; 
+                UI.renderHistoricoTransacoes(historyCurrentPage, historyFilters); 
+            }
+            if (e.target.id === 'bills-month-filter') { 
+                billsFilters.mes = e.target.value; 
+                billsCurrentPage = 1; 
+                UI.renderLancamentosFuturos(billsCurrentPage, billsFilters); 
+            }
             if (e.target.id === 'conta-tipo') {
                 const isCreditCard = e.target.value === 'Cartão de Crédito';
                 const cartaoFields = document.getElementById('cartao-credito-fields');
