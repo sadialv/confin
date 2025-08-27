@@ -16,6 +16,16 @@ function setupEventListeners() {
         const current = document.documentElement.getAttribute('data-theme');
         applyTheme(current === 'light' ? 'dark' : 'light');
     });
+
+    // --- NOVO CÓDIGO: LÓGICA PARA FECHAR O MODAL AO CLICAR FORA ---
+    document.getElementById('modal-container').addEventListener('click', (e) => {
+        // Verifica se o clique foi no próprio fundo (overlay) e não no conteúdo do modal
+        if (e.target === e.currentTarget) {
+            UI.closeModal();
+        }
+    });
+    // --- FIM DO NOVO CÓDIGO ---
+
     document.getElementById('dashboard-tab-buttons').addEventListener('click', e => e.target.matches('.tab-button') && UI.switchTab(e.target, '.card:has(#dashboard-tab-buttons)'));
     document.getElementById('main-tab-buttons').addEventListener('click', e => e.target.matches('.tab-button') && UI.switchTab(e.target, '.card:has(#main-tab-buttons)'));
     document.getElementById('form-transacao-rapida').addEventListener('submit', salvarTransacaoRapida);
