@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ConFin - Gestor Financeiro Completo</title>
+    <title>ConFin - Gestor Financeiro</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,7 +16,7 @@
 <body>
     <header>
         <h1><i class="fas fa-wallet"></i> ConFin</h1>
-        <div class="theme-switcher" id="theme-switcher">
+        <div id="theme-switcher" class="theme-switcher">
             <i class="fas fa-sun"></i>
             <div class="theme-toggle"><div class="theme-toggle-circle"></div></div>
             <i class="fas fa-moon"></i>
@@ -27,50 +27,48 @@
         <aside>
             <div class="card">
                 <div class="card-header">
-                    <div class="card-header-title"><i class="fas fa-university"></i><h2>Minhas Contas</h2></div>
+                    <div class="card-header-title"><h2>Minhas Contas</h2></div>
                     <button id="btn-add-account" class="btn-icon" title="Adicionar Conta"><i class="fas fa-plus"></i></button>
                 </div>
-                <div id="accounts-container"><p style="text-align:center; color: var(--text-secondary);">Carregando...</p></div>
+                <div id="accounts-container"><p class="placeholder">Carregando...</p></div>
             </div>
-            <div class="card" style="margin-top: 1.5rem;">
-                <div class="card-header"><div class="card-header-title"><i class="fas fa-plus-circle"></i><h2>Nova Transação</h2></div></div>
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-header-title"><h2>Nova Transação</h2></div>
+                </div>
                 <form id="form-transacao-rapida"></form>
             </div>
         </aside>
 
         <main id="main-content">
             <div class="card">
-                <div class="card-header" id="summary-card-header">
-                    <div class="card-header-title"><i class="fas fa-chart-pie"></i><h2>Dashboard Financeira</h2></div>
+                <div class="card-header">
+                    <div class="card-header-title"><h2>Dashboard Financeira</h2></div>
                 </div>
-                
                 <div class="tab-buttons" id="dashboard-tab-buttons">
                     <button class="tab-button active" data-tab="dashboard-monthly">Visão Mensal</button>
                     <button class="tab-button" data-tab="dashboard-yearly">Visão Anual</button>
                 </div>
-            
-                <div id="dashboard-monthly" class="tab-content active"></div>
-                <div id="dashboard-yearly" class="tab-content"></div>
+                <div id="dashboard-monthly" class="tab-content active"><p class="placeholder">Carregando...</p></div>
+                <div id="dashboard-yearly" class="tab-content"><p class="placeholder">Carregando...</p></div>
             </div>
 
-            <div class="card" style="margin-top: 1.5rem;">
+            <div class="card">
                  <div class="card-header">
-                    <div class="card-header-title"><i class="fas fa-exchange-alt"></i><h2>Painel Financeiro</h2></div>
+                    <div class="card-header-title"><h2>Painel Financeiro</h2></div>
                     <div class="actions">
-                        <button id="btn-open-installment" class="btn btn-secondary"><i class="fas fa-credit-card"></i> Compra Parcelada</button>
-                        <button id="btn-open-bill" class="btn"><i class="fas fa-plus"></i> Lançamento Futuro</button>
+                        <button id="btn-open-installment" class="btn btn-secondary btn-small"><i class="fas fa-credit-card"></i> Compra Parcelada</button>
+                        <button id="btn-open-bill" class="btn btn-small"><i class="fas fa-plus"></i> Lançamento Futuro</button>
                     </div>
                 </div>
                 <div class="tab-buttons" id="main-tab-buttons">
                     <button class="tab-button active" data-tab="tab-bills">Contas a Pagar/Receber</button>
                     <button class="tab-button" data-tab="tab-history">Histórico de Transações</button>
                 </div>
-                <div id="tab-bills" class="tab-content active"><p style="text-align:center; color: var(--text-secondary);">Carregando...</p></div>
-                <div id="tab-history" class="tab-content"><p style="text-align:center; color: var(--text-secondary);">Carregando...</p></div>
+                <div id="tab-bills" class="tab-content active"><p class="placeholder">Carregando...</p></div>
+                <div id="tab-history" class="tab-content"><p class="placeholder">Carregando...</p></div>
             </div>
         </main>
-
-        <main id="statement-view-container" style="display: none;"></main>
     </div>
 
     <div class="modal-overlay" id="modal-container">
