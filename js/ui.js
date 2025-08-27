@@ -1,3 +1,4 @@
+// js/ui.js
 import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, HOJE, CHART_COLORS } from './utils.js';
 import { getState, getContaPorId, getContas } from './state.js';
 
@@ -238,7 +239,7 @@ const renderTransactionCard = (t) => {
         </div>`;
 };
 export const renderFormTransacaoRapida = () => {
-    const container = document.getElementById('form-transacao-rapida');
+    const container = document.getElementById('form-transacao-unificada');
     const contas = getContas();
     const contasCartao = contas.filter(c => c.tipo === 'Cartão de Crédito');
     
@@ -247,48 +248,64 @@ export const renderFormTransacaoRapida = () => {
     const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}">${c}</option>`).join('');
 
     container.innerHTML = `
-        <div class="tab-buttons" id="transaction-type-tabs">
-            <button class="tab-button active" data-tab="form-a-vista">À Vista</button>
-            <button class="tab-button" data-tab="form-parcelada">Parcelada</button>
-            <button class="tab-button" data-tab="form-recorrente">Recorrente</button>
+        <div class="form-group">
+            <label for="tipo-compra">Tipo de Compra</label>
+            <select id="tipo-compra" name="tipo_compra">
+                <option value="vista">À Vista</option>
+                <option value="parcelada">Parcelada</option>
+                <option value="recorrente">Recorrente</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Descrição</label>
+            <input type="text" name="descricao" required>
+        </div>
+        <div class="form-group">
+            <label id="label-valor">Valor</label>
+            <input type="number" name="valor" step="0.01" required>
+        </div>
+        <div class="form-group">
+            <label id="label-data">Data</label>
+            <input type="date" name="data" value="${toISODateString(new Date())}" required>
+        </div>
+        <div class="form-group">
+            <label id="label-conta">Conta</label>
+            <select name="conta_id" required>${contasOptions}</select>
         </div>
 
-        <div id="form-a-vista" class="tab-content active">
-            <form id="form-transacao-vista">
-                <div class="form-group"><label>Descrição</label><input type="text" name="descricao" required></div>
-                <div class="form-group"><label>Valor</label><input type="number" name="valor" step="0.01" required></div>
-                <div class="form-group"><label>Tipo</label><select name="tipo"><option value="despesa">Despesa</option><option value="receita">Receita</option></select></div>
-                <div class="form-group"><label>Conta</label><select name="conta_id" required>${contasOptions}</select></div>
-                <div class="form-group"><label>Categoria</label><select name="categoria" required>${categoriasOptions}</select></div>
-                <div class="form-group"><label>Data</label><input type="date" name="data" value="${toISODateString(new Date())}" required></div>
-                <button type="submit" class="btn">Salvar Transação</button>
-            </form>
+        <div id="parcelada-fields" style="display: none;">
+            <div class="form-group">
+                <label>Nº de Parcelas</label>
+                <input name="numero_parcelas" type="number" min="2">
+            </div>
         </div>
-
-        <div id="form-parcelada" class="tab-content">
-            <form id="form-transacao-parcelada">
-                <div class="form-group"><label>Descrição</label><input name="descricao" required></div>
-                <div class="form-group"><label>Valor Total</label><input name="valor_total" type="number" step="0.01" required></div>
-                <div class="form-group"><label>Nº de Parcelas</label><input name="numero_parcelas" type="number" min="2" required></div>
-                <div class="form-group"><label>Data da Compra</label><input name="data_compra" type="date" value="${toISODateString(new Date())}" required></div>
-                <div class="form-group"><label>Cartão de Crédito</label><select name="conta_id" required>${contasCartaoOptions}</select></div>
-                <div class="form-group"><label>Categoria</label><select name="categoria" required>${categoriasOptions}</select></div>
-                <button type="submit" class="btn">Lançar Parcelas</button>
-            </form>
+        <div id="recorrente-fields" style="display: none;">
+            <div class="form-group">
+                <label>Frequência</label>
+                <select name="frequencia">
+                    <option value="diaria">Diária</option>
+                    <option value="mensal">Mensal</option>
+                    <option value="anual">Anual</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Repetir até</label>
+                <input name="data_fim_recorrencia" type="date">
+            </div>
         </div>
-
-        <div id="form-recorrente" class="tab-content">
-             <form id="form-transacao-recorrente">
-                <div class="form-group"><label>Descrição</label><input name="descricao" placeholder="Ex: Assinatura Netflix" required></div>
-                <div class="form-group"><label>Valor de cada Lançamento</label><input name="valor" type="number" step="0.01" required></div>
-                <div class="form-group"><label>Data do Primeiro Vencimento</label><input name="data_inicio" type="date" value="${toISODateString(new Date())}" required></div>
-                <div class="form-group"><label>Frequência</label><select name="frequencia"><option value="mensal">Mensal</option><option value="anual">Anual</option></select></div>
-                <div class="form-group"><label>Nº de Repetições</label><input name="repeticoes" type="number" min="1" value="12" required></div>
-                <div class="form-group"><label>Categoria</label><select name="categoria" required>${categoriasOptions}</select></div>
-                <button type="submit" class="btn">Criar Lançamentos</button>
-            </form>
+        
+        <div class="form-group">
+            <label>Categoria</label>
+            <select name="categoria" required>${categoriasOptions}</select>
         </div>
+        <button type="submit" class="btn">Salvar Transação</button>
     `;
+
+    const contaSelect = container.querySelector('select[name="conta_id"]');
+    if (contasCartaoOptions.length > 0) {
+        contaSelect.dataset.allOptions = contasOptions;
+        contaSelect.dataset.creditCardOptions = contasCartaoOptions;
+    }
 };
 export const getAccountModalContent = (id=null) => {
     const conta = id ? getContaPorId(id) : {};
