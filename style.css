@@ -65,12 +65,49 @@ main { display: flex; flex-direction: column; gap: 1.5rem; }
 .tab-content.active { display: block; }
 
 /* LISTAS */
-.account-item { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border-color); }
-.account-name { font-weight: 500; }
-.account-type { font-size: 0.8rem; color: var(--text-secondary); }
-.account-balance { font-weight: 500; }
-.account-actions { display: flex; }
+/* --- AJUSTE AQUI --- */
+.account-item {
+    display: grid;
+    /* Duas colunas principais: uma para os detalhes, outra para o saldo e ações */
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+.account-item:last-child {
+    border-bottom: none;
+}
+.account-details {
+    /* Faz com que nome e tipo fiquem um sobre o outro */
+    display: flex;
+    flex-direction: column;
+}
+.account-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+.account-type {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+.account-balance-actions {
+    /* Agrupa o saldo e os botões na segunda coluna */
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.account-balance {
+    font-weight: 500;
+    white-space: nowrap;
+}
+.account-actions {
+    display: flex;
+}
+/* --- FIM DO AJUSTE --- */
+
 .bill-item, .transaction-card { display: grid; grid-template-columns: 40px 1fr auto auto; gap: 1rem; align-items: center; padding: 0.75rem; border-bottom: 1px solid var(--border-color); }
+.bill-item:last-child, .transaction-card:last-child { border-bottom: none; }
 .transaction-icon-wrapper { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; }
 .transaction-description { font-weight: 500; }
 .transaction-meta { font-size: 0.85rem; color: var(--text-secondary); }
@@ -83,12 +120,13 @@ main { display: flex; flex-direction: column; gap: 1.5rem; }
 .form-group input, .form-group select { width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--radius); background-color: var(--bg-primary); color: var(--text-primary); }
 
 /* MODAL & TOAST */
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; opacity: 0; visibility: hidden; z-index: 1000; }
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; opacity: 0; visibility: hidden; z-index: 1000; transition: opacity 0.2s; }
 .modal-overlay.active { opacity: 1; visibility: visible; }
-.modal-content { background-color: var(--bg-card); padding: 1.5rem; border-radius: var(--radius); width: 90%; max-width: 500px; }
+.modal-content { background-color: var(--bg-card); padding: 1.5rem; border-radius: var(--radius); width: 90%; max-width: 500px; position: relative; }
 .modal-close-btn { position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; color: var(--text-secondary); cursor: pointer; }
 .toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 1001; }
-.toast { color: white; padding: 1rem; border-radius: var(--radius); margin-top: 1rem; }
+.toast { color: white; padding: 1rem; border-radius: var(--radius); margin-top: 1rem; opacity: 0; transition: opacity 0.3s; }
+.toast.show { opacity: 1; }
 .toast.success { background-color: var(--income-color); }
 .toast.error { background-color: var(--expense-color); }
 
