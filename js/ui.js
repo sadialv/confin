@@ -49,6 +49,7 @@ export const renderAllComponents = () => {
     renderHistoricoTransacoes();
     renderFormTransacaoRapida();
 };
+
 export const renderContas = () => {
     const container = document.getElementById('accounts-container');
     const { contas, transacoes } = getState();
@@ -75,8 +76,10 @@ export const renderContas = () => {
                 </div>`;
     }).join('');
 };
+
 export const renderVisaoMensal = () => {
     const container = document.getElementById('dashboard-monthly');
+    if (!container) return;
     const mes = document.getElementById('dashboard-month-filter')?.value || new Date().toISOString().slice(0, 7);
     const { transacoes } = getState();
     const transacoesMes = transacoes.filter(t => t.data?.startsWith(mes));
@@ -101,8 +104,10 @@ export const renderVisaoMensal = () => {
         });
     }
 };
+
 export const renderVisaoAnual = () => {
     const container = document.getElementById('dashboard-yearly');
+    if (!container) return;
     const ano = parseInt(document.getElementById('dashboard-year-filter')?.value) || new Date().getFullYear();
     const { transacoes } = getState();
     const transacoesAno = transacoes.filter(t => t.data?.startsWith(ano));
@@ -122,9 +127,13 @@ export const renderVisaoAnual = () => {
         });
     }
 };
+
 export const renderFilters = (type, filters = { mes: 'todos', pesquisa: '' }) => {
     const isBills = type === 'bills';
-    const container = document.getElementById(isBills ? 'bills-filters-container' : 'history-filters-container');
+    const containerId = isBills ? 'bills-filters-container' : 'history-filters-container';
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
     const data = isBills ? getState().lancamentosFuturos.filter(l => l.status === 'pendente') : getState().transacoes;
     const dateKey = isBills ? 'data_vencimento' : 'data';
     
@@ -145,8 +154,10 @@ export const renderFilters = (type, filters = { mes: 'todos', pesquisa: '' }) =>
             <div class="form-group"><label>Pesquisar</label><input type="search" id="${isBills ? 'bills' : 'history'}-search-input" value="${filters.pesquisa}"></div>
         </div>`;
 };
+
 export const renderLancamentosFuturos = (page = 1, filters = { mes: 'todos', pesquisa: '' }) => {
     const container = document.getElementById('bills-list-container');
+    if (!container) return;
     const { lancamentosFuturos, comprasParceladas } = getState();
     const pendentes = lancamentosFuturos.filter(l => l.status === 'pendente');
     const pesquisaLower = filters.pesquisa.toLowerCase();
@@ -160,8 +171,10 @@ export const renderLancamentosFuturos = (page = 1, filters = { mes: 'todos', pes
     const paginacaoHTML = totalPages > 1 ? `<div class="pagination-container"><button class="btn" data-action="prev-page-bills" ${page === 1 ? 'disabled' : ''}>&lt;</button><span class="pagination-info">${page} / ${totalPages}</span><button class="btn" data-action="next-page-bills" ${page >= totalPages ? 'disabled' : ''}>&gt;</button></div>` : '';
     container.innerHTML = itensHTML + paginacaoHTML;
 };
+
 const renderBillsSummary = (bills) => {
     const container = document.getElementById('bills-summary-panel');
+    if (!container) return;
     const totalPagar = bills.filter(l => l.tipo === 'a_pagar').reduce((sum, l) => sum + l.valor, 0);
     const totalReceber = bills.filter(l => l.tipo === 'a_receber').reduce((sum, l) => sum + l.valor, 0);
     
@@ -181,6 +194,7 @@ const renderBillsSummary = (bills) => {
             </div>
         </div>`;
 };
+
 const renderBillItem = (bill, compras) => {
     const isParcela = !!bill.compra_parcelada_id; let cat = bill.categoria;
     if (isParcela) { const c = compras.find(compra => compra.id === bill.compra_parcelada_id); if(c) cat = c.categoria; }
@@ -194,8 +208,10 @@ const renderBillItem = (bill, compras) => {
                 <div class="bill-actions"><button class="btn btn-small" data-action="pagar-conta" data-id="${bill.id}">Pagar</button><button class="btn-icon" data-action="${editAction}" data-id="${editId}" title="Editar"><i class="fas fa-edit"></i></button><button class="btn-icon" data-action="deletar-lancamento" data-id="${bill.id}" data-compra-id="${bill.compra_parcelada_id}"><i class="fas fa-trash"></i></button></div>
             </div>`;
 };
+
 export const renderHistoricoTransacoes = (page = 1, filters = { mes: 'todos', pesquisa: '' }) => {
     const container = document.getElementById('history-list-container');
+    if (!container) return;
     const { transacoes } = getState();
     const pesquisaLower = filters.pesquisa.toLowerCase();
     const filtrados = transacoes.filter(t => (filters.mes === 'todos' || t.data.startsWith(filters.mes)) && (filters.pesquisa === '' || t.descricao.toLowerCase().includes(pesquisaLower) || t.categoria.toLowerCase().includes(pesquisaLower) || getContaPorId(t.conta_id)?.nome.toLowerCase().includes(pesquisaLower)));
@@ -208,8 +224,10 @@ export const renderHistoricoTransacoes = (page = 1, filters = { mes: 'todos', pe
     const paginacaoHTML = totalPages > 1 ? `<div class="pagination-container"><button class="btn" data-action="prev-page-history" ${page === 1 ? 'disabled' : ''}>&lt;</button><span class="pagination-info">${page} / ${totalPages}</span><button class="btn" data-action="next-page-history" ${page >= totalPages ? 'disabled' : ''}>&gt;</button></div>` : '';
     container.innerHTML = itensHTML + paginacaoHTML;
 };
+
 const renderHistorySummary = (transactions) => {
     const container = document.getElementById('history-summary-panel');
+    if (!container) return;
     const totalReceitas = transactions.filter(t => t.tipo === 'receita').reduce((sum, t) => sum + t.valor, 0);
     const totalDespesas = transactions.filter(t => t.tipo === 'despesa').reduce((sum, t) => sum + t.valor, 0);
     const saldo = totalReceitas - totalDespesas;
@@ -234,6 +252,7 @@ const renderHistorySummary = (transactions) => {
             </div>
         </div>`;
 };
+
 const renderTransactionCard = (t) => {
     const conta = getContaPorId(t.conta_id); const icon = CATEGORY_ICONS[t.categoria] || CATEGORY_ICONS['Outros'];
     return `<div class="transaction-card">
@@ -243,8 +262,10 @@ const renderTransactionCard = (t) => {
             <div class="transaction-actions"><button class="btn-icon" data-action="editar-transacao" data-id="${t.id}" title="Editar"><i class="fas fa-edit"></i></button><button class="btn-icon" data-action="deletar-transacao" data-id="${t.id}" title="Deletar"><i class="fas fa-trash"></i></button></div>
         </div>`;
 };
+
 export const renderFormTransacaoRapida = () => {
     const container = document.getElementById('form-transacao-unificada');
+    if (!container) return;
     const contas = getContas();
     const contasCartao = contas.filter(c => c.tipo === 'Cartão de Crédito');
     
@@ -277,7 +298,6 @@ export const renderFormTransacaoRapida = () => {
             <label id="label-conta">Conta</label>
             <select name="conta_id" required>${contasOptions}</select>
         </div>
-
         <div id="parcelada-fields" style="display: none;">
             <div class="form-group">
                 <label>Nº de Parcelas</label>
@@ -298,7 +318,6 @@ export const renderFormTransacaoRapida = () => {
                 <input name="data_fim_recorrencia" type="date">
             </div>
         </div>
-        
         <div class="form-group">
             <label>Categoria</label>
             <select name="categoria" required>${categoriasOptions}</select>
@@ -312,6 +331,8 @@ export const renderFormTransacaoRapida = () => {
         contaSelect.dataset.creditCardOptions = contasCartaoOptions;
     }
 };
+
+// --- MODAIS ---
 export const getAccountModalContent = (id=null) => {
     const conta = id ? getContaPorId(id) : {};
     const isCreditCard = conta?.tipo === 'Cartão de Crédito';
@@ -329,6 +350,7 @@ export const getAccountModalContent = (id=null) => {
             <div style="text-align: right; margin-top: 1.5rem;"><button type="submit" class="btn">Salvar</button></div>
         </form>`;
 };
+
 export const getBillModalContent = (id = null) => {
     const { lancamentosFuturos } = getState();
     const bill = id ? lancamentosFuturos.find(l => l.id === id) : {};
@@ -343,6 +365,7 @@ export const getBillModalContent = (id = null) => {
             <div style="text-align: right;"><button type="submit" class="btn">Salvar</button></div>
         </form>`;
 };
+
 export const getTransactionModalContent = (id) => {
     const { transacoes } = getState();
     const transacao = transacoes.find(t => t.id === id);
@@ -360,6 +383,7 @@ export const getTransactionModalContent = (id) => {
             <div style="text-align: right;"><button type="submit" class="btn">Salvar Alterações</button></div>
         </form>`;
 };
+
 export const getInstallmentPurchaseEditModalContent = (compraId) => {
     const { comprasParceladas } = getState();
     const compra = comprasParceladas.find(c => c.id === compraId);
@@ -373,6 +397,7 @@ export const getInstallmentPurchaseEditModalContent = (compraId) => {
             <div style="text-align: right;"><button type="submit" class="btn">Salvar Alterações</button></div>
         </form>`;
 };
+
 export const getPayBillModalContent = (billId) => {
     const bill = getState().lancamentosFuturos.find(b=>b.id===billId);
     return `<h2>Pagar ${bill.descricao}</h2>
@@ -383,6 +408,7 @@ export const getPayBillModalContent = (billId) => {
             <button class="btn" type="submit">Confirmar</button>
         </form>`;
 };
+
 export const getInstallmentPurchaseModalContent = (compraAEditar = null) => {
     const contasCartao = getContas().filter(c => c.tipo === 'Cartão de Crédito');
     const contasOptions = contasCartao.map(c => `<option value="${c.id}" ${compraAEditar?.conta_id === c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
@@ -399,6 +425,7 @@ export const getInstallmentPurchaseModalContent = (compraAEditar = null) => {
             <div style="text-align: right;"><button type="submit" class="btn">${compraAEditar ? 'Salvar e Substituir' : 'Salvar Compra'}</button></div>
         </form>`;
 };
+
 export const getStatementModalContent = (contaId) => {
     const conta = getContaPorId(contaId);
     const { transacoes } = getState();
@@ -422,6 +449,7 @@ export const getStatementModalContent = (contaId) => {
             <p class="placeholder">Selecione um mês para ver os detalhes.</p>
         </div>`;
 };
+
 export const renderStatementDetails = (contaId, mesSelecionado) => {
     const container = document.getElementById('statement-details-container');
     if (!mesSelecionado) { container.innerHTML = '<p class="placeholder">Selecione um mês para ver os detalhes.</p>'; return; }
