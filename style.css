@@ -118,31 +118,7 @@ main { display: flex; flex-direction: column; gap: 1.5rem; }
 .pagination-container button:disabled { opacity: 0.5; cursor: not-allowed; }
 .pagination-container button:hover:not(:disabled) { background-color: var(--bg-primary); border-color: var(--accent-color); color: var(--accent-color); }
 .pagination-info { font-weight: 500; color: var(--text-secondary); }
-
-/* PAINEL DE RESUMO DOS FILTROS */
-.summary-panel {
-    background-color: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius);
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-    display: flex;
-    justify-content: space-around;
-    flex-wrap: wrap;
-    gap: 1rem;
-    text-align: center;
-}
-.summary-panel-item {
-    display: flex;
-    flex-direction: column;
-}
-.summary-panel-item .label {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    font-weight: 500;
-    margin-bottom: 0.25rem;
-}
-.summary-panel-item .value {
-    font-size: 1.1rem;
-    font-weight: 600;
-}
+.summary-panel { background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem; display: flex; justify-content: space-around; flex-wrap: wrap; gap: 1rem; text-align: center; }
+.summary-panel-item { display: flex; flex-direction: column; }
+.summary-panel-item .label { font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; margin-bottom: 0.25rem; }
+.summary-panel-item .value { font-size: 1.1rem; font-weight: 600; }
