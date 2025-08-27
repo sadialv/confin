@@ -47,7 +47,7 @@ main { display: flex; flex-direction: column; gap: 1.5rem; }
 .card-header-title h2 { margin: 0; font-size: 1.1rem; }
 
 /* ELEMENTOS GERAIS */
-.btn { background-color: var(--accent-color); color: white; border: none; padding: 0.5rem 1rem; border-radius: var(--radius); cursor: pointer; font-weight: 500; }
+.btn { background-color: var(--accent-color); color: white; border: none; padding: 0.5rem 1rem; border-radius: var(--radius); cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; gap: 0.5rem; }
 .btn:hover { background-color: var(--accent-color-hover); }
 .btn-secondary { background-color: #42526e; }
 .btn-small { font-size: 0.85rem; }
@@ -65,15 +65,7 @@ main { display: flex; flex-direction: column; gap: 1.5rem; }
 .tab-content.active { display: block; }
 
 /* LISTAS */
-/* CORRIGIDO: Alinhamento da lista de contas */
-.account-item {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid var(--border-color);
-}
+.account-item { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border-color); }
 .account-item:last-child { border-bottom: none; }
 .account-details { display: flex; flex-direction: column; }
 .account-name { font-weight: 600; font-size: 0.95rem; }
@@ -113,8 +105,21 @@ main { display: flex; flex-direction: column; gap: 1.5rem; }
 
 /* DASHBOARD */
 .dashboard-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-/* CORRIGIDO: Centralização dos KPIs */
 .kpi-item { text-align: center; }
 .kpi-item h4 { font-size: 0.9rem; color: var(--text-secondary); font-weight: 500; }
 .kpi-item p { font-size: 1.25rem; font-weight: 600; margin: 0; }
 .dashboard-chart-container { height: 300px; }
+
+/* FILTROS E PAGINAÇÃO */
+.filters-container { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.filters-container .form-group { flex: 1; margin-bottom: 0; }
+.filters-container select, .filters-container input { min-width: 150px; }
+.pagination-container { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-color); }
+.pagination-container button { background-color: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); cursor: pointer; border-radius: var(--radius); padding: 0.5rem 1rem; }
+.pagination-container button:disabled { opacity: 0.5; cursor: not-allowed; }
+.pagination-container button:hover:not(:disabled) { background-color: var(--bg-primary); border-color: var(--accent-color); color: var(--accent-color); }
+.pagination-info { font-weight: 500; color: var(--text-secondary); }
+.summary-panel { background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem; display: flex; justify-content: space-around; flex-wrap: wrap; gap: 1rem; text-align: center; }
+.summary-panel-item { display: flex; flex-direction: column; }
+.summary-panel-item .label { font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; margin-bottom: 0.25rem; }
+.summary-panel-item .value { font-size: 1.1rem; font-weight: 600; }
