@@ -1,3 +1,4 @@
+// js/main.js
 import * as UI from './ui.js';
 import * as API from './api.js';
 import * as State from './state.js';
@@ -22,7 +23,6 @@ async function deletarCompraParceladaCompleta(compraId) {
     }
 }
 
-// CORRIGIDO: A função deletarLancamento agora inclui a lógica para apagar a compra parcelada inteira
 async function deletarLancamento(id, compraId) {
     if (compraId) {
         if (!confirm('Este é um lançamento parcelado. Deseja apagar a compra inteira e todas as suas parcelas?')) return;
@@ -31,7 +31,7 @@ async function deletarLancamento(id, compraId) {
             UI.showToast('Compra e parcelas deletadas com sucesso!');
         } catch(err) {
             UI.showToast(err.message, 'error');
-            return; // Interrompe se houver erro
+            return;
         }
     } else {
         if (!confirm('Apagar este lançamento?')) return;
@@ -40,10 +40,10 @@ async function deletarLancamento(id, compraId) {
             UI.showToast('Lançamento deletado.');
         } catch (err) {
             UI.showToast(err.message, 'error');
-            return; // Interrompe se houver erro
+            return;
         }
     }
-    await initializeApp(false); // Recarrega os dados após qualquer exclusão
+    await initializeApp(false);
 }
 
 async function salvarLancamentoFuturo(e) {
@@ -133,88 +133,101 @@ async function salvarCompraParcelada(e) {
     }
 }
 
-// --- EVENTOS ---
-function setupEventListeners() {
-    document.getElementById('theme-switcher').addEventListener('click', () => { /* ...código existente... */ });
-    document.getElementById('modal-container').addEventListener('click', (e) => { /* ...código existente... */ });
-    document.getElementById('dashboard-tab-buttons').addEventListener('click', e => e.target.matches('.tab-button') && UI.switchTab(e.target, '.card:has(#dashboard-tab-buttons)'));
-    document.getElementById('main-tab-buttons').addEventListener('click', e => e.target.matches('.tab-button') && UI.switchTab(e.target, '.card:has(#main-tab-buttons)'));
-    document.getElementById('form-transacao-rapida').addEventListener('submit', salvarTransacaoRapida);
-    document.getElementById('btn-add-account').addEventListener('click', () => {
-        UI.openModal(UI.getAccountModalContent());
-        document.getElementById('form-conta').addEventListener('submit', salvarConta);
-    });
-    document.getElementById('btn-open-bill').addEventListener('click',() => {
-        UI.openModal(UI.getBillModalContent());
-        document.getElementById('form-lancamento').addEventListener('submit', salvarLancamentoFuturo);
-    });
-    document.getElementById('btn-open-installment').addEventListener('click',() => {
-        UI.openModal(UI.getInstallmentPurchaseModalContent());
-        document.getElementById('form-compra-parcelada').addEventListener('submit', salvarCompraParcelada);
-    });
-    
-    document.body.addEventListener('click', e => {
-        const target = e.target.closest('[data-action]');
-        if(!target) return;
-        const id = parseInt(target.dataset.id);
-        const compraId = parseInt(target.dataset.compraId);
-        switch(target.dataset.action){
-            case 'editar-conta': 
-                UI.openModal(UI.getAccountModalContent(id)); 
-                document.getElementById('form-conta').addEventListener('submit',salvarConta); 
-                break;
-            case 'deletar-conta': 
-                deletarConta(id); 
-                break;
-            case 'pagar-conta': 
-                UI.openModal(UI.getPayBillModalContent(id)); 
-                document.getElementById('form-pagamento').addEventListener('submit',confirmarPagamento); 
-                break;
-            case 'ver-fatura':
-                UI.openModal(UI.getStatementModalContent(id));
-                document.getElementById('statement-month-select').addEventListener('change', (e) => {
-                    UI.renderStatementDetails(parseInt(e.target.dataset.contaId), e.target.value);
-                });
-                break;
-            case 'deletar-lancamento':
-                deletarLancamento(id, compraId);
-                break;
-            case 'deletar-transacao':
-                deletarTransacao(id);
-                break;
-            case 'editar-lancamento':
-                UI.openModal(UI.getBillModalContent(id));
-                document.getElementById('form-lancamento').addEventListener('submit', salvarLancamentoFuturo);
-                break;
-            case 'editar-transacao':
-                UI.openModal(UI.getTransactionModalContent(id));
-                document.getElementById('form-edicao-transacao').addEventListener('submit', salvarEdicaoTransacao);
-                break;
-            case 'recriar-compra-parcelada':
-                const compraOriginal = State.getState().comprasParceladas.find(c => c.id === id);
-                if (compraOriginal) {
-                    UI.openModal(UI.getInstallmentPurchaseModalContent(compraOriginal));
-                    document.getElementById('form-compra-parcelada').addEventListener('submit', salvarCompraParcelada);
-                }
-                break;
-        }
-    });
-    document.body.addEventListener('change', e => { /* ...código existente... */ });
-}
-
-// --- INICIALIZAÇÃO ---
-async function initializeApp(showToast = true) {
-    if(showToast) UI.showToast('Carregando dados...');
-    try {
-        const data = await API.fetchData();
-        State.setState(data);
-        UI.renderAllComponents();
-    } catch (error) {
-        UI.showToast(error.message, 'error');
-    }
-}
-
+// --- FUNÇÃO PRINCIPAL ---
 document.addEventListener('DOMContentLoaded', () => {
+    function setupEventListeners() {
+        document.getElementById('theme-switcher').addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme');
+            applyTheme(current === 'light' ? 'dark' : 'light');
+        });
+        document.getElementById('modal-container').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) UI.closeModal();
+        });
+        document.getElementById('dashboard-tab-buttons').addEventListener('click', e => e.target.matches('.tab-button') && UI.switchTab(e.target, '.card:has(#dashboard-tab-buttons)'));
+        document.getElementById('main-tab-buttons').addEventListener('click', e => e.target.matches('.tab-button') && UI.switchTab(e.target, '.card:has(#main-tab-buttons)'));
+        document.getElementById('form-transacao-rapida').addEventListener('submit', salvarTransacaoRapida);
+        document.getElementById('btn-add-account').addEventListener('click', () => {
+            UI.openModal(UI.getAccountModalContent());
+            document.getElementById('form-conta').addEventListener('submit', salvarConta);
+        });
+        document.getElementById('btn-open-bill').addEventListener('click',() => {
+            UI.openModal(UI.getBillModalContent());
+            document.getElementById('form-lancamento').addEventListener('submit', salvarLancamentoFuturo);
+        });
+        document.getElementById('btn-open-installment').addEventListener('click',() => {
+            UI.openModal(UI.getInstallmentPurchaseModalContent());
+            document.getElementById('form-compra-parcelada').addEventListener('submit', salvarCompraParcelada);
+        });
+        
+        document.body.addEventListener('click', e => {
+            const target = e.target.closest('[data-action]');
+            if(!target) return;
+            const id = parseInt(target.dataset.id);
+            const compraId = parseInt(target.dataset.compraId);
+            switch(target.dataset.action){
+                case 'editar-conta': 
+                    UI.openModal(UI.getAccountModalContent(id)); 
+                    document.getElementById('form-conta').addEventListener('submit',salvarConta); 
+                    break;
+                case 'deletar-conta': 
+                    deletarConta(id); 
+                    break;
+                case 'pagar-conta': 
+                    UI.openModal(UI.getPayBillModalContent(id)); 
+                    document.getElementById('form-pagamento').addEventListener('submit',confirmarPagamento); 
+                    break;
+                case 'ver-fatura':
+                    UI.openModal(UI.getStatementModalContent(id));
+                    document.getElementById('statement-month-select').addEventListener('change', (e) => {
+                        UI.renderStatementDetails(parseInt(e.target.dataset.contaId), e.target.value);
+                    });
+                    break;
+                case 'deletar-lancamento':
+                    deletarLancamento(id, compraId);
+                    break;
+                case 'deletar-transacao':
+                    deletarTransacao(id);
+                    break;
+                case 'editar-lancamento':
+                    UI.openModal(UI.getBillModalContent(id));
+                    document.getElementById('form-lancamento').addEventListener('submit', salvarLancamentoFuturo);
+                    break;
+                case 'editar-transacao':
+                    UI.openModal(UI.getTransactionModalContent(id));
+                    document.getElementById('form-edicao-transacao').addEventListener('submit', salvarEdicaoTransacao);
+                    break;
+                case 'recriar-compra-parcelada':
+                    const compraOriginal = State.getState().comprasParceladas.find(c => c.id === id);
+                    if (compraOriginal) {
+                        UI.openModal(UI.getInstallmentPurchaseModalContent(compraOriginal));
+                        document.getElementById('form-compra-parcelada').addEventListener('submit', salvarCompraParcelada);
+                    }
+                    break;
+            }
+        });
+
+        document.body.addEventListener('change', e => {
+            if (e.target.id === 'conta-tipo') {
+                const isCreditCard = e.target.value === 'Cartão de Crédito';
+                const cartaoFields = document.getElementById('cartao-credito-fields');
+                const saldoField = document.getElementById('saldo-inicial-group');
+                if(cartaoFields) cartaoFields.style.display = isCreditCard ? '' : 'none';
+                if(saldoField) saldoField.style.display = isCreditCard ? 'none' : 'block';
+            }
+        });
+    }
+
+    async function initializeApp(showToast = true) {
+        if(showToast) UI.showToast('Carregando dados...');
+        try {
+            const data = await API.fetchData();
+            State.setState(data);
+            UI.renderAllComponents();
+        } catch (error) {
+            UI.showToast(error.message, 'error');
+        }
+    }
+
     applyTheme(localStorage.getItem('confin-theme') || 'light');
     setupEventListeners();
     initializeApp();
