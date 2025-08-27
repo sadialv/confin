@@ -141,3 +141,56 @@ main { display: flex; flex-direction: column; gap: 1.5rem; }
 .kpi-item h4 { font-size: 0.9rem; color: var(--text-secondary); font-weight: 500; }
 .kpi-item p { font-size: 1.25rem; font-weight: 600; margin: 0; }
 .dashboard-chart-container { height: 300px; }
+/* /== ESTILOS PARA FILTROS E PAGINAÇÃO ==/ */
+
+.filters-container {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.filters-container .form-group {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+.filters-container select,
+.filters-container input {
+    min-width: 150px;
+}
+
+.pagination-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.pagination-container button {
+    background-color: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: var(--radius);
+    padding: 0.5rem 1rem;
+}
+
+.pagination-container button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pagination-container button:hover:not(:disabled) {
+    background-color: var(--bg-primary);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+.pagination-info {
+    font-weight: 500;
+    color: var(--text-secondary);
+}
