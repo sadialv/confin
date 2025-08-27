@@ -65,47 +65,14 @@ main { display: flex; flex-direction: column; gap: 1.5rem; }
 .tab-content.active { display: block; }
 
 /* LISTAS */
-/* --- AJUSTE AQUI --- */
-.account-item {
-    display: grid;
-    /* Duas colunas principais: uma para os detalhes, outra para o saldo e ações */
-    grid-template-columns: 1fr auto;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid var(--border-color);
-}
-.account-item:last-child {
-    border-bottom: none;
-}
-.account-details {
-    /* Faz com que nome e tipo fiquem um sobre o outro */
-    display: flex;
-    flex-direction: column;
-}
-.account-name {
-    font-weight: 600;
-    font-size: 0.95rem;
-}
-.account-type {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-}
-.account-balance-actions {
-    /* Agrupa o saldo e os botões na segunda coluna */
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-.account-balance {
-    font-weight: 500;
-    white-space: nowrap;
-}
-.account-actions {
-    display: flex;
-}
-/* --- FIM DO AJUSTE --- */
-
+.account-item { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border-color); }
+.account-item:last-child { border-bottom: none; }
+.account-details { display: flex; flex-direction: column; }
+.account-name { font-weight: 600; font-size: 0.95rem; }
+.account-type { font-size: 0.8rem; color: var(--text-secondary); }
+.account-balance-actions { display: flex; align-items: center; gap: 0.5rem; }
+.account-balance { font-weight: 500; white-space: nowrap; }
+.account-actions { display: flex; }
 .bill-item, .transaction-card { display: grid; grid-template-columns: 40px 1fr auto auto; gap: 1rem; align-items: center; padding: 0.75rem; border-bottom: 1px solid var(--border-color); }
 .bill-item:last-child, .transaction-card:last-child { border-bottom: none; }
 .transaction-icon-wrapper { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; }
@@ -125,8 +92,7 @@ main { display: flex; flex-direction: column; gap: 1.5rem; }
 .modal-content { background-color: var(--bg-card); padding: 1.5rem; border-radius: var(--radius); width: 90%; max-width: 500px; position: relative; }
 .modal-close-btn { position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; color: var(--text-secondary); cursor: pointer; }
 .toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 1001; }
-.toast { color: white; padding: 1rem; border-radius: var(--radius); margin-top: 1rem; opacity: 0; transition: opacity 0.3s; }
-.toast.show { opacity: 1; }
+.toast { color: white; padding: 1rem; border-radius: var(--radius); margin-top: 1rem; }
 .toast.success { background-color: var(--income-color); }
 .toast.error { background-color: var(--expense-color); }
 
@@ -141,56 +107,13 @@ main { display: flex; flex-direction: column; gap: 1.5rem; }
 .kpi-item h4 { font-size: 0.9rem; color: var(--text-secondary); font-weight: 500; }
 .kpi-item p { font-size: 1.25rem; font-weight: 600; margin: 0; }
 .dashboard-chart-container { height: 300px; }
-/* /== ESTILOS PARA FILTROS E PAGINAÇÃO ==/ */
 
-.filters-container {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-}
-
-.filters-container .form-group {
-    flex: 1;
-    margin-bottom: 0;
-}
-
-.filters-container select,
-.filters-container input {
-    min-width: 150px;
-}
-
-.pagination-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 1rem;
-    margin-top: 1.5rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-color);
-}
-
-.pagination-container button {
-    background-color: transparent;
-    border: 1px solid var(--border-color);
-    color: var(--text-secondary);
-    cursor: pointer;
-    border-radius: var(--radius);
-    padding: 0.5rem 1rem;
-}
-
-.pagination-container button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.pagination-container button:hover:not(:disabled) {
-    background-color: var(--bg-primary);
-    border-color: var(--accent-color);
-    color: var(--accent-color);
-}
-
-.pagination-info {
-    font-weight: 500;
-    color: var(--text-secondary);
-}
+/* FILTROS E PAGINAÇÃO */
+.filters-container { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.filters-container .form-group { flex: 1; margin-bottom: 0; }
+.filters-container select, .filters-container input { min-width: 150px; }
+.pagination-container { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-color); }
+.pagination-container button { background-color: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); cursor: pointer; border-radius: var(--radius); padding: 0.5rem 1rem; }
+.pagination-container button:disabled { opacity: 0.5; cursor: not-allowed; }
+.pagination-container button:hover:not(:disabled) { background-color: var(--bg-primary); border-color: var(--accent-color); color: var(--accent-color); }
+.pagination-info { font-weight: 500; color: var(--text-secondary); }
