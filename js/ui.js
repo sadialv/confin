@@ -1,4 +1,99 @@
+// js/ui.js
 import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, HOJE, CHART_COLORS } from './utils.js';
+import { getState, getContaPorId, getContas } from './state.js';
+
+let summaryChart = null;
+let annualChart = null;
+
+// --- GERAL ---
+export const showToast = (message, type = 'success') => { /* ...código da função... */ };
+export const setLoadingState = (button, isLoading, originalText = 'Salvar') => { /* ...código da função... */ };
+export const openModal = (content) => { /* ...código da função... */ };
+export const closeModal = () => document.getElementById('modal-container').classList.remove('active');
+export const switchTab = (button, parentSelector) => { /* ...código da função... */ };
+
+// --- RENDERIZAÇÃO ---
+export const renderAllComponents = () => { /* ...código da função... */ };
+export const renderContas = () => { /* ...código da função... */ };
+export const renderVisaoMensal = () => { /* ...código da função... */ };
+export const renderVisaoAnual = () => { /* ...código da função... */ };
+export const renderLancamentosFuturos = () => { /* ...código da função... */ };
+
+const renderBillItem = (bill, compras) => {
+    const isParcela = !!bill.compra_parcelada_id;
+    let cat = bill.categoria;
+    if (isParcela) {
+        const c = compras.find(c => c.id === bill.compra_parcelada_id);
+        if(c) cat = c.categoria;
+    }
+    const icon = CATEGORY_ICONS[cat] || CATEGORY_ICONS['Outros'];
+    
+    // ATUALIZADO: A ação de editar agora diferencia parcela de lançamento único
+    const editAction = isParcela ? 'recriar-compra-parcelada' : 'editar-lancamento';
+    const editId = isParcela ? bill.compra_parcelada_id : bill.id;
+
+    return `<div class="bill-item">
+                <div class="transaction-icon-wrapper" style="background-color:${icon.color};"><i class="${icon.icon}"></i></div>
+                <div>
+                    <div class="transaction-description">${bill.descricao}</div>
+                    <div class="transaction-meta">Vence em: ${new Date(bill.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}</div>
+                </div>
+                <span class="transaction-value ${bill.tipo === 'a_pagar' ? 'expense-text' : 'income-text'}">${formatarMoeda(bill.valor)}</span>
+                <div class="bill-actions">
+                    <button class="btn btn-small" data-action="pagar-conta" data-id="${bill.id}">Pagar</button>
+                    <button class="btn-icon" data-action="${editAction}" data-id="${editId}" title="Editar"><i class="fas fa-edit"></i></button>
+                    <button class="btn-icon" data-action="deletar-lancamento" data-id="${bill.id}" data-compra-id="${bill.compra_parcelada_id}"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>`;
+};
+
+export const renderHistoricoTransacoes = () => { /* ...código da função... */ };
+const renderTransactionCard = (t) => { /* ...código da função... */ };
+export const renderFormTransacaoRapida = () => { /* ...código da função... */ };
+
+// --- MODAIS ---
+export const getAccountModalContent = (id=null) => { /* ...código da função... */ };
+
+// ATUALIZADO: Modal completo para editar lançamentos únicos
+export const getBillModalContent = (id = null) => {
+    const { lancamentosFuturos } = getState();
+    const bill = id ? lancamentosFuturos.find(l => l.id === id) : {};
+    const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${bill.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
+
+    return `<h2>${id ? 'Editar' : 'Novo'} Lançamento</h2>
+        <form id="form-lancamento" data-id="${id || ''}">
+            <div class="form-group"><label>Descrição</label><input name="descricao" value="${bill.descricao || ''}" required></div>
+            <div class="form-group"><label>Valor</label><input name="valor" type="number" step="0.01" value="${bill.valor || ''}" required></div>
+            <div class="form-group"><label>Data Vencimento</label><input name="data_vencimento" type="date" value="${bill.data_vencimento || toISODateString(new Date())}" required></div>
+            <div class="form-group"><label>Categoria</label><select name="categoria">${categoriasOptions}</select></div>
+            <div class="form-group"><label>Tipo</label><select name="tipo"><option value="a_pagar" ${bill.tipo==='a_pagar'?'selected':''}>A Pagar</option><option value="a_receber" ${bill.tipo==='a_receber'?'selected':''}>A Receber</option></select></div>
+            <div style="text-align: right;"><button type="submit" class="btn">Salvar</button></div>
+        </form>`;
+};
+
+export const getPayBillModalContent = (billId) => { /* ...código da função... */ };
+
+// ATUALIZADO: Modal de compra parcelada agora aceita dados para pré-preenchimento
+export const getInstallmentPurchaseModalContent = (compraAEditar = null) => {
+    const contasCartao = getContas().filter(c => c.tipo === 'Cartão de Crédito');
+    const contasOptions = contasCartao.map(c => `<option value="${c.id}" ${compraAEditar?.conta_id === c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
+    const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${compraAEditar?.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
+
+    return `<h2>${compraAEditar ? 'Recriar' : 'Nova'} Compra Parcelada</h2>
+        ${compraAEditar ? '<p class="placeholder" style="margin-bottom:1rem;">Ajuste os dados e salve. A compra antiga será substituída.</p>' : ''}
+        <form id="form-compra-parcelada" data-compra-antiga-id="${compraAEditar?.id || ''}">
+            <div class="form-group"><label>Descrição</label><input name="descricao" value="${compraAEditar?.descricao || ''}" required></div>
+            <div class="form-group"><label>Valor Total</label><input name="valor_total" type="number" step="0.01" value="${compraAEditar?.valor_total || ''}" required></div>
+            <div class="form-group"><label>Número de Parcelas</label><input name="numero_parcelas" type="number" min="1" value="${compraAEditar?.numero_parcelas || ''}" required></div>
+            <div class="form-group"><label>Data da Compra</label><input name="data_compra" type="date" value="${compraAEditar?.data_compra || toISODateString(new Date())}" required></div>
+            <div class="form-group"><label>Cartão de Crédito</label><select name="conta_id" required>${contasOptions}</select></div>
+            <div class="form-group"><label>Categoria</label><select name="categoria" required>${categoriasOptions}</select></div>
+            <div style="text-align: right;"><button type="submit" class="btn">${compraAEditar ? 'Salvar e Substituir' : 'Salvar Compra'}</button></div>
+        </form>`;
+};
+
+export const getStatementModalContent = (contaId) => { /* ...código da função... */ };
+export const renderStatementDetails = (contaId, mesSelecionado) => { /* ...código da função... */ };import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, HOJE, CHART_COLORS } from './utils.js';
 import { getState, getContaPorId, getContas } from './state.js';
 
 let summaryChart = null;
@@ -352,3 +447,4 @@ export const renderStatementDetails = (contaId, mesSelecionado) => {
             ${transacoesFatura.length ? transacoesFatura.map(renderTransactionCard).join('') : '<p class="placeholder">Nenhuma despesa nesta fatura.</p>'}
         </div>`;
 };
+
