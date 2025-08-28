@@ -428,3 +428,57 @@ header h1 {
 [data-theme="dark"] .theme-toggle-circle {
     transform: translateX(22px);
 }
+
+/* --- NOVO: ESTILOS DO ACORDEÃO --- */
+.monthly-group {
+    margin-bottom: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--transition);
+}
+.monthly-group:hover {
+    box-shadow: var(--shadow-md);
+}
+.monthly-header {
+    background-color: var(--background-color);
+    padding: 0.75rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background-color var(--transition);
+}
+.monthly-header:hover {
+    background-color: rgba(0,0,0,0.03);
+}
+[data-theme="dark"] .monthly-header:hover {
+    background-color: rgba(255,255,255,0.03);
+}
+.monthly-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    text-transform: capitalize;
+}
+.monthly-summary {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.9rem;
+}
+.chevron-icon {
+    transition: transform 0.3s ease;
+}
+.monthly-group.open .chevron-icon {
+    transform: rotate(180deg);
+}
+.monthly-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-in-out;
+    padding: 0 1rem;
+}
+.monthly-content.open {
+    max-height: 10000px; /* Grande o suficiente para qualquer lista */
+}
