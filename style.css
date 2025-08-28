@@ -47,7 +47,7 @@ main { display: flex; flex-direction: column; gap: 1.5rem; }
 .card-header-title h2 { margin: 0; font-size: 1.1rem; }
 
 /* ELEMENTOS GERAIS */
-.btn { background-color: var(--accent-color); color: white; border: none; padding: 0.5rem 1rem; border-radius: var(--radius); cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; gap: 0.5rem; }
+.btn { background-color: var(--accent-color); color: white; border: none; padding: 0.5rem 1rem; border-radius: var(--radius); cursor: pointer; font-weight: 500; }
 .btn:hover { background-color: var(--accent-color-hover); }
 .btn-secondary { background-color: #42526e; }
 .btn-small { font-size: 0.85rem; }
@@ -104,8 +104,7 @@ main { display: flex; flex-direction: column; gap: 1.5rem; }
 [data-theme="dark"] .theme-toggle-circle { transform: translateX(22px); }
 
 /* DASHBOARD */
-.dashboard-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-.kpi-item { text-align: center; }
+.dashboard-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; text-align: center; }
 .kpi-item h4 { font-size: 0.9rem; color: var(--text-secondary); font-weight: 500; }
 .kpi-item p { font-size: 1.25rem; font-weight: 600; margin: 0; }
 .dashboard-chart-container { height: 300px; }
