@@ -185,34 +185,141 @@ export const renderVisaoAnual = () => {
     }
 };
 
-export const renderFilters = (type, filters = { mes: '', pesquisa: '' }) => {
-    // ...
+export const renderFilters = (type) => {
+    // ... Esta função pode ser implementada para adicionar selects de mês, etc.
 };
 
 const renderSummaryPanel = (containerId, items, type) => {
-    // ...
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const isHistory = type === 'history';
+    const totalReceitas = isHistory ? items.filter(t=>t.tipo==='receita').reduce((s,t)=>s+t.valor,0) : items.filter(t=>t.tipo==='a_receber').reduce((s,t)=>s+t.valor,0);
+    const totalDespesas = isHistory ? items.filter(t=>t.tipo==='despesa').reduce((s,t)=>s+t.valor,0) : items.filter(t=>t.tipo==='a_pagar').reduce((s,t)=>s+t.valor,0);
+    const saldo = totalReceitas - totalDespesas;
+    const receitasLabel = isHistory ? 'Receitas' : 'A Receber';
+    const despesasLabel = isHistory ? 'Despesas' : 'A Pagar';
+    container.innerHTML = `
+        <div class="alert alert-light py-2">
+            <div class="d-flex justify-content-around flex-wrap small">
+                <span>Itens na Tela: <strong>${items.length}</strong></span>
+                <span class="income-text">${receitasLabel}: <strong>${formatarMoeda(totalReceitas)}</strong></span>
+                <span class="expense-text">${despesasLabel}: <strong>${formatarMoeda(totalDespesas)}</strong></span>
+                ${isHistory ? `<span><strong>Saldo:</strong> <span class="${saldo >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldo)}</span></span>` : ''}
+            </div>
+        </div>`;
 };
 
 // --- RENDERIZAÇÃO DAS LISTAS EM ACORDEÃO ---
 
 const renderBillItem = (bill, compras) => {
-    // ... (versão com acordeão do Bootstrap, como na resposta anterior)
+    const isParcela = !!bill.compra_parcelada_id;
+    let cat = bill.categoria;
+    if (isParcela) {
+        const c = compras.find(compra => compra.id === bill.compra_parcelada_id);
+        if(c) cat = c.categoria;
+    }
+    const icon = CATEGORY_ICONS[cat] || CATEGORY_ICONS['Outros'];
+    const editAction = isParcela ? 'recriar-compra-parcelada' : 'editar-lancamento';
+    const editId = isParcela ? bill.compra_parcelada_id : bill.id;
+    const collapseId = `collapse-bill-${bill.id}`;
+
+    return `
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
+                    <div class="d-flex w-100 align-items-center">
+                        <span class="transaction-icon-wrapper me-3" style="background-color:${icon.color};"><i class="${icon.icon}"></i></span>
+                        <span>${bill.descricao}</span>
+                        <span class="ms-auto fw-bold ${bill.tipo === 'a_pagar' ? 'expense-text' : 'income-text'}">${formatarMoeda(bill.valor)}</span>
+                    </div>
+                </button>
+            </h2>
+            <div id="${collapseId}" class="accordion-collapse collapse">
+                <div class="accordion-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-body-secondary">Vencimento: ${new Date(bill.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}</small>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-success btn-sm" data-action="pagar-conta" data-id="${bill.id}">Pagar</button>
+                        <button class="btn btn-outline-secondary btn-sm" data-action="${editAction}" data-id="${editId}" title="Editar"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-outline-danger btn-sm" data-action="deletar-lancamento" data-id="${bill.id}" data-compra-id="${bill.compra_parcelada_id || ''}"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
 };
 
 const renderTransactionCard = (t) => {
-    // ... (versão com acordeão do Bootstrap, como na resposta anterior)
+    const conta = getContaPorId(t.conta_id);
+    const icon = CATEGORY_ICONS[t.categoria] || CATEGORY_ICONS['Outros'];
+    const collapseId = `collapse-trans-${t.id || t.descricao.replace(/\s/g,'')}`;
+    
+    const actions = t.isVirtual ? '<small class="text-info">Parcela Futura (Virtual)</small>' : `
+        <div class="btn-group">
+            <button class="btn btn-outline-secondary btn-sm" data-action="editar-transacao" data-id="${t.id}" title="Editar"><i class="fas fa-edit"></i></button>
+            <button class="btn btn-outline-danger btn-sm" data-action="deletar-transacao" data-id="${t.id}" title="Deletar"><i class="fas fa-trash"></i></button>
+        </div>`;
+
+    return `
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
+                    <div class="d-flex w-100 align-items-center">
+                        <span class="transaction-icon-wrapper me-3" style="background-color:${icon.color};"><i class="${icon.icon}"></i></span>
+                        <span>${t.descricao}</span>
+                        <span class="ms-auto fw-bold ${t.tipo === 'despesa' ? 'expense-text' : 'income-text'}">${t.tipo === 'despesa' ? '-' : '+'} ${formatarMoeda(t.valor)}</span>
+                    </div>
+                </button>
+            </h2>
+            <div id="${collapseId}" class="accordion-collapse collapse">
+                <div class="accordion-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-body-secondary">
+                            <i class="fas fa-calendar-alt"></i> ${new Date(t.data + 'T12:00:00').toLocaleDateString('pt-BR')} |
+                            <i class="fas fa-tag"></i> ${t.categoria} |
+                            <i class="fas fa-wallet"></i> ${conta ? conta.nome : 'N/A'}
+                        </small>
+                    </div>
+                    ${actions}
+                </div>
+            </div>
+        </div>`;
 };
+
 
 export const renderLancamentosFuturos = (page = 1, filters = { mes: 'todos', pesquisa: '' }) => {
     const container = document.getElementById('bills-list-container');
-    // ... (lógica para filtrar e renderizar usando renderBillItem)
+    if (!container) return;
+    const { lancamentosFuturos, comprasParceladas } = getState();
+    const pendentes = lancamentosFuturos.filter(l => l.status === 'pendente');
+    const filtrados = pendentes.sort((a,b) => new Date(a.data_vencimento) - new Date(b.data_vencimento)); // Adicionado sort
+    
+    renderSummaryPanel('bills-summary-panel', filtrados, 'bills');
+
+    const paginados = filtrados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+
+    if (!paginados.length) { 
+        container.innerHTML = '<p class="text-center text-body-secondary p-3">Nenhum lançamento futuro.</p>'; 
+        return; 
+    }
+    container.innerHTML = paginados.map(l => renderBillItem(l, comprasParceladas)).join('');
 };
 
 export const renderHistoricoTransacoes = (page = 1, filters = { mes: 'todos', pesquisa: '' }) => {
     const container = document.getElementById('history-list-container');
-    // ... (lógica para filtrar e renderizar usando renderTransactionCard)
-};
+    if (!container) return;
+    const transacoesCompletas = [...getState().transacoes, ...gerarTransacoesVirtuais()].sort((a,b) => new Date(b.data) - new Date(a.data));
+    
+    renderSummaryPanel('history-summary-panel', transacoesCompletas, 'history');
 
+    const paginados = transacoesCompletas.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+    
+    if (!paginados.length) { 
+        container.innerHTML = '<p class="text-center text-body-secondary p-3">Nenhuma transação encontrada.</p>'; 
+        return; 
+    }
+    container.innerHTML = paginados.map(renderTransactionCard).join('');
+};
 
 // --- GERADORES DE CONTEÚDO PARA MODAL ---
 
