@@ -277,7 +277,6 @@ const renderHistorySummary = (transactions) => {
     const totalReceitas = transactions.filter(t => t.tipo === 'receita').reduce((sum, t) => sum + t.valor, 0);
     const totalDespesas = transactions.filter(t => t.tipo === 'despesa').reduce((sum, t) => sum + t.valor, 0);
     const saldo = totalReceitas - totalDespesas;
-
     container.innerHTML = `
         <div class="summary-panel">
             <div class="summary-panel-item"><span class="label">Transações na Tela</span><span class="value">${transactions.length}</span></div>
