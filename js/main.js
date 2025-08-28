@@ -23,7 +23,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- AÇÕES (Salvar, Deletar, etc.) ---
 
     async function salvarConta(e) {
-        e.preventDefault();
         const form = e.target;
         const btn = form.querySelector('button[type="submit"]');
         UI.setLoadingState(btn, true, 'Salvando...');
@@ -34,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const state = State.getState();
             const newContas = id ? state.contas.map(c => c.id == saved.id ? saved : c) : [...state.contas, saved];
             State.setState({ contas: newContas.sort((a, b) => a.nome.localeCompare(b.nome)) });
-            UI.renderContas(); // Renderiza apenas o componente afetado
+            UI.renderContas();
             UI.closeModal();
             UI.showToast('Conta salva!');
         } catch (err) {
@@ -48,9 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!confirm('Apagar conta? As transações associadas não serão apagadas.')) return;
         try {
             await API.deletarDados('contas', id);
-            const state = State.getState();
-            State.setState({ contas: state.contas.filter(c => c.id !== id) });
-            UI.renderContas(); // Apenas atualiza a lista de contas
+            State.setState({ contas: State.getState().contas.filter(c => c.id !== id) });
+            UI.renderContas();
             UI.showToast('Conta deletada.');
         } catch (err) {
             UI.showToast(err.message, 'error');
@@ -58,7 +56,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     async function confirmarPagamento(e) {
-        e.preventDefault();
         const form = e.target;
         const btn = form.querySelector('button[type="submit"]');
         UI.setLoadingState(btn, true);
@@ -73,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await API.salvarDados('lancamentos_futuros', { status: 'pago' }, form.dataset.billId);
             UI.closeModal();
             UI.showToast('Conta paga!');
-            await reloadStateAndRender(); // Recarrega tudo pois afeta múltiplos painéis
+            await reloadStateAndRender();
         } catch (err) {
             UI.showToast(err.message, 'error');
         } finally {
@@ -82,7 +79,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function salvarTransacaoUnificada(e) {
-        e.preventDefault();
         const form = e.target;
         const btn = form.querySelector('button[type="submit"]');
         UI.setLoadingState(btn, true, "Salvando...");
@@ -100,7 +96,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 await API.salvarDados('transacoes', transacao);
                 toastMessage = 'Transação salva!';
             } else if (tipoCompra === 'parcelada' || tipoCompra === 'recorrente') {
-                // Lógica para parcelada e recorrente (cria múltiplos lançamentos)
                 const valor = parseFloat(data.valor);
                 const dataInicio = new Date(data.data + 'T12:00:00');
                 const lancamentos = [];
@@ -132,8 +127,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (frequencia === 'mensal') {
                             proximaData = new Date(dataInicio.getFullYear(), dataInicio.getMonth() + i, 1);
                             proximaData.setDate(Math.min(diaVencimento, new Date(proximaData.getFullYear(), proximaData.getMonth() + 1, 0).getDate()));
-                        } else { // anual
+                        } else if (frequencia === 'anual') {
                             proximaData = new Date(dataInicio.getFullYear() + i, dataInicio.getMonth(), diaVencimento);
+                        } else if (frequencia === 'quinzenal') {
+                            proximaData = new Date(dataInicio.getTime() + (15 * i * 24 * 60 * 60 * 1000));
+                        } else { // diaria
+                            proximaData = new Date(dataInicio.getTime() + (i * 24 * 60 * 60 * 1000));
                         }
                         lancamentos.push({
                             descricao: data.descricao, valor: Math.abs(valor),
@@ -157,24 +156,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // ... (outras funções de salvar/deletar podem ser adicionadas aqui)
+    async function deletarLancamento(id, compraId) { /* ... Lógica de deleção ... */ }
+    async function deletarTransacao(id) { /* ... Lógica de deleção ... */ }
 
+    // --- LISTENERS DE EVENTOS ---
     function setupEventListeners() {
         document.getElementById('theme-switcher').addEventListener('click', () => {
             const current = document.documentElement.getAttribute('data-theme');
             applyTheme(current === 'light' ? 'dark' : 'light');
         });
-        
+
+        document.getElementById('btn-add-account').addEventListener('click', () => {
+            UI.openModal(UI.getAccountModalContent());
+        });
+
         document.body.addEventListener('click', e => {
             if (e.target.matches('#modal-container, #modal-close-btn, .btn-close')) {
                 UI.closeModal();
             }
-
             const target = e.target.closest('[data-action]');
             if (!target) return;
             
             const action = target.dataset.action;
             const id = parseInt(target.dataset.id);
+            const compraId = parseInt(target.dataset.compraId);
 
             switch (action) {
                 case 'editar-conta':
@@ -183,10 +188,59 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'deletar-conta':
                     deletarConta(id);
                     break;
-                 case 'pagar-conta': 
-                    UI.openModal(UI.getPayBillModalContent(id)); 
+                case 'ver-fatura':
+                    UI.showToast('Função "Ver Fatura" não implementada.', 'error');
                     break;
-                // Adicione outros 'cases' para editar/deletar transações etc.
+                case 'pagar-conta':
+                    UI.openModal(UI.getPayBillModalContent(id));
+                    break;
+                case 'editar-lancamento':
+                    UI.openModal(UI.getBillModalContent(id));
+                    break;
+                case 'deletar-lancamento':
+                    deletarLancamento(id, compraId);
+                    break;
+                case 'recriar-compra-parcelada':
+                    const compra = State.getState().comprasParceladas.find(c => c.id === id);
+                    if (compra) UI.openModal(UI.getInstallmentPurchaseModalContent(compra));
+                    break;
+                case 'editar-transacao':
+                    UI.openModal(UI.getTransactionModalContent(id));
+                    break;
+                case 'deletar-transacao':
+                    deletarTransacao(id);
+                    break;
+            }
+        });
+
+        document.body.addEventListener('change', e => {
+            if (e.target.id === 'tipo-compra') {
+                const tipo = e.target.value;
+                const form = e.target.closest('form');
+                const parceladaFields = form.querySelector('#parcelada-fields');
+                const recorrenteFields = form.querySelector('#recorrente-fields');
+                const labelValor = form.querySelector('#label-valor');
+                const selectConta = form.querySelector('select[name="conta_id"]');
+                
+                parceladaFields.style.display = 'none';
+                recorrenteFields.style.display = 'none';
+                
+                if (selectConta.dataset.allOptions) {
+                    selectConta.innerHTML = selectConta.dataset.allOptions;
+                }
+
+                if (tipo === 'parcelada') {
+                    parceladaFields.style.display = 'block';
+                    labelValor.textContent = 'Valor Total';
+                    if (selectConta.dataset.creditCardOptions) {
+                        selectConta.innerHTML = selectConta.dataset.creditCardOptions;
+                    }
+                } else if (tipo === 'recorrente') {
+                    recorrenteFields.style.display = 'block';
+                    labelValor.textContent = 'Valor da Recorrência';
+                } else {
+                    labelValor.textContent = 'Valor';
+                }
             }
         });
         
@@ -202,19 +256,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'form-pagamento':
                     confirmarPagamento(e);
                     break;
-                // Adicione outros formulários se necessário
             }
         });
-
-        document.getElementById('btn-add-account').addEventListener('click', () => {
-            UI.openModal(UI.getAccountModalContent());
-        });
-
-        // ... (Listeners para filtros de pesquisa e mês)
     }
 
-    async function initializeApp(showToast = true) {
-        if (showToast) UI.showToast('Carregando dados...');
+    async function initializeApp() {
+        UI.showToast('Carregando dados...');
         try {
             const data = await API.fetchData();
             State.setState(data);
