@@ -79,7 +79,6 @@ main { display: flex; flex-direction: column; gap: 1.5rem; }
 .transaction-description { font-weight: 500; }
 .transaction-meta { font-size: 0.85rem; color: var(--text-secondary); }
 .transaction-value { font-weight: 500; }
-.monthly-header { padding: 0.5rem 0; font-weight: 600; font-size: 1.1rem; text-transform: capitalize; border-bottom: 1px solid var(--border-color); margin-bottom: 0.5rem; }
 
 /* FORMULÁRIOS */
 .form-group { margin-bottom: 1rem; }
@@ -122,3 +121,41 @@ main { display: flex; flex-direction: column; gap: 1.5rem; }
 .summary-panel-item { display: flex; flex-direction: column; }
 .summary-panel-item .label { font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; margin-bottom: 0.25rem; }
 .summary-panel-item .value { font-size: 1.1rem; font-weight: 600; }
+
+/* --- NOVO: ESTILOS DO ACORDEÃO --- */
+.monthly-group {
+    margin-bottom: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.monthly-header {
+    background-color: var(--bg-primary);
+    padding: 0.75rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 600;
+}
+.monthly-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    text-transform: capitalize;
+}
+.monthly-summary {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.9rem;
+}
+.chevron-icon {
+    transition: transform 0.3s ease;
+}
+.monthly-group.open .chevron-icon {
+    transform: rotate(180deg);
+}
+.monthly-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-in-out;
+}
