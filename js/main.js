@@ -251,6 +251,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // NOVO: Listener para o acordeão
+        document.getElementById('main-content').addEventListener('click', e => {
+            const header = e.target.closest('.monthly-header');
+            if (header) {
+                header.parentNode.classList.toggle('open');
+                const content = header.nextElementSibling;
+                content.classList.toggle('open');
+            }
+        });
+
         document.getElementById('form-transacao-unificada').addEventListener('submit', salvarTransacaoUnificada);
 
         document.getElementById('btn-add-account').addEventListener('click', () => {
@@ -266,22 +276,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const compraId = parseInt(target.dataset.compraId);
 
             switch (action) {
-                case 'next-page-history':
-                    State.incrementHistoryPage();
-                    UI.renderHistoricoTransacoes();
-                    break;
-                case 'prev-page-history':
-                    State.decrementHistoryPage();
-                    UI.renderHistoricoTransacoes();
-                    break;
-                case 'next-page-bills':
-                    State.incrementBillsPage();
-                    UI.renderLancamentosFuturos();
-                    break;
-                case 'prev-page-bills':
-                    State.decrementBillsPage();
-                    UI.renderLancamentosFuturos();
-                    break;
                 case 'editar-conta':
                     UI.openModal(UI.getAccountModalContent(id));
                     document.getElementById('form-conta').addEventListener('submit', salvarConta);
@@ -326,12 +320,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.addEventListener('input', e => {
             if (e.target.id === 'history-search-input') {
                 State.setHistoryFilter('pesquisa', e.target.value);
-                State.setHistoryPage(1);
                 UI.renderHistoricoTransacoes();
             }
             if (e.target.id === 'bills-search-input') {
                 State.setBillsFilter('pesquisa', e.target.value);
-                State.setBillsPage(1);
                 UI.renderLancamentosFuturos();
             }
         });
@@ -345,12 +337,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (e.target.id === 'history-month-filter') {
                 State.setHistoryFilter('mes', e.target.value);
-                State.setHistoryPage(1);
                 UI.renderHistoricoTransacoes();
             }
             if (e.target.id === 'bills-month-filter') {
                 State.setBillsFilter('mes', e.target.value);
-                State.setBillsPage(1);
                 UI.renderLancamentosFuturos();
             }
             if (e.target.id === 'conta-tipo') {
