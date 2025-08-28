@@ -398,12 +398,40 @@ export const renderLancamentosFuturos = () => {
         const filtrados = pendentes.filter(l => (filters.mes === 'todos' || l.data_vencimento.startsWith(filters.mes)) && (filters.pesquisa === '' || l.descricao.toLowerCase().includes(pesquisaLower)));
 
         renderBillsSummary(filtrados);
+        
+        const lancamentosAgrupados = filtrados.reduce((acc, item) => {
+            const mes = item.data_vencimento.substring(0, 7);
+            if (!acc[mes]) {
+                acc[mes] = [];
+            }
+            acc[mes].push(item);
+            return acc;
+        }, {});
 
-        const totalPages = Math.ceil(filtrados.length / ITEMS_PER_PAGE);
-        const itensPaginados = filtrados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
-        const itensHTML = itensPaginados.length ? itensPaginados.map(l => renderBillItem(l, comprasParceladas)).join('') : '<p class="placeholder">Nenhum lançamento encontrado.</p>';
-        const paginacaoHTML = totalPages > 1 ? `<div class="pagination-container"><button class="btn" data-action="prev-page-bills" ${page === 1 ? 'disabled' : ''}>&lt;</button><span class="pagination-info">${page} / ${totalPages}</span><button class="btn" data-action="next-page-bills" ${page >= totalPages ? 'disabled' : ''}>&gt;</button></div>` : '';
-        container.innerHTML = itensHTML + paginacaoHTML;
+        const mesesOrdenados = Object.keys(lancamentosAgrupados).sort().reverse();
+        
+        let htmlContent = mesesOrdenados.length ? mesesOrdenados.map(mes => {
+            const lancamentosDoMes = lancamentosAgrupados[mes].sort((a, b) => new Date(a.data_vencimento) - new Date(b.data_vencimento));
+            const totalMes = lancamentosDoMes.reduce((acc, l) => acc + l.valor, 0);
+            const [ano, mesNum] = mes.split('-');
+            const nomeMes = new Date(ano, mesNum - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+
+            return `
+                <div class="monthly-group">
+                    <div class="monthly-header" data-month="${mes}">
+                        <h3>${nomeMes}</h3>
+                        <div class="monthly-summary">
+                            <span class="value expense-text">${formatarMoeda(totalMes)}</span>
+                            <i class="fas fa-chevron-down chevron-icon"></i>
+                        </div>
+                    </div>
+                    <div class="monthly-content">
+                        ${lancamentosDoMes.map(l => renderBillItem(l, comprasParceladas)).join('')}
+                    </div>
+                </div>`;
+        }).join('') : '<p class="placeholder">Nenhum lançamento encontrado.</p>';
+
+        container.innerHTML = htmlContent;
     } catch (error) {
         console.error("Erro ao renderizar lançamentos futuros:", error);
         container.innerHTML = '<p class="placeholder" style="color: var(--expense-color);">Ocorreu um erro ao carregar os lançamentos.</p>';
@@ -444,7 +472,6 @@ export const renderHistoricoTransacoes = () => {
     if (!container) return;
     try {
         const state = getState();
-        const page = state.historyCurrentPage;
         const filters = state.historyFilters;
         const transacoesVirtuais = gerarTransacoesVirtuais();
         const transacoesCompletas = [...state.transacoes, ...transacoesVirtuais].sort((a, b) => new Date(b.data) - new Date(a.data));
@@ -453,12 +480,41 @@ export const renderHistoricoTransacoes = () => {
         const filtrados = transacoesCompletas.filter(t => (filters.mes === 'todos' || t.data.startsWith(filters.mes)) && (filters.pesquisa === '' || t.descricao.toLowerCase().includes(pesquisaLower) || t.categoria.toLowerCase().includes(pesquisaLower) || getContaPorId(t.conta_id)?.nome.toLowerCase().includes(pesquisaLower)));
 
         renderHistorySummary(filtrados);
+        
+        const transacoesAgrupadas = filtrados.reduce((acc, item) => {
+            const mes = item.data.substring(0, 7);
+            if (!acc[mes]) {
+                acc[mes] = [];
+            }
+            acc[mes].push(item);
+            return acc;
+        }, {});
+        
+        const mesesOrdenados = Object.keys(transacoesAgrupadas).sort().reverse();
+        
+        let htmlContent = mesesOrdenados.length ? mesesOrdenados.map(mes => {
+            const transacoesDoMes = transacoesAgrupadas[mes];
+            const saldoMes = transacoesDoMes.reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, 0);
+            const [ano, mesNum] = mes.split('-');
+            const nomeMes = new Date(ano, mesNum - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
 
-        const totalPages = Math.ceil(filtrados.length / ITEMS_PER_PAGE);
-        const itensPaginados = filtrados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
-        const itensHTML = itensPaginados.length ? itensPaginados.map(renderTransactionCard).join('') : '<p class="placeholder">Nenhuma transação encontrada.</p>';
-        const paginacaoHTML = totalPages > 1 ? `<div class="pagination-container"><button class="btn" data-action="prev-page-history" ${page === 1 ? 'disabled' : ''}>&lt;</button><span class="pagination-info">${page} / ${totalPages}</span><button class="btn" data-action="next-page-history" ${page >= totalPages ? 'disabled' : ''}>&gt;</button></div>` : '';
-        container.innerHTML = itensHTML + paginacaoHTML;
+            return `
+                <div class="monthly-group">
+                    <div class="monthly-header" data-month="${mes}">
+                        <h3>${nomeMes}</h3>
+                        <div class="monthly-summary">
+                            <span class="value ${saldoMes >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldoMes)}</span>
+                            <i class="fas fa-chevron-down chevron-icon"></i>
+                        </div>
+                    </div>
+                    <div class="monthly-content">
+                        ${transacoesDoMes.map(renderTransactionCard).join('')}
+                    </div>
+                </div>`;
+        }).join('') : '<p class="placeholder">Nenhuma transação encontrada.</p>';
+
+        container.innerHTML = htmlContent;
+
     } catch (error) {
         console.error("Erro ao renderizar histórico de transações:", error);
         container.innerHTML = '<p class="placeholder" style="color: var(--expense-color);">Ocorreu um erro ao carregar o histórico.</p>';
@@ -590,7 +646,7 @@ export const getInstallmentPurchaseEditModalContent = (compraId) => {
     if (!compra) return `<p>Compra não encontrada.</p>`;
     const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${compra.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
     return `<h2>Editar Compra Parcelada</h2>
-        <p style="color: var(--text-secondary); font-size: 0.9rem;">A alteração na descrição e categoria será aplicada a todas as parcelas futuras.</p>
+        <p style="color: var(--text-color-secondary); font-size: 0.9rem;">A alteração na descrição e categoria será aplicada a todas as parcelas futuras.</p>
         <form id="form-edicao-compra-parcelada" data-id="${compraId}">
             <div class="form-group"><label>Descrição</label><input name="descricao" value="${compra.descricao}" required></div>
             <div class="form-group"><label>Categoria</label><select name="categoria">${categoriasOptions}</select></div>
