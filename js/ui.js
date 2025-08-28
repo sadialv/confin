@@ -1,6 +1,7 @@
 // js/ui.js
 import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, HOJE, CHART_COLORS } from './utils.js';
-import { getState, getContaPorId, getContas } from './state.js';
+import { getState, getContaPorId, getContas, getHistoryPage, getHistoryFilters, getBillsPage, getBillsFilters } from './state.js';
+import * as API from './api.js';
 
 let summaryChart = null;
 let annualChart = null;
@@ -20,7 +21,7 @@ export const showToast = (message, type = 'success') => {
     }, 3000);
 };
 export const setLoadingState = (button, isLoading, originalText = 'Salvar') => {
-    if(!button) return;
+    if (!button) return;
     button.disabled = isLoading;
     button.innerHTML = isLoading ? `<i class="fas fa-spinner fa-spin"></i>` : originalText;
 };
@@ -79,22 +80,153 @@ const gerarTransacoesVirtuais = () => {
     }
 };
 
+// --- FUNÇÕES DE MANIPULAÇÃO DE FORMULÁRIO ---
+export const handleUnifiedFormTypeChange = (tipo) => {
+    const form = document.getElementById('form-transacao-unificada');
+    if (!form) return;
+    const camposParcelada = form.querySelector('#parcelada-fields');
+    const camposRecorrente = form.querySelector('#recorrente-fields');
+    const labelValor = form.querySelector('#label-valor');
+    const labelData = form.querySelector('#label-data');
+    const selectConta = form.querySelector('select[name="conta_id"]');
+    const groupConta = form.querySelector('#group-conta');
+    const groupData = form.querySelector('#group-data');
+
+    camposParcelada.style.display = 'none';
+    camposRecorrente.style.display = 'none';
+    labelValor.textContent = 'Valor';
+    labelData.textContent = 'Data';
+    groupConta.style.display = 'block';
+    groupData.style.display = 'block';
+    if (selectConta.dataset.allOptions) selectConta.innerHTML = selectConta.dataset.allOptions;
+    selectConta.disabled = false;
+
+    if (tipo === 'parcelada') {
+        camposParcelada.style.display = 'block';
+        labelValor.textContent = 'Valor Total';
+        labelData.textContent = 'Data da Compra';
+        if (selectConta.dataset.creditCardOptions) selectConta.innerHTML = selectConta.dataset.creditCardOptions;
+    } else if (tipo === 'recorrente') {
+        camposRecorrente.style.display = 'block';
+        labelValor.textContent = 'Valor da Assinatura';
+        labelData.textContent = 'Data de Início';
+        groupConta.style.display = 'none';
+    }
+};
+
+export const handleRecurringFrequencyChange = (frequencia, form) => {
+    const groupDiaVencimento = form.querySelector('#group-dia-vencimento');
+    groupDiaVencimento.style.display = (frequencia === 'mensal' || frequencia === 'anual') ? 'block' : 'none';
+};
+
+export const handleAccountTypeChange = (tipo) => {
+    const isCreditCard = tipo === 'Cartão de Crédito';
+    const cartaoFields = document.getElementById('cartao-credito-fields');
+    const saldoField = document.getElementById('saldo-inicial-group');
+    if (cartaoFields) cartaoFields.style.display = isCreditCard ? '' : 'none';
+    if (saldoField) saldoField.style.display = isCreditCard ? 'none' : 'block';
+};
+
+export const handleUnifiedTransactionSave = async (form) => {
+    const data = Object.fromEntries(new FormData(form));
+    const tipoCompra = data.tipo_compra;
+    let toastMessage = '';
+
+    if (tipoCompra === 'vista') {
+        const transacao = {
+            descricao: data.descricao,
+            valor: Math.abs(parseFloat(data.valor)),
+            data: data.data,
+            conta_id: parseInt(data.conta_id),
+            categoria: data.categoria,
+            tipo: parseFloat(data.valor) >= 0 ? 'receita' : 'despesa'
+        };
+        await API.salvarDados('transacoes', transacao);
+        toastMessage = 'Transação salva!';
+
+    } else if (tipoCompra === 'parcelada') {
+        const dadosCompra = {
+            descricao: data.descricao,
+            valor_total: parseFloat(data.valor),
+            numero_parcelas: parseInt(data.numero_parcelas),
+            data_compra: data.data,
+            conta_id: parseInt(data.conta_id),
+            categoria: data.categoria,
+        };
+        const compraSalva = await API.salvarDados('compras_parceladas', dadosCompra);
+        const valorParcela = parseFloat((dadosCompra.valor_total / dadosCompra.numero_parcelas).toFixed(2));
+        const dataCompraObj = new Date(dadosCompra.data_compra + 'T12:00:00');
+        const lancamentos = [];
+        for (let i = 1; i <= dadosCompra.numero_parcelas; i++) {
+            const dataVencimento = new Date(dataCompraObj);
+            dataVencimento.setMonth(dataVencimento.getMonth() + i);
+            lancamentos.push({
+                descricao: `${dadosCompra.descricao} (${i}/${dadosCompra.numero_parcelas})`,
+                valor: valorParcela,
+                data_vencimento: toISODateString(dataVencimento),
+                tipo: 'a_pagar',
+                status: 'pendente',
+                compra_parcelada_id: compraSalva.id,
+                categoria: dadosCompra.categoria
+            });
+        }
+        await API.salvarMultiplosLancamentos(lancamentos);
+        toastMessage = 'Compra parcelada lançada!';
+
+    } else if (tipoCompra === 'recorrente') {
+        const valor = parseFloat(data.valor);
+        const dataInicio = new Date(data.data + 'T12:00:00');
+        const quantidade = parseInt(data.quantidade);
+        const diaVencimento = parseInt(data.dia_vencimento);
+        const frequencia = data.frequencia;
+
+        const lancamentos = [];
+        let dataCorrente = new Date(dataInicio);
+
+        for (let i = 0; i < quantidade; i++) {
+            let proximaData;
+            if (frequencia === 'mensal') {
+                proximaData = new Date(dataInicio.getFullYear(), dataInicio.getMonth() + i, diaVencimento);
+            } else if (frequencia === 'anual') {
+                proximaData = new Date(dataInicio.getFullYear() + i, dataInicio.getMonth(), diaVencimento);
+            } else if (frequencia === '15d') {
+                proximaData = new Date(new Date(dataInicio).setDate(dataInicio.getDate() + (15 * i)));
+            } else if (frequencia === '30d') {
+                proximaData = new Date(new Date(dataInicio).setDate(dataInicio.getDate() + (30 * i)));
+            }
+
+            lancamentos.push({
+                descricao: data.descricao,
+                valor: Math.abs(valor),
+                data_vencimento: toISODateString(proximaData),
+                tipo: 'a_pagar',
+                status: 'pendente',
+                categoria: data.categoria
+            });
+        }
+        await API.salvarMultiplosLancamentos(lancamentos);
+        toastMessage = `${lancamentos.length} lançamentos recorrentes criados!`;
+    }
+};
 
 // --- RENDERIZAÇÃO ---
 export const renderAllComponents = () => {
     renderContas();
     renderVisaoMensal();
     renderVisaoAnual();
-    renderFilters('bills');
+    renderFilters('bills', getBillsFilters());
     renderLancamentosFuturos();
-    renderFilters('history');
+    renderFilters('history', getHistoryFilters());
     renderHistoricoTransacoes();
     renderFormTransacaoRapida();
 };
 export const renderContas = () => {
     const container = document.getElementById('accounts-container');
     const { contas, transacoes } = getState();
-    if (!contas.length) { container.innerHTML = '<p class="placeholder">Nenhuma conta.</p>'; return; }
+    if (!contas.length) {
+        container.innerHTML = '<p class="placeholder">Nenhuma conta.</p>';
+        return;
+    }
     container.innerHTML = contas.map(conta => {
         const saldo = transacoes.filter(t => t.conta_id === conta.id).reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, conta.saldo_inicial);
         let botoesEspecificos = '';
@@ -138,11 +270,30 @@ export const renderVisaoMensal = () => {
     document.getElementById('dashboard-month-filter').addEventListener('change', renderVisaoMensal);
     if (summaryChart) summaryChart.destroy();
     const ctx = document.getElementById('summary-chart-monthly')?.getContext('2d');
-    const despesasPorCat = transacoesMes.filter(t => t.tipo === 'despesa').reduce((acc, t) => { acc[t.categoria] = (acc[t.categoria] || 0) + t.valor; return acc; }, {});
-    if(ctx && Object.keys(despesasPorCat).length > 0) {
+    const despesasPorCat = transacoesMes.filter(t => t.tipo === 'despesa').reduce((acc, t) => {
+        acc[t.categoria] = (acc[t.categoria] || 0) + t.valor;
+        return acc;
+    }, {});
+    if (ctx && Object.keys(despesasPorCat).length > 0) {
         summaryChart = new Chart(ctx, {
-            type: 'doughnut', data: { labels: Object.keys(despesasPorCat), datasets: [{ data: Object.values(despesasPorCat), backgroundColor: CHART_COLORS }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'right' } } }
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(despesasPorCat),
+                datasets: [{
+                    data: Object.values(despesasPorCat),
+                    backgroundColor: CHART_COLORS
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'right'
+                    }
+                }
+            }
         });
     }
 };
@@ -154,10 +305,12 @@ export const renderVisaoAnual = () => {
     const transacoesVirtuais = gerarTransacoesVirtuais();
     const transacoesCompletas = [...transacoes, ...transacoesVirtuais];
     const transacoesAno = transacoesCompletas.filter(t => t.data?.startsWith(ano));
-    let receitasPorMes = Array(12).fill(0); let despesasPorMes = Array(12).fill(0);
+    let receitasPorMes = Array(12).fill(0);
+    let despesasPorMes = Array(12).fill(0);
     transacoesAno.forEach(t => {
         const mes = new Date(t.data + 'T12:00:00').getMonth();
-        if (t.tipo === 'receita') receitasPorMes[mes] += t.valor; else despesasPorMes[mes] += t.valor;
+        if (t.tipo === 'receita') receitasPorMes[mes] += t.valor;
+        else despesasPorMes[mes] += t.valor;
     });
     container.innerHTML = `<input type="number" id="dashboard-year-filter" value="${ano}" min="2020" max="2050" style="margin-bottom: 1rem; width: 100px;"><div class="dashboard-chart-container"><canvas id="annual-chart"></canvas></div>`;
     document.getElementById('dashboard-year-filter').addEventListener('change', renderVisaoAnual);
@@ -165,36 +318,62 @@ export const renderVisaoAnual = () => {
     const ctx = document.getElementById('annual-chart')?.getContext('2d');
     if (ctx) {
         annualChart = new Chart(ctx, {
-            type: 'bar', data: { labels: ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'], datasets: [{ label: 'Receitas', data: receitasPorMes, backgroundColor: 'rgba(0, 135, 90, 0.7)' },{ label: 'Despesas', data: despesasPorMes, backgroundColor: 'rgba(222, 53, 11, 0.7)' }] },
-            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+            type: 'bar',
+            data: {
+                labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+                datasets: [{
+                    label: 'Receitas',
+                    data: receitasPorMes,
+                    backgroundColor: 'rgba(0, 135, 90, 0.7)'
+                }, {
+                    label: 'Despesas',
+                    data: despesasPorMes,
+                    backgroundColor: 'rgba(222, 53, 11, 0.7)'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
         });
     }
 };
-export const renderFilters = (type, filters = { mes: 'todos', pesquisa: '' }) => {
+export const renderFilters = (type) => {
+    const state = getState();
     const isBills = type === 'bills';
     const containerId = isBills ? 'bills-filters-container' : 'history-filters-container';
     const container = document.getElementById(containerId);
     if (!container) return;
-    
-    let data, dateKey;
+
+    let data, dateKey, filters;
     if (isBills) {
-        data = getState().lancamentosFuturos.filter(l => l.status === 'pendente');
+        data = state.lancamentosFuturos.filter(l => l.status === 'pendente');
         dateKey = 'data_vencimento';
+        filters = state.billsFilters;
     } else {
         const transacoesVirtuais = gerarTransacoesVirtuais();
-        data = [...getState().transacoes, ...transacoesVirtuais];
+        data = [...state.transacoes, ...transacoesVirtuais];
         dateKey = 'data';
+        filters = state.historyFilters;
     }
 
     const mesesDisponiveis = [...new Set(
         data
-            .map(item => item[dateKey] ? item[dateKey].substring(0, 7) : null)
-            .filter(Boolean)
+        .map(item => item[dateKey] ? item[dateKey].substring(0, 7) : null)
+        .filter(Boolean)
     )].sort().reverse();
 
     const mesOptions = mesesDisponiveis.map(mes => {
         const [ano, mesNum] = mes.split('-');
-        const nomeMes = new Date(ano, mesNum - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        const nomeMes = new Date(ano, mesNum - 1).toLocaleString('pt-BR', {
+            month: 'long',
+            year: 'numeric'
+        });
         return `<option value="${mes}" ${filters.mes === mes ? 'selected' : ''}>${nomeMes}</option>`;
     }).join('');
     container.innerHTML = `
@@ -203,15 +382,21 @@ export const renderFilters = (type, filters = { mes: 'todos', pesquisa: '' }) =>
             <div class="form-group"><label>Pesquisar</label><input type="search" id="${isBills ? 'bills' : 'history'}-search-input" value="${filters.pesquisa}"></div>
         </div>`;
 };
-export const renderLancamentosFuturos = (page = 1, filters = { mes: 'todos', pesquisa: '' }) => {
+export const renderLancamentosFuturos = () => {
     const container = document.getElementById('bills-list-container');
     if (!container) return;
     try {
-        const { lancamentosFuturos, comprasParceladas } = getState();
+        const state = getState();
+        const page = state.billsCurrentPage;
+        const filters = state.billsFilters;
+        const {
+            lancamentosFuturos,
+            comprasParceladas
+        } = state;
         const pendentes = lancamentosFuturos.filter(l => l.status === 'pendente');
         const pesquisaLower = filters.pesquisa.toLowerCase();
         const filtrados = pendentes.filter(l => (filters.mes === 'todos' || l.data_vencimento.startsWith(filters.mes)) && (filters.pesquisa === '' || l.descricao.toLowerCase().includes(pesquisaLower)));
-        
+
         renderBillsSummary(filtrados);
 
         const totalPages = Math.ceil(filtrados.length / ITEMS_PER_PAGE);
@@ -229,7 +414,7 @@ const renderBillsSummary = (bills) => {
     if (!container) return;
     const totalPagar = bills.filter(l => l.tipo === 'a_pagar').reduce((sum, l) => sum + l.valor, 0);
     const totalReceber = bills.filter(l => l.tipo === 'a_receber').reduce((sum, l) => sum + l.valor, 0);
-    
+
     container.innerHTML = `
         <div class="summary-panel">
             <div class="summary-panel-item"><span class="label">Lançamentos na Tela</span><span class="value">${bills.length}</span></div>
@@ -238,8 +423,12 @@ const renderBillsSummary = (bills) => {
         </div>`;
 };
 const renderBillItem = (bill, compras) => {
-    const isParcela = !!bill.compra_parcelada_id; let cat = bill.categoria;
-    if (isParcela) { const c = compras.find(compra => compra.id === bill.compra_parcelada_id); if(c) cat = c.categoria; }
+    const isParcela = !!bill.compra_parcelada_id;
+    let cat = bill.categoria;
+    if (isParcela) {
+        const c = compras.find(compra => compra.id === bill.compra_parcelada_id);
+        if (c) cat = c.categoria;
+    }
     const icon = CATEGORY_ICONS[cat] || CATEGORY_ICONS['Outros'];
     const editAction = isParcela ? 'recriar-compra-parcelada' : 'editar-lancamento';
     const editId = isParcela ? bill.compra_parcelada_id : bill.id;
@@ -250,16 +439,19 @@ const renderBillItem = (bill, compras) => {
                 <div class="bill-actions"><button class="btn btn-small" data-action="pagar-conta" data-id="${bill.id}">Pagar</button><button class="btn-icon" data-action="${editAction}" data-id="${editId}" title="Editar"><i class="fas fa-edit"></i></button><button class="btn-icon" data-action="deletar-lancamento" data-id="${bill.id}" data-compra-id="${bill.compra_parcelada_id}"><i class="fas fa-trash"></i></button></div>
             </div>`;
 };
-export const renderHistoricoTransacoes = (page = 1, filters = { mes: 'todos', pesquisa: '' }) => {
+export const renderHistoricoTransacoes = () => {
     const container = document.getElementById('history-list-container');
     if (!container) return;
     try {
+        const state = getState();
+        const page = state.historyCurrentPage;
+        const filters = state.historyFilters;
         const transacoesVirtuais = gerarTransacoesVirtuais();
-        const transacoesCompletas = [...getState().transacoes, ...transacoesVirtuais].sort((a,b) => new Date(b.data) - new Date(a.data));
-        
+        const transacoesCompletas = [...state.transacoes, ...transacoesVirtuais].sort((a, b) => new Date(b.data) - new Date(a.data));
+
         const pesquisaLower = filters.pesquisa.toLowerCase();
         const filtrados = transacoesCompletas.filter(t => (filters.mes === 'todos' || t.data.startsWith(filters.mes)) && (filters.pesquisa === '' || t.descricao.toLowerCase().includes(pesquisaLower) || t.categoria.toLowerCase().includes(pesquisaLower) || getContaPorId(t.conta_id)?.nome.toLowerCase().includes(pesquisaLower)));
-        
+
         renderHistorySummary(filtrados);
 
         const totalPages = Math.ceil(filtrados.length / ITEMS_PER_PAGE);
@@ -287,10 +479,11 @@ const renderHistorySummary = (transactions) => {
         </div>`;
 };
 const renderTransactionCard = (t) => {
-    const conta = getContaPorId(t.conta_id); const icon = CATEGORY_ICONS[t.categoria] || CATEGORY_ICONS['Outros'];
+    const conta = getContaPorId(t.conta_id);
+    const icon = CATEGORY_ICONS[t.categoria] || CATEGORY_ICONS['Outros'];
     const editButton = t.isVirtual ? '' : `<button class="btn-icon" data-action="editar-transacao" data-id="${t.id}" title="Editar"><i class="fas fa-edit"></i></button>`;
     const deleteButton = t.isVirtual ? '' : `<button class="btn-icon" data-action="deletar-transacao" data-id="${t.id}" title="Deletar"><i class="fas fa-trash"></i></button>`;
-    
+
     return `<div class="transaction-card">
             <div class="transaction-icon-wrapper" style="background-color:${icon.color};"><i class="${icon.icon}"></i></div>
             <div><div class="transaction-description">${t.descricao}</div><div class="transaction-meta">${t.categoria} | ${conta ? conta.nome : ''}</div></div>
@@ -303,7 +496,7 @@ export const renderFormTransacaoRapida = () => {
     if (!container) return;
     const contas = getContas();
     const contasCartao = contas.filter(c => c.tipo === 'Cartão de Crédito');
-    
+
     const contasOptions = contas.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
     const contasCartaoOptions = contasCartao.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
     const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}">${c}</option>`).join('');
@@ -337,7 +530,7 @@ export const renderFormTransacaoRapida = () => {
         contaSelect.dataset.creditCardOptions = contasCartaoOptions;
     }
 };
-export const getAccountModalContent = (id=null) => {
+export const getAccountModalContent = (id = null) => {
     const conta = id ? getContaPorId(id) : {};
     const isCreditCard = conta?.tipo === 'Cartão de Crédito';
     return `<h2>${id ? 'Editar' : 'Nova'} Conta</h2>
@@ -355,7 +548,9 @@ export const getAccountModalContent = (id=null) => {
         </form>`;
 };
 export const getBillModalContent = (id = null) => {
-    const { lancamentosFuturos } = getState();
+    const {
+        lancamentosFuturos
+    } = getState();
     const bill = id ? lancamentosFuturos.find(l => l.id === id) : {};
     const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${bill.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
     return `<h2>${id ? 'Editar' : 'Novo'} Lançamento</h2>
@@ -364,12 +559,14 @@ export const getBillModalContent = (id = null) => {
             <div class="form-group"><label>Valor</label><input name="valor" type="number" step="0.01" value="${bill.valor || ''}" required></div>
             <div class="form-group"><label>Data Vencimento</label><input name="data_vencimento" type="date" value="${bill.data_vencimento || toISODateString(new Date())}" required></div>
             <div class="form-group"><label>Categoria</label><select name="categoria">${categoriasOptions}</select></div>
-            <div class="form-group"><label>Tipo</label><select name="tipo"><option value="a_pagar" ${bill.tipo==='a_pagar'?'selected':''}>A Pagar</option><option value="a_receber" ${bill.tipo==='a_receber'?'selected':''}>A Receber</option></select></div>
+            <div class="form-group"><label>Tipo</label><select name="tipo"><option value="a_pagar" ${bill.tipo === 'a_pagar' ? 'selected' : ''}>A Pagar</option><option value="a_receber" ${bill.tipo === 'a_receber' ? 'selected' : ''}>A Receber</option></select></div>
             <div style="text-align: right;"><button type="submit" class="btn">Salvar</button></div>
         </form>`;
 };
 export const getTransactionModalContent = (id) => {
-    const { transacoes } = getState();
+    const {
+        transacoes
+    } = getState();
     const transacao = transacoes.find(t => t.id === id);
     if (!transacao) return `<p>Transação não encontrada.</p>`;
     const contasOptions = getContas().map(c => `<option value="${c.id}" ${transacao.conta_id === c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
@@ -381,12 +578,14 @@ export const getTransactionModalContent = (id) => {
             <div class="form-group"><label>Data</label><input name="data" type="date" value="${transacao.data}" required></div>
             <div class="form-group"><label>Conta</label><select name="conta_id">${contasOptions}</select></div>
             <div class="form-group"><label>Categoria</label><select name="categoria">${categoriasOptions}</select></div>
-            <div class="form-group"><label>Tipo</label><select name="tipo"><option value="despesa" ${transacao.tipo==='despesa'?'selected':''}>Despesa</option><option value="receita" ${transacao.tipo==='receita'?'selected':''}>Receita</option></select></div>
+            <div class="form-group"><label>Tipo</label><select name="tipo"><option value="despesa" ${transacao.tipo === 'despesa' ? 'selected' : ''}>Despesa</option><option value="receita" ${transacao.tipo === 'receita' ? 'selected' : ''}>Receita</option></select></div>
             <div style="text-align: right;"><button type="submit" class="btn">Salvar Alterações</button></div>
         </form>`;
 };
 export const getInstallmentPurchaseEditModalContent = (compraId) => {
-    const { comprasParceladas } = getState();
+    const {
+        comprasParceladas
+    } = getState();
     const compra = comprasParceladas.find(c => c.id === compraId);
     if (!compra) return `<p>Compra não encontrada.</p>`;
     const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${compra.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
@@ -399,12 +598,12 @@ export const getInstallmentPurchaseEditModalContent = (compraId) => {
         </form>`;
 };
 export const getPayBillModalContent = (billId) => {
-    const bill = getState().lancamentosFuturos.find(b=>b.id===billId);
+    const bill = getState().lancamentosFuturos.find(b => b.id === billId);
     return `<h2>Pagar ${bill.descricao}</h2>
         <form id="form-pagamento" data-bill-id="${bill.id}" data-valor="${bill.valor}" data-desc="${bill.descricao}" data-cat="${bill.categoria || 'Contas'}">
             <p style="font-size: 1.5rem; font-weight: 600;">${formatarMoeda(bill.valor)}</p>
             <div class="form-group"><label>Data Pgto.</label><input type="date" name="data" value="${toISODateString(new Date())}"></div>
-            <div class="form-group"><label>Pagar com</label><select name="conta_id">${getContas().filter(c=>c.tipo!=='Cartão de Crédito').map(c=>`<option value="${c.id}">${c.nome}</option>`).join('')}</select></div>
+            <div class="form-group"><label>Pagar com</label><select name="conta_id">${getContas().filter(c => c.tipo !== 'Cartão de Crédito').map(c => `<option value="${c.id}">${c.nome}</option>`).join('')}</select></div>
             <button class="btn" type="submit">Confirmar</button>
         </form>`;
 };
@@ -426,12 +625,17 @@ export const getInstallmentPurchaseModalContent = (compraAEditar = null) => {
 };
 export const getStatementModalContent = (contaId) => {
     const conta = getContaPorId(contaId);
-    const { transacoes } = getState();
+    const {
+        transacoes
+    } = getState();
     const mesesDisponiveis = [...new Set(transacoes.filter(t => t.conta_id === contaId).map(t => t.data.substring(0, 7)))].sort().reverse();
     const options = mesesDisponiveis.map(mes => {
         const [ano, mesNum] = mes.split('-');
         const data = new Date(ano, mesNum - 1);
-        const nomeMes = data.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        const nomeMes = data.toLocaleString('pt-BR', {
+            month: 'long',
+            year: 'numeric'
+        });
         return `<option value="${mes}">${nomeMes}</option>`;
     }).join('');
     return `
@@ -449,9 +653,14 @@ export const getStatementModalContent = (contaId) => {
 };
 export const renderStatementDetails = (contaId, mesSelecionado) => {
     const container = document.getElementById('statement-details-container');
-    if (!mesSelecionado) { container.innerHTML = '<p class="placeholder">Selecione um mês para ver os detalhes.</p>'; return; }
+    if (!mesSelecionado) {
+        container.innerHTML = '<p class="placeholder">Selecione um mês para ver os detalhes.</p>';
+        return;
+    }
     const conta = getContaPorId(contaId);
-    const { transacoes } = getState();
+    const {
+        transacoes
+    } = getState();
     const diaFechamento = conta.dia_fechamento_cartao || 28;
     const [ano, mes] = mesSelecionado.split('-').map(Number);
     const fimCiclo = new Date(ano, mes - 1, diaFechamento);
