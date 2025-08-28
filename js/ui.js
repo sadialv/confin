@@ -28,18 +28,19 @@ export const setLoadingState = (button, isLoading, originalText = 'Salvar') => {
 export const openModal = (content) => {
     const container = document.getElementById('modal-container');
     if(!container) return;
+
+    // Nova estrutura HTML para o "popup"
     const modalHTML = `
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">${content.title}</h5>
-                    <button type="button" class="btn-close" id="modal-close-btn"></button>
-                </div>
-                <div class="modal-body">
-                    ${content.body}
-                </div>
+        <div class="popup-dialog">
+            <div class="popup-header">
+                <h5 class="popup-title">${content.title}</h5>
+                <button type="button" class="btn-close" id="modal-close-btn"></button>
+            </div>
+            <div class="popup-body">
+                ${content.body}
             </div>
         </div>`;
+    
     container.innerHTML = modalHTML;
     container.classList.add('active');
 };
@@ -132,11 +133,11 @@ export const renderFormTransacaoRapida = () => {
         <div class="mb-3" id="group-data"><label id="label-data" class="form-label">Data</label><input type="date" name="data" value="${toISODateString(new Date())}" class="form-control form-control-sm" required></div>
         <div class="mb-3" id="group-conta"><label id="label-conta" class="form-label">Conta</label><select name="conta_id" class="form-select form-select-sm" required>${contasOptions}</select></div>
         
-        <div id="parcelada-fields" style="display: none;">
+        <div id="parcelada-fields" class="extra-fields">
             <div class="mb-3"><label class="form-label">Nº de Parcelas</label><input name="numero_parcelas" type="number" min="2" class="form-control form-control-sm"></div>
         </div>
         
-        <div id="recorrente-fields" style="display: none;">
+        <div id="recorrente-fields" class="extra-fields">
             <div class="mb-3"><label class="form-label">Frequência</label>
                 <select name="frequencia" class="form-select form-select-sm">
                     <option value="diaria">Diária</option>
@@ -393,3 +394,4 @@ export const getPayBillModalContent = (billId) => {
         </form>`;
     return { title, body };
 };
+// Adicione aqui as outras funções get...ModalContent se necessário (getBillModalContent, etc.)
