@@ -32,11 +32,47 @@ export const openModal = (content) => {
 export const closeModal = () => document.getElementById('modal-container').classList.remove('active');
 export const switchTab = (button, parentSelector) => {
     const parent = document.querySelector(parentSelector);
+    if (!parent) return;
     parent.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
     parent.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
     button.classList.add('active');
-    parent.querySelector(`#${button.dataset.tab}`).classList.add('active');
+    const tabContent = parent.querySelector(`#${button.dataset.tab}`);
+    if (tabContent) {
+        tabContent.classList.add('active');
+    }
 };
+
+// --- FUNÇÃO AUXILIAR PARA TRANSAÇÕES VIRTUAIS ---
+const gerarTransacoesVirtuais = () => {
+    const { comprasParceladas, lancamentosFuturos } = getState();
+    const transacoesVirtuais = [];
+
+    comprasParceladas.forEach(compra => {
+        const parcelas = lancamentosFuturos.filter(l => l.compra_parcelada_id === compra.id);
+        const dataCompra = new Date(compra.data_compra + 'T12:00:00');
+
+        parcelas.forEach(parcela => {
+            const numeroParcelaMatch = parcela.descricao.match(/\((\d+)\/\d+\)/);
+            if (!numeroParcelaMatch) return;
+
+            const numeroParcela = parseInt(numeroParcelaMatch[1]);
+            const dataVirtual = new Date(dataCompra.getFullYear(), dataCompra.getMonth() + numeroParcela - 1, dataCompra.getDate());
+
+            transacoesVirtuais.push({
+                id: `v_${parcela.id}`,
+                descricao: parcela.descricao,
+                valor: parcela.valor,
+                data: toISODateString(dataVirtual),
+                categoria: compra.categoria,
+                conta_id: compra.conta_id,
+                tipo: 'despesa',
+                isVirtual: true
+            });
+        });
+    });
+    return transacoesVirtuais;
+};
+
 
 // --- RENDERIZAÇÃO ---
 export const renderAllComponents = () => {
@@ -80,7 +116,9 @@ export const renderVisaoMensal = () => {
     if (!container) return;
     const mes = document.getElementById('dashboard-month-filter')?.value || new Date().toISOString().slice(0, 7);
     const { transacoes } = getState();
-    const transacoesMes = transacoes.filter(t => t.data?.startsWith(mes));
+    const transacoesVirtuais = gerarTransacoesVirtuais();
+    const transacoesCompletas = [...transacoes, ...transacoesVirtuais];
+    const transacoesMes = transacoesCompletas.filter(t => t.data?.startsWith(mes));
     const receitas = transacoesMes.filter(t => t.tipo === 'receita').reduce((s, t) => s + t.valor, 0);
     const despesas = transacoesMes.filter(t => t.tipo === 'despesa').reduce((s, t) => s + t.valor, 0);
     container.innerHTML = `
@@ -107,7 +145,9 @@ export const renderVisaoAnual = () => {
     if (!container) return;
     const ano = parseInt(document.getElementById('dashboard-year-filter')?.value) || new Date().getFullYear();
     const { transacoes } = getState();
-    const transacoesAno = transacoes.filter(t => t.data?.startsWith(ano));
+    const transacoesVirtuais = gerarTransacoesVirtuais();
+    const transacoesCompletas = [...transacoes, ...transacoesVirtuais];
+    const transacoesAno = transacoesCompletas.filter(t => t.data?.startsWith(ano));
     let receitasPorMes = Array(12).fill(0); let despesasPorMes = Array(12).fill(0);
     transacoesAno.forEach(t => {
         const mes = new Date(t.data + 'T12:00:00').getMonth();
@@ -129,16 +169,18 @@ export const renderFilters = (type, filters = { mes: 'todos', pesquisa: '' }) =>
     const containerId = isBills ? 'bills-filters-container' : 'history-filters-container';
     const container = document.getElementById(containerId);
     if (!container) return;
-
-    const data = isBills ? getState().lancamentosFuturos.filter(l => l.status === 'pendente') : getState().transacoes;
-    const dateKey = isBills ? 'data_vencimento' : 'data';
     
-    const mesesDisponiveis = [...new Set(
-        data
-            .map(item => item[dateKey] ? item[dateKey].substring(0, 7) : null)
-            .filter(Boolean)
-    )].sort().reverse();
+    let data, dateKey;
+    if (isBills) {
+        data = getState().lancamentosFuturos.filter(l => l.status === 'pendente');
+        dateKey = 'data_vencimento';
+    } else {
+        const transacoesVirtuais = gerarTransacoesVirtuais();
+        data = [...getState().transacoes, ...transacoesVirtuais];
+        dateKey = 'data';
+    }
 
+    const mesesDisponiveis = [...new Set(data.map(item => item[dateKey] ? item[dateKey].substring(0, 7) : null).filter(Boolean))].sort().reverse();
     const mesOptions = mesesDisponiveis.map(mes => {
         const [ano, mesNum] = mes.split('-');
         const nomeMes = new Date(ano, mesNum - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
@@ -204,9 +246,12 @@ const renderBillItem = (bill, compras) => {
 export const renderHistoricoTransacoes = (page = 1, filters = { mes: 'todos', pesquisa: '' }) => {
     const container = document.getElementById('history-list-container');
     if (!container) return;
-    const { transacoes } = getState();
+
+    const transacoesVirtuais = gerarTransacoesVirtuais();
+    const transacoesCompletas = [...getState().transacoes, ...transacoesVirtuais].sort((a,b) => new Date(b.data) - new Date(a.data));
+    
     const pesquisaLower = filters.pesquisa.toLowerCase();
-    const filtrados = transacoes.filter(t => (filters.mes === 'todos' || t.data.startsWith(filters.mes)) && (filters.pesquisa === '' || t.descricao.toLowerCase().includes(pesquisaLower) || t.categoria.toLowerCase().includes(pesquisaLower) || getContaPorId(t.conta_id)?.nome.toLowerCase().includes(pesquisaLower)));
+    const filtrados = transacoesCompletas.filter(t => (filters.mes === 'todos' || t.data.startsWith(filters.mes)) && (filters.pesquisa === '' || t.descricao.toLowerCase().includes(pesquisaLower) || t.categoria.toLowerCase().includes(pesquisaLower) || getContaPorId(t.conta_id)?.nome.toLowerCase().includes(pesquisaLower)));
     
     renderHistorySummary(filtrados);
 
@@ -245,11 +290,14 @@ const renderHistorySummary = (transactions) => {
 };
 const renderTransactionCard = (t) => {
     const conta = getContaPorId(t.conta_id); const icon = CATEGORY_ICONS[t.categoria] || CATEGORY_ICONS['Outros'];
+    const editButton = t.isVirtual ? '' : `<button class="btn-icon" data-action="editar-transacao" data-id="${t.id}" title="Editar"><i class="fas fa-edit"></i></button>`;
+    const deleteButton = t.isVirtual ? '' : `<button class="btn-icon" data-action="deletar-transacao" data-id="${t.id}" title="Deletar"><i class="fas fa-trash"></i></button>`;
+    
     return `<div class="transaction-card">
             <div class="transaction-icon-wrapper" style="background-color:${icon.color};"><i class="${icon.icon}"></i></div>
             <div><div class="transaction-description">${t.descricao}</div><div class="transaction-meta">${t.categoria} | ${conta ? conta.nome : ''}</div></div>
             <span class="transaction-value ${t.tipo === 'despesa' ? 'expense-text' : 'income-text'}">${t.tipo === 'despesa' ? '-' : ''} ${formatarMoeda(t.valor)}</span>
-            <div class="transaction-actions"><button class="btn-icon" data-action="editar-transacao" data-id="${t.id}" title="Editar"><i class="fas fa-edit"></i></button><button class="btn-icon" data-action="deletar-transacao" data-id="${t.id}" title="Deletar"><i class="fas fa-trash"></i></button></div>
+            <div class="transaction-actions">${editButton}${deleteButton}</div>
         </div>`;
 };
 export const renderFormTransacaoRapida = () => {
@@ -420,7 +468,7 @@ export const getStatementModalContent = (contaId) => {
         const [ano, mesNum] = mes.split('-');
         const data = new Date(ano, mesNum - 1);
         const nomeMes = data.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
-        return `<option value="${mes}">${nomeMes}</option>`;
+        return `<option value="${mes}">${nomeMes}</option>>`;
     }).join('');
     return `
         <h2>Fatura - ${conta.nome}</h2>
