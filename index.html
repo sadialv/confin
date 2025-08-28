@@ -39,8 +39,8 @@
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>
-                    <div class="card-body" id="accounts-container">
-                        <p class="text-center text-body-secondary">Carregando...</p>
+                    <div class="card-body p-0" id="accounts-container">
+                        <p class="text-center text-body-secondary p-3">Carregando...</p>
                     </div>
                 </div>
 
@@ -57,20 +57,20 @@
             <div class="col-lg-8">
                 <div class="card shadow-sm mb-4">
                     <div class="card-header">
-                         <ul class="nav nav-tabs card-header-tabs" id="dashboard-tab-buttons">
-                            <li class="nav-item">
-                                <button class="nav-link active" data-tab="dashboard-monthly">Visão Mensal</button>
+                         <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#dashboard-monthly-pane" type="button" role="tab">Visão Mensal</button>
                             </li>
-                            <li class="nav-item">
-                                <button class="nav-link" data-tab="dashboard-yearly">Visão Anual</button>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#dashboard-yearly-pane" type="button" role="tab">Visão Anual</button>
                             </li>
                         </ul>
                     </div>
-                    <div class="card-body">
-                        <div id="dashboard-monthly" class="tab-content active">
+                    <div class="card-body tab-content">
+                        <div id="dashboard-monthly-pane" class="tab-pane fade show active" role="tabpanel">
                              <p class="text-center text-body-secondary">Carregando...</p>
                         </div>
-                        <div id="dashboard-yearly" class="tab-content">
+                        <div id="dashboard-yearly-pane" class="tab-pane fade" role="tabpanel">
                              <p class="text-center text-body-secondary">Carregando...</p>
                         </div>
                     </div>
@@ -78,24 +78,24 @@
 
                 <div class="card shadow-sm mb-4">
                     <div class="card-header">
-                        <ul class="nav nav-tabs card-header-tabs" id="main-tab-buttons">
-                            <li class="nav-item">
-                                <button class="nav-link active" data-tab="bills-tab">Contas a Pagar/Receber</button>
+                        <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#bills-tab-pane" type="button" role="tab">Contas a Pagar/Receber</button>
                             </li>
-                            <li class="nav-item">
-                                <button class="nav-link" data-tab="history-tab">Histórico de Transações</button>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#history-tab-pane" type="button" role="tab">Histórico de Transações</button>
                             </li>
                         </ul>
                     </div>
-                    <div class="card-body">
-                        <div id="bills-tab" class="tab-content active">
+                    <div class="card-body tab-content">
+                        <div id="bills-tab-pane" class="tab-pane fade show active" role="tabpanel">
                             <div id="bills-filters-container"></div>
                             <div id="bills-summary-panel" class="mb-3"></div>
                             <div class="accordion" id="bills-list-container">
                                 <p class="text-center text-body-secondary">Carregando...</p>
                             </div>
                         </div>
-                        <div id="history-tab" class="tab-content">
+                        <div id="history-tab-pane" class="tab-pane fade" role="tabpanel">
                             <div id="history-filters-container"></div>
                             <div id="history-summary-panel" class="mb-3"></div>
                             <div class="accordion" id="history-list-container">
@@ -105,19 +105,13 @@
                     </div>
                 </div>
             </div>
-
         </div>
     </main>
     
-    <div id="modal-container">
-        <div class="modal-content">
-            <div id="modal-content-area"></div>
-        </div>
-    </div>
+    <div id="modal-container"></div>
     <div id="toast-container"></div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
     <script src="js/utils.js" type="module"></script>
     <script src="js/api.js" type="module"></script>
     <script src="js/state.js" type="module"></script>
