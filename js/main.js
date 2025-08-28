@@ -3,239 +3,149 @@ import * as API from './api.js';
 import * as State from './state.js';
 import { applyTheme, toISODateString } from './utils.js';
 
-// Estado dos filtros e paginação
-let historyCurrentPage = 1;
-let historyFilters = { mes: 'todos', pesquisa: '' };
-let billsCurrentPage = 1;
-let billsFilters = { mes: 'todos', pesquisa: '' };
+// --- FUNÇÃO PRINCIPAL QUE RODA QUANDO O HTML ESTÁ PRONTO ---
+document.addEventListener('DOMContentLoaded', () => {
 
-// --- AÇÕES ---
-async function salvarConta(e){
-    e.preventDefault();
-    const form = e.target;
-    const btn = form.querySelector('button');
-    UI.setLoadingState(btn, true);
-    try {
-        const id = form.dataset.id;
-        const data = Object.fromEntries(new FormData(form));
-        const saved = await API.salvarDados('contas', data, id);
-        const state = State.getState();
-        const newContas = id ? state.contas.map(c => c.id == saved.id ? saved : c) : [...state.contas, saved];
-        State.setState({ contas: newContas.sort((a, b) => a.nome.localeCompare(b.nome)) });
-        UI.renderAllComponents();
-        UI.closeModal();
-        UI.showToast('Conta salva!');
-    } catch(err) {
-        UI.showToast(err.message, 'error');
-    } finally {
-        UI.setLoadingState(btn, false, 'Salvar');
-    }
-}
+    // Estado dos filtros e paginação
+    let historyCurrentPage = 1;
+    let historyFilters = { mes: 'todos', pesquisa: '' };
+    let billsCurrentPage = 1;
+    let billsFilters = { mes: 'todos', pesquisa: '' };
 
-async function deletarConta(id){
-    if(!confirm('Apagar conta?')) return;
-    try {
-        await API.deletarDados('contas', id);
-        const state = State.getState();
-        State.setState({ contas: state.contas.filter(c => c.id !== id) });
-        UI.renderAllComponents();
-        UI.showToast('Conta deletada.');
-    } catch(err) {
-        UI.showToast(err.message, 'error');
-    }
-}
-
-async function salvarTransacaoRapida(e){
-    e.preventDefault();
-    const form = e.target;
-    const btn = form.querySelector('button');
-    UI.setLoadingState(btn, true);
-    try {
-        const data = Object.fromEntries(new FormData(form));
-        data.valor = parseFloat(data.valor);
-        data.conta_id = parseInt(data.conta_id);
-        const saved = await API.salvarDados('transacoes', data);
-        const state = State.getState();
-        State.setState({ transacoes: [...state.transacoes, saved].sort((a,b) => new Date(b.data) - new Date(a.data)) });
-        UI.renderAllComponents();
-        form.reset();
-        UI.showToast('Transação salva!');
-    } catch(err) {
-        UI.showToast(err.message, 'error');
-    } finally {
-        UI.setLoadingState(btn, false, 'Salvar Transação');
-    }
-}
-
-async function confirmarPagamento(e){
-    e.preventDefault();
-    const form = e.target;
-    const btn = form.querySelector('button');
-    UI.setLoadingState(btn, true);
-    try {
-        const data = Object.fromEntries(new FormData(form));
-        const transacao = {
-            descricao: form.dataset.desc,
-            valor: parseFloat(form.dataset.valor),
-            data: data.data,
-            conta_id: parseInt(data.conta_id),
-            categoria: form.dataset.cat,
-            tipo: 'despesa'
-        };
-        const savedT = await API.salvarDados('transacoes', transacao);
-        const savedL = await API.salvarDados('lancamentos_futuros', { status: 'pago' }, form.dataset.billId);
-        const state = State.getState();
-        State.setState({
-            transacoes: [...state.transacoes, savedT].sort((a,b) => new Date(b.data) - new Date(a.data)),
-            lancamentosFuturos: state.lancamentosFuturos.map(l => l.id == savedL.id ? savedL : l)
-        });
-        UI.renderAllComponents();
-        UI.closeModal();
-        UI.showToast('Conta paga!');
-    } catch(err) {
-        UI.showToast(err.message, 'error');
-    } finally {
-        UI.setLoadingState(btn, false, 'Confirmar');
-    }
-}
-
-async function deletarTransacao(id){
-    if(!confirm('Apagar transação?')) return;
-    try {
-        await API.deletarDados('transacoes', id);
-        const state = State.getState();
-        State.setState({ transacoes: state.transacoes.filter(t => t.id !== id) });
-        UI.renderAllComponents();
-        UI.showToast('Transação deletada.');
-    } catch(err) {
-        UI.showToast(err.message, 'error');
-    }
-}
-
-async function deletarCompraParceladaCompleta(compraId) {
-    if (!compraId) return;
-    try {
-        await API.deletarLancamentosPorCompraId(compraId);
-        await API.deletarDados('compras_parceladas', compraId);
-    } catch (error) {
-        console.error("Erro ao deletar compra parcelada antiga:", error);
-        UI.showToast(`Erro ao deletar compra antiga: ${error.message}`, 'error');
-        throw error;
-    }
-}
-
-async function deletarLancamento(id, compraId) {
-    if (compraId) {
-        if (!confirm('Este é um lançamento parcelado. Deseja apagar a compra inteira e todas as suas parcelas?')) return;
+    // --- AÇÕES ---
+    async function salvarConta(e){ e.preventDefault(); const form=e.target; const btn=form.querySelector('button'); UI.setLoadingState(btn,true); try { const id=form.dataset.id; const data=Object.fromEntries(new FormData(form)); const saved=await API.salvarDados('contas',data,id); const state=State.getState(); const newContas=id?state.contas.map(c=>c.id==saved.id?saved:c):[...state.contas,saved]; State.setState({contas:newContas.sort((a, b) => a.nome.localeCompare(b.nome))}); UI.renderAllComponents(); UI.closeModal(); UI.showToast('Conta salva!'); } catch(err){UI.showToast(err.message,'error')} finally {UI.setLoadingState(btn,false,'Salvar')} }
+    async function deletarConta(id){ if(!confirm('Apagar conta?'))return; try{ await API.deletarDados('contas',id); const state=State.getState(); State.setState({contas:state.contas.filter(c=>c.id!==id)}); UI.renderAllComponents(); UI.showToast('Conta deletada.'); } catch(err){UI.showToast(err.message,'error')} }
+    async function confirmarPagamento(e){ e.preventDefault(); const form=e.target; const btn=form.querySelector('button'); UI.setLoadingState(btn,true); try { const data=Object.fromEntries(new FormData(form)); const transacao = { descricao:form.dataset.desc, valor:parseFloat(form.dataset.valor), data:data.data, conta_id:parseInt(data.conta_id), categoria:form.dataset.cat, tipo:'despesa' }; const savedT=await API.salvarDados('transacoes',transacao); const savedL=await API.salvarDados('lancamentos_futuros',{status:'pago'},form.dataset.billId); const state=State.getState(); State.setState({ transacoes:[...state.transacoes, savedT].sort((a,b)=>new Date(b.data)-new Date(a.data)), lancamentosFuturos:state.lancamentosFuturos.map(l=>l.id===savedL.id?savedL:l) }); UI.renderAllComponents(); UI.closeModal(); UI.showToast('Conta paga!'); } catch(err){UI.showToast(err.message,'error')} finally {UI.setLoadingState(btn,false,'Confirmar')} }
+    async function deletarTransacao(id){ if(!confirm('Apagar transação?'))return; try { await API.deletarDados('transacoes', id); await initializeApp(false); UI.showToast('Transação deletada.'); } catch(err){UI.showToast(err.message,'error')} }
+    async function deletarCompraParceladaCompleta(compraId) { if (!compraId) return; try { await API.deletarLancamentosPorCompraId(compraId); await API.deletarDados('compras_parceladas', compraId); } catch (error) { console.error("Erro ao deletar compra parcelada antiga:", error); UI.showToast(`Erro ao deletar compra antiga: ${error.message}`, 'error'); throw error; } }
+    async function deletarLancamento(id, compraId) { if (compraId) { if (!confirm('Este é um lançamento parcelado. Deseja apagar a compra inteira e todas as suas parcelas?')) return; try { await deletarCompraParceladaCompleta(compraId); await initializeApp(false); UI.showToast('Compra e parcelas deletadas com sucesso!'); } catch(err) { UI.showToast(err.message, 'error'); } } else { if (!confirm('Apagar este lançamento?')) return; try { await API.deletarDados('lancamentos_futuros', id); await initializeApp(false); UI.showToast('Lançamento deletado.'); } catch (err) { UI.showToast(err.message, 'error'); } } }
+    async function salvarLancamentoFuturo(e) { e.preventDefault(); const form = e.target; const btn = form.querySelector('button'); const id = form.dataset.id; UI.setLoadingState(btn, true); try { const data = Object.fromEntries(new FormData(form)); data.valor = parseFloat(data.valor); const saved = await API.salvarDados('lancamentos_futuros', data, id); await initializeApp(false); UI.closeModal(); UI.showToast(`Lançamento ${id ? 'atualizado' : 'salvo'}!`); } catch(err) { UI.showToast(err.message, 'error'); } finally { UI.setLoadingState(btn, false, 'Salvar'); } }
+    async function salvarEdicaoTransacao(e) { e.preventDefault(); const form = e.target; const btn = form.querySelector('button'); const id = form.dataset.id; UI.setLoadingState(btn, true); try { const data = Object.fromEntries(new FormData(form)); data.valor = parseFloat(data.valor); data.conta_id = parseInt(data.conta_id); const saved = await API.salvarDados('transacoes', data, id); await initializeApp(false); UI.closeModal(); UI.showToast('Transação atualizada!'); } catch(err) { UI.showToast(err.message, 'error'); } finally { UI.setLoadingState(btn, false, 'Salvar Alterações'); } }
+    
+    async function salvarCompraParcelada(e) {
+        e.preventDefault();
+        const form = e.target;
+        const btn = form.querySelector('button');
+        const idCompraAntiga = form.dataset.compraAntigaId ? parseInt(form.dataset.compraAntigaId) : null;
+        UI.setLoadingState(btn, true);
         try {
-            await deletarCompraParceladaCompleta(compraId);
-            UI.showToast('Compra e parcelas deletadas com sucesso!');
+            const data = Object.fromEntries(new FormData(form));
+            const dadosCompra = {
+                descricao: data.descricao, valor_total: parseFloat(data.valor_total),
+                numero_parcelas: parseInt(data.numero_parcelas), data_compra: data.data_compra,
+                conta_id: parseInt(data.conta_id), categoria: data.categoria,
+            };
+            const compraSalva = await API.salvarDados('compras_parceladas', dadosCompra);
+            const valorParcela = parseFloat((dadosCompra.valor_total / dadosCompra.numero_parcelas).toFixed(2));
+            const dataCompraObj = new Date(dadosCompra.data_compra + 'T12:00:00');
+            const lancamentos = [];
+            for (let i = 1; i <= dadosCompra.numero_parcelas; i++) {
+                const dataVencimento = new Date(dataCompraObj);
+                dataVencimento.setMonth(dataVencimento.getMonth() + i);
+                lancamentos.push({
+                    descricao: `${dadosCompra.descricao} (${i}/${dadosCompra.numero_parcelas})`, valor: valorParcela,
+                    data_vencimento: toISODateString(dataVencimento), tipo: 'a_pagar',
+                    status: 'pendente', compra_parcelada_id: compraSalva.id
+                });
+            }
+            await API.salvarMultiplosLancamentos(lancamentos);
+            if (idCompraAntiga) {
+                await deletarCompraParceladaCompleta(idCompraAntiga);
+            }
+            await initializeApp(false);
+            UI.closeModal();
+            UI.showToast(`Compra parcelada ${idCompraAntiga ? 'recriada' : 'salva'} com sucesso!`);
         } catch(err) {
             UI.showToast(err.message, 'error');
-            return;
+        } finally {
+            UI.setLoadingState(btn, false, idCompraAntiga ? 'Salvar e Substituir' : 'Salvar Compra');
         }
-    } else {
-        if (!confirm('Apagar este lançamento?')) return;
+    }
+    
+    async function salvarTransacaoUnificada(e) {
+        e.preventDefault();
+        const form = e.target;
+        const btn = form.querySelector('button');
+        UI.setLoadingState(btn, true, "Salvando...");
         try {
-            await API.deletarDados('lancamentos_futuros', id);
-            UI.showToast('Lançamento deletado.');
+            const data = Object.fromEntries(new FormData(form));
+            const tipoCompra = data.tipo_compra;
+            let toastMessage = '';
+
+            if (tipoCompra === 'vista') {
+                const transacao = {
+                    descricao: data.descricao, valor: Math.abs(parseFloat(data.valor)), data: data.data,
+                    conta_id: parseInt(data.conta_id), categoria: data.categoria,
+                    tipo: parseFloat(data.valor) >= 0 ? 'receita' : 'despesa'
+                };
+                await API.salvarDados('transacoes', transacao);
+                toastMessage = 'Transação salva!';
+
+            } else if (tipoCompra === 'parcelada') {
+                const dadosCompra = {
+                    descricao: data.descricao, valor_total: parseFloat(data.valor),
+                    numero_parcelas: parseInt(data.numero_parcelas), data_compra: data.data,
+                    conta_id: parseInt(data.conta_id), categoria: data.categoria,
+                };
+                const compraSalva = await API.salvarDados('compras_parceladas', dadosCompra);
+                const valorParcela = parseFloat((dadosCompra.valor_total / dadosCompra.numero_parcelas).toFixed(2));
+                const dataCompraObj = new Date(dadosCompra.data_compra + 'T12:00:00');
+                const lancamentos = [];
+                for (let i = 1; i <= dadosCompra.numero_parcelas; i++) {
+                    const dataVencimento = new Date(dataCompraObj);
+                    dataVencimento.setMonth(dataVencimento.getMonth() + i);
+                    lancamentos.push({
+                        descricao: `${dadosCompra.descricao} (${i}/${dadosCompra.numero_parcelas})`, valor: valorParcela,
+                        data_vencimento: toISODateString(dataVencimento), tipo: 'a_pagar',
+                        status: 'pendente', compra_parcelada_id: compraSalva.id, categoria: dadosCompra.categoria
+                    });
+                }
+                await API.salvarMultiplosLancamentos(lancamentos);
+                toastMessage = 'Compra parcelada lançada!';
+
+            } else if (tipoCompra === 'recorrente') {
+                const valor = parseFloat(data.valor);
+                const dataInicio = new Date(data.data + 'T12:00:00');
+                const quantidade = parseInt(data.quantidade);
+                const diaVencimento = parseInt(data.dia_vencimento);
+                const frequencia = data.frequencia;
+                
+                const lancamentos = [];
+                for (let i = 0; i < quantidade; i++) {
+                    let proximaData;
+                    if (frequencia === 'mensal') {
+                        proximaData = new Date(dataInicio.getFullYear(), dataInicio.getMonth() + i, diaVencimento);
+                    } else if (frequencia === 'anual') {
+                        proximaData = new Date(dataInicio.getFullYear() + i, dataInicio.getMonth(), diaVencimento);
+                    } else if (frequencia === '15d') {
+                        proximaData = new Date(new Date(dataInicio).setDate(dataInicio.getDate() + (15 * i)));
+                    } else if (frequencia === '30d') {
+                        proximaData = new Date(new Date(dataInicio).setDate(dataInicio.getDate() + (30 * i)));
+                    }
+                    
+                    lancamentos.push({
+                        descricao: data.descricao, valor: Math.abs(valor),
+                        data_vencimento: toISODateString(proximaData), tipo: 'a_pagar',
+                        status: 'pendente', categoria: data.categoria
+                    });
+                }
+                await API.salvarMultiplosLancamentos(lancamentos);
+                toastMessage = `${lancamentos.length} lançamentos recorrentes criados!`;
+            }
+            
+            await initializeApp(false);
+            form.reset();
+            form.querySelector('#tipo-compra').dispatchEvent(new Event('change'));
+            UI.showToast(toastMessage);
+
         } catch (err) {
             UI.showToast(err.message, 'error');
-            return;
+        } finally {
+            UI.setLoadingState(btn, false, 'Salvar Transação');
         }
     }
-    await initializeApp(false);
-}
 
-async function salvarLancamentoFuturo(e) {
-    e.preventDefault();
-    const form = e.target;
-    const btn = form.querySelector('button');
-    const id = form.dataset.id;
-    UI.setLoadingState(btn, true);
-    try {
-        const data = Object.fromEntries(new FormData(form));
-        data.valor = parseFloat(data.valor);
-        const saved = await API.salvarDados('lancamentos_futuros', data, id);
-        const state = State.getState();
-        const newList = id ? state.lancamentosFuturos.map(l => l.id == saved.id ? saved : l) : [...state.lancamentosFuturos, saved];
-        State.setState({ lancamentosFuturos: newList.sort((a,b) => new Date(a.data_vencimento) - new Date(b.data_vencimento)) });
-        UI.renderAllComponents();
-        UI.closeModal();
-        UI.showToast(`Lançamento ${id ? 'atualizado' : 'salvo'}!`);
-    } catch(err) {
-        UI.showToast(err.message, 'error');
-    } finally {
-        UI.setLoadingState(btn, false, 'Salvar');
-    }
-}
-
-async function salvarEdicaoTransacao(e) {
-    e.preventDefault();
-    const form = e.target;
-    const btn = form.querySelector('button');
-    const id = form.dataset.id;
-    UI.setLoadingState(btn, true);
-    try {
-        const data = Object.fromEntries(new FormData(form));
-        data.valor = parseFloat(data.valor);
-        data.conta_id = parseInt(data.conta_id);
-        const saved = await API.salvarDados('transacoes', data, id);
-        const state = State.getState();
-        const newList = state.transacoes.map(t => t.id == saved.id ? saved : t);
-        State.setState({ transacoes: newList.sort((a,b) => new Date(b.data) - new Date(a.data)) });
-        UI.renderAllComponents();
-        UI.closeModal();
-        UI.showToast('Transação atualizada!');
-    } catch(err) {
-        UI.showToast(err.message, 'error');
-    } finally {
-        UI.setLoadingState(btn, false, 'Salvar Alterações');
-    }
-}
-
-async function salvarCompraParcelada(e) {
-    e.preventDefault();
-    const form = e.target;
-    const btn = form.querySelector('button');
-    const idCompraAntiga = form.dataset.compraAntigaId ? parseInt(form.dataset.compraAntigaId) : null;
-    UI.setLoadingState(btn, true);
-    try {
-        const data = Object.fromEntries(new FormData(form));
-        const dadosCompra = {
-            descricao: data.descricao, valor_total: parseFloat(data.valor_total),
-            numero_parcelas: parseInt(data.numero_parcelas), data_compra: data.data_compra,
-            conta_id: parseInt(data.conta_id), categoria: data.categoria,
-        };
-        const compraSalva = await API.salvarDados('compras_parceladas', dadosCompra);
-        const valorParcela = parseFloat((dadosCompra.valor_total / dadosCompra.numero_parcelas).toFixed(2));
-        const dataCompraObj = new Date(dadosCompra.data_compra + 'T12:00:00');
-        const lancamentos = [];
-        for (let i = 1; i <= dadosCompra.numero_parcelas; i++) {
-            const dataVencimento = new Date(dataCompraObj);
-            dataVencimento.setMonth(dataVencimento.getMonth() + i);
-            lancamentos.push({
-                descricao: `${dadosCompra.descricao} (${i}/${dadosCompra.numero_parcelas})`, valor: valorParcela,
-                data_vencimento: toISODateString(dataVencimento), tipo: 'a_pagar',
-                status: 'pendente', compra_parcelada_id: compraSalva.id
-            });
-        }
-        await API.salvarMultiplosLancamentos(lancamentos);
-        if (idCompraAntiga) {
-            await deletarCompraParceladaCompleta(idCompraAntiga);
-        }
-        await initializeApp(false);
-        UI.closeModal();
-        UI.showToast(`Compra parcelada ${idCompraAntiga ? 'recriada' : 'salva'} com sucesso!`);
-    } catch(err) {
-        UI.showToast(err.message, 'error');
-    } finally {
-        UI.setLoadingState(btn, false, idCompraAntiga ? 'Salvar e Substituir' : 'Salvar Compra');
-    }
-}
-
-// --- FUNÇÃO PRINCIPAL ---
-document.addEventListener('DOMContentLoaded', () => {
+    // --- EVENT LISTENERS ---
     function setupEventListeners() {
         document.getElementById('theme-switcher').addEventListener('click', () => {
             const current = document.documentElement.getAttribute('data-theme');
@@ -244,38 +154,15 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('modal-container').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) UI.closeModal();
         });
-        document.getElementById('dashboard-tab-buttons').addEventListener('click', e => {
-            if (e.target.matches('.tab-button')) {
-                UI.switchTab(e.target, '.card:has(#dashboard-tab-buttons)');
-                if (e.target.dataset.tab === 'dashboard-monthly') UI.renderVisaoMensal();
-                else UI.renderVisaoAnual();
-            }
-        });
-        document.getElementById('main-tab-buttons').addEventListener('click', e => {
-            if (e.target.matches('.tab-button')) {
-                UI.switchTab(e.target, '.card:has(#main-tab-buttons)');
-                const tabId = e.target.dataset.tab;
-                if (tabId === 'tab-bills') {
-                    UI.renderFilters('bills', billsFilters);
-                    UI.renderLancamentosFuturos(billsCurrentPage, billsFilters);
-                } else if (tabId === 'tab-history') {
-                    UI.renderFilters('history', historyFilters);
-                    UI.renderHistoricoTransacoes(historyCurrentPage, historyFilters);
-                }
-            }
-        });
-        document.getElementById('form-transacao-rapida').addEventListener('submit', salvarTransacaoRapida);
+        document.getElementById('dashboard-tab-buttons').addEventListener('click', e => { if (e.target.matches('.tab-button')) { UI.switchTab(e.target, '.card:has(#dashboard-tab-buttons)'); UI.renderAllComponents(); } });
+        document.getElementById('main-tab-buttons').addEventListener('click', e => { if (e.target.matches('.tab-button')) { UI.switchTab(e.target, '.card:has(#main-tab-buttons)'); UI.renderAllComponents(); } });
+        
+        // CORRIGIDO: O listener agora aponta para o ID 'form-transacao-unificada'
+        document.getElementById('form-transacao-unificada').addEventListener('submit', salvarTransacaoUnificada);
+        
         document.getElementById('btn-add-account').addEventListener('click', () => {
             UI.openModal(UI.getAccountModalContent());
             document.getElementById('form-conta').addEventListener('submit', salvarConta);
-        });
-        document.getElementById('btn-open-bill').addEventListener('click',() => {
-            UI.openModal(UI.getBillModalContent());
-            document.getElementById('form-lancamento').addEventListener('submit', salvarLancamentoFuturo);
-        });
-        document.getElementById('btn-open-installment').addEventListener('click',() => {
-            UI.openModal(UI.getInstallmentPurchaseModalContent());
-            document.getElementById('form-compra-parcelada').addEventListener('submit', salvarCompraParcelada);
         });
         
         document.body.addEventListener('click', e => {
@@ -338,6 +225,43 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         document.body.addEventListener('change', e => {
+            if (e.target.id === 'tipo-compra') {
+                const tipo = e.target.value;
+                const form = e.target.closest('form');
+                const camposParcelada = form.querySelector('#parcelada-fields');
+                const camposRecorrente = form.querySelector('#recorrente-fields');
+                const labelValor = form.querySelector('#label-valor');
+                const labelData = form.querySelector('#label-data');
+                const selectConta = form.querySelector('select[name="conta_id"]');
+                const groupConta = form.querySelector('#group-conta');
+                const groupDiaVencimento = form.querySelector('#group-dia-vencimento');
+
+                camposParcelada.style.display = 'none';
+                camposRecorrente.style.display = 'none';
+                labelValor.textContent = 'Valor';
+                labelData.textContent = 'Data';
+                groupConta.style.display = 'block';
+                if(selectConta.dataset.allOptions) selectConta.innerHTML = selectConta.dataset.allOptions;
+                selectConta.disabled = false;
+
+                if (tipo === 'parcelada') {
+                    camposParcelada.style.display = 'block';
+                    labelValor.textContent = 'Valor Total';
+                    labelData.textContent = 'Data da Compra';
+                    if(selectConta.dataset.creditCardOptions) selectConta.innerHTML = selectConta.dataset.creditCardOptions;
+                } else if (tipo === 'recorrente') {
+                    camposRecorrente.style.display = 'block';
+                    labelValor.textContent = 'Valor da Assinatura';
+                    labelData.textContent = 'Data de Início';
+                    groupConta.style.display = 'none';
+                }
+            }
+            if (e.target.name === 'frequencia') {
+                const frequencia = e.target.value;
+                const form = e.target.closest('form');
+                const groupDiaVencimento = form.querySelector('#group-dia-vencimento');
+                groupDiaVencimento.style.display = (frequencia === 'mensal' || frequencia === 'anual') ? 'block' : 'none';
+            }
             if (e.target.id === 'history-month-filter') { historyFilters.mes = e.target.value; historyCurrentPage = 1; UI.renderHistoricoTransacoes(historyCurrentPage, historyFilters); }
             if (e.target.id === 'bills-month-filter') { billsFilters.mes = e.target.value; billsCurrentPage = 1; UI.renderLancamentosFuturos(billsCurrentPage, billsFilters); }
             if (e.target.id === 'conta-tipo') {
