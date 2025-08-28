@@ -3,10 +3,8 @@ import * as API from './api.js';
 import * as State from './state.js';
 import { applyTheme, toISODateString } from './utils.js';
 
-// --- FUNÇÃO PRINCIPAL QUE RODA QUANDO O HTML ESTÁ PRONTO ---
 document.addEventListener('DOMContentLoaded', () => {
 
-    // Estado dos filtros e paginação
     let historyCurrentPage = 1;
     let historyFilters = { mes: 'todos', pesquisa: '' };
     let billsCurrentPage = 1;
@@ -21,7 +19,6 @@ document.addEventListener('DOMContentLoaded', () => {
     async function deletarLancamento(id, compraId) { if (compraId) { if (!confirm('Este é um lançamento parcelado. Deseja apagar a compra inteira e todas as suas parcelas?')) return; try { await deletarCompraParceladaCompleta(compraId); await initializeApp(false); UI.showToast('Compra e parcelas deletadas com sucesso!'); } catch(err) { UI.showToast(err.message, 'error'); } } else { if (!confirm('Apagar este lançamento?')) return; try { await API.deletarDados('lancamentos_futuros', id); await initializeApp(false); UI.showToast('Lançamento deletado.'); } catch (err) { UI.showToast(err.message, 'error'); } } }
     async function salvarLancamentoFuturo(e) { e.preventDefault(); const form = e.target; const btn = form.querySelector('button'); const id = form.dataset.id; UI.setLoadingState(btn, true); try { const data = Object.fromEntries(new FormData(form)); data.valor = parseFloat(data.valor); const saved = await API.salvarDados('lancamentos_futuros', data, id); await initializeApp(false); UI.closeModal(); UI.showToast(`Lançamento ${id ? 'atualizado' : 'salvo'}!`); } catch(err) { UI.showToast(err.message, 'error'); } finally { UI.setLoadingState(btn, false, 'Salvar'); } }
     async function salvarEdicaoTransacao(e) { e.preventDefault(); const form = e.target; const btn = form.querySelector('button'); const id = form.dataset.id; UI.setLoadingState(btn, true); try { const data = Object.fromEntries(new FormData(form)); data.valor = parseFloat(data.valor); data.conta_id = parseInt(data.conta_id); const saved = await API.salvarDados('transacoes', data, id); await initializeApp(false); UI.closeModal(); UI.showToast('Transação atualizada!'); } catch(err) { UI.showToast(err.message, 'error'); } finally { UI.setLoadingState(btn, false, 'Salvar Alterações'); } }
-    
     async function salvarCompraParcelada(e) {
         e.preventDefault();
         const form = e.target;
@@ -61,7 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
             UI.setLoadingState(btn, false, idCompraAntiga ? 'Salvar e Substituir' : 'Salvar Compra');
         }
     }
-
     async function salvarTransacaoUnificada(e) {
         e.preventDefault();
         const form = e.target;
@@ -111,6 +107,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const frequencia = data.frequencia;
                 
                 const lancamentos = [];
+                let dataCorrente = new Date(dataInicio);
+
                 for (let i = 0; i < quantidade; i++) {
                     let proximaData;
                     if (frequencia === 'mensal') {
@@ -154,8 +152,25 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('modal-container').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) UI.closeModal();
         });
-        document.getElementById('dashboard-tab-buttons').addEventListener('click', e => { if (e.target.matches('.tab-button')) { UI.switchTab(e.target, '.card:has(#dashboard-tab-buttons)'); UI.renderAllComponents(); } });
-        document.getElementById('main-tab-buttons').addEventListener('click', e => { if (e.target.matches('.tab-button')) { UI.switchTab(e.target, '.card:has(#main-tab-buttons)'); UI.renderAllComponents(); } });
+        document.getElementById('dashboard-tab-buttons').addEventListener('click', e => {
+            if (e.target.matches('.tab-button')) {
+                UI.switchTab(e.target, '.card:has(#dashboard-tab-buttons)');
+                if (e.target.dataset.tab === 'dashboard-monthly') UI.renderVisaoMensal();
+                else UI.renderVisaoAnual();
+            }
+        });
+        document.getElementById('main-tab-buttons').addEventListener('click', e => {
+            if (e.target.matches('.tab-button')) {
+                UI.switchTab(e.target, '.card:has(#main-tab-buttons)');
+                if (e.target.dataset.tab === 'tab-bills') {
+                    UI.renderFilters('bills', billsFilters);
+                    UI.renderLancamentosFuturos(billsCurrentPage, billsFilters);
+                } else if (e.target.dataset.tab === 'tab-history') {
+                    UI.renderFilters('history', historyFilters);
+                    UI.renderHistoricoTransacoes(historyCurrentPage, historyFilters);
+                }
+            }
+        });
         
         document.getElementById('form-transacao-unificada').addEventListener('submit', salvarTransacaoUnificada);
         
