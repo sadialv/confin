@@ -1,8 +1,6 @@
 // js/utils.js
-
 export const CATEGORIAS_PADRAO = ['Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Lazer', 'Educação', 'Salário', 'Investimentos', 'Contas', 'Ajustes', 'Pagamento de Fatura', 'Compras', 'Outros'];
 
-// SUBSTITUA SEU OBJETO CATEGORY_ICONS POR ESTE:
 export const CATEGORY_ICONS = {
     'Alimentação': { icon: 'fas fa-utensils', color: '#f97316' },
     'Transporte': { icon: 'fas fa-car', color: '#3b82f6' },
