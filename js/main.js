@@ -14,8 +14,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- AÇÕES ---
 
-    // Função auxiliar para recarregar o estado da API e renderizar a UI.
-    // Usada em operações complexas que alteram múltiplos registros.
     async function reloadStateAndRender() {
         try {
             const data = await API.fetchData();
@@ -312,13 +310,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- EVENT LISTENERS (Refatorado) ---
+    // --- EVENT LISTENERS (COM CÓDIGO DE DEPURAÇÃO) ---
     function setupEventListeners() {
+        console.log("Iniciando setupEventListeners...");
+
+        console.log("Procurando o elemento #theme-switcher");
         document.getElementById('theme-switcher').addEventListener('click', () => {
             const current = document.documentElement.getAttribute('data-theme');
             applyTheme(current === 'light' ? 'dark' : 'light');
         });
         
+        console.log("Procurando o elemento #modal-container");
         document.getElementById('modal-container').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) UI.closeModal();
         });
@@ -340,12 +342,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
+        console.log("Procurando o elemento #dashboard-tab-buttons");
         document.getElementById('dashboard-tab-buttons').addEventListener('click', e => { if (e.target.matches('.tab-button')) { UI.switchTab(e.target, '.card:has(#dashboard-tab-buttons)'); UI.renderAllComponents(); } });
+        
+        console.log("Procurando o elemento #main-tab-buttons");
         document.getElementById('main-tab-buttons').addEventListener('click', e => { if (e.target.matches('.tab-button')) { UI.switchTab(e.target, '.card:has(#main-tab-buttons)'); UI.renderAllComponents(); } });
         
+        console.log("Procurando o elemento #btn-add-account");
         document.getElementById('btn-add-account').addEventListener('click', () => {
             UI.openModal(UI.getAccountModalContent());
         });
+
+        console.log("Todos os listeners com getElementById foram adicionados com sucesso.");
         
         document.body.addEventListener('click', e => {
             const target = e.target.closest('[data-action]');
