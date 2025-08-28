@@ -1,3 +1,52 @@
+/* =================================
+   VARIÁVEIS GLOBAIS E TEMA
+   ================================= */
+
+/* Esconde o ícone de tema inadequado */
+[data-theme="dark"] .fa-sun { display: none; }
+[data-theme="light"] .fa-moon { display: none; }
+
+/* Sobrescreve as variáveis do Bootstrap para o tema escuro */
+[data-theme="dark"] {
+    --bs-body-bg: #212529;
+    --bs-body-color: #dee2e6;
+    --bs-tertiary-bg: #343a40;
+    --bs-secondary-bg: #495057;
+    --bs-border-color: #495057;
+    --bs-body-secondary: #adb5bd;
+    --bs-light-rgb: 43, 48, 53; /* Usado em .alert-light */
+}
+
+/* Ajustes finos para componentes no tema escuro */
+[data-theme="dark"] .modal-content {
+    background-color: #343a40;
+}
+[data-theme="dark"] .nav-tabs .nav-link {
+    border-color: #495057;
+}
+[data-theme="dark"] .nav-tabs .nav-link.active {
+    background-color: #212529;
+    border-color: #495057;
+}
+[data-theme="dark"] .accordion-button {
+    background-color: #343a40;
+    color: #dee2e6;
+}
+[data-theme="dark"] .accordion-button:not(.collapsed) {
+    background-color: #495057;
+}
+[data-theme="dark"] .accordion-button::after {
+    filter: invert(1) grayscale(100) brightness(200%);
+}
+[data-theme="dark"] .list-group-item {
+    background-color: var(--bs-tertiary-bg);
+}
+
+
+/* =================================
+   COMPONENTES CUSTOMIZADOS (MODAL E TOAST)
+   ================================= */
+
 /* Container para notificações (toasts) */
 #toast-container {
     position: fixed;
@@ -26,84 +75,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 1050;
-    display: none;
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: 5%;
-}
-#modal-container.active {
-    display: flex;
-}
-
-/* Cores customizadas para Receita/Despesa */
-.income-text {
-    color: #198754 !important; /* Verde do Bootstrap Success */
-}
-.expense-text {
-    color: #dc3545 !important; /* Vermelho do Bootstrap Danger */
-}
-
-/* Ícone do acordeão sem rotação */
-.accordion-button.collapsed::after {
-    transform: rotate(-90deg);
-}
-
-/* Ícone do wrapper de transação */
-.transaction-icon-wrapper {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    color: white;
-    font-size: 1rem;
-    flex-shrink: 0;
-}
-
-
-/* TEMA ESCURO */
-[data-theme="dark"] .fa-sun { display: none; }
-[data-theme="light"] .fa-moon { display: none; }
-
-[data-theme="dark"] {
-    --bs-body-bg: #212529;
-    --bs-body-color: #dee2e6;
-    --bs-tertiary-bg: #343a40;
-    --bs-secondary-bg: #495057;
-    --bs-border-color: #495057;
-    --bs-body-secondary: #adb5bd;
-}
-[data-theme="dark"] .modal-content {
-    background-color: #343a40;
-}
-[data-theme="dark"] .nav-tabs .nav-link {
-    border-color: #495057;
-}
-[data-theme="dark"] .nav-tabs .nav-link.active {
-    background-color: #212529;
-    border-color: #495057;
-}
-[data-theme="dark"] .accordion-button {
-    background-color: #343a40;
-    color: #dee2e6;
-}
-[data-theme="dark"] .accordion-button:not(.collapsed) {
-    background-color: #495057;
-}
-[data-theme="dark"] .accordion-button::after {
-    filter: invert(1) grayscale(100) brightness(200%);
-}
-/* Adicione este código ao seu style.css */
-#modal-container {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5); /* Esta linha cria o fundo escuro semi-transparente */
+    background-color: rgba(0, 0, 0, 0.5); /* Fundo escuro semi-transparente */
     z-index: 1050;
     display: none; /* Inicia oculto */
     align-items: flex-start;
@@ -114,4 +86,44 @@
 
 #modal-container.active {
     display: flex; /* Exibe o modal quando a classe 'active' é adicionada */
+}
+
+
+/* =================================
+   UTILITÁRIOS E AJUSTES
+   ================================= */
+
+/* Cores customizadas para Receita/Despesa */
+.income-text {
+    color: var(--bs-success) !important;
+}
+.expense-text {
+    color: var(--bs-danger) !important;
+}
+
+/* Ícone do acordeão sem rotação brusca */
+.accordion-button::after {
+    transition: transform 0.2s ease-in-out;
+}
+.accordion-button:not(.collapsed)::after {
+    transform: rotate(-180deg);
+}
+
+
+/* Ícone circular das transações */
+.transaction-icon-wrapper {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 1rem;
+    flex-shrink: 0; /* Impede que o ícone encolha */
+}
+
+/* Garante que os campos extras do formulário comecem ocultos */
+.extra-fields {
+    display: none;
 }
