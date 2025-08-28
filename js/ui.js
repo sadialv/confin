@@ -387,7 +387,6 @@ export const renderLancamentosFuturos = () => {
     if (!container) return;
     try {
         const state = getState();
-        const page = state.billsCurrentPage;
         const filters = state.billsFilters;
         const {
             lancamentosFuturos,
