@@ -44,33 +44,38 @@ export const switchTab = (button, parentSelector) => {
 
 // --- FUNÇÃO AUXILIAR PARA TRANSAÇÕES VIRTUAIS ---
 const gerarTransacoesVirtuais = () => {
-    const { comprasParceladas, lancamentosFuturos } = getState();
-    const transacoesVirtuais = [];
+    try {
+        const { comprasParceladas, lancamentosFuturos } = getState();
+        const transacoesVirtuais = [];
 
-    comprasParceladas.forEach(compra => {
-        const parcelas = lancamentosFuturos.filter(l => l.compra_parcelada_id === compra.id);
-        const dataCompra = new Date(compra.data_compra + 'T12:00:00');
+        comprasParceladas.forEach(compra => {
+            const parcelas = lancamentosFuturos.filter(l => l.compra_parcelada_id === compra.id);
+            const dataCompra = new Date(compra.data_compra + 'T12:00:00');
 
-        parcelas.forEach(parcela => {
-            const numeroParcelaMatch = parcela.descricao.match(/\((\d+)\/\d+\)/);
-            if (!numeroParcelaMatch) return;
+            parcelas.forEach(parcela => {
+                const numeroParcelaMatch = parcela.descricao.match(/\((\d+)\/\d+\)/);
+                if (!numeroParcelaMatch) return;
 
-            const numeroParcela = parseInt(numeroParcelaMatch[1]);
-            const dataVirtual = new Date(dataCompra.getFullYear(), dataCompra.getMonth() + numeroParcela - 1, dataCompra.getDate());
+                const numeroParcela = parseInt(numeroParcelaMatch[1]);
+                const dataVirtual = new Date(dataCompra.getFullYear(), dataCompra.getMonth() + numeroParcela - 1, dataCompra.getDate());
 
-            transacoesVirtuais.push({
-                id: `v_${parcela.id}`,
-                descricao: parcela.descricao,
-                valor: parcela.valor,
-                data: toISODateString(dataVirtual),
-                categoria: compra.categoria,
-                conta_id: compra.conta_id,
-                tipo: 'despesa',
-                isVirtual: true
+                transacoesVirtuais.push({
+                    id: `v_${parcela.id}`,
+                    descricao: parcela.descricao,
+                    valor: parcela.valor,
+                    data: toISODateString(dataVirtual),
+                    categoria: compra.categoria,
+                    conta_id: compra.conta_id,
+                    tipo: 'despesa',
+                    isVirtual: true
+                });
             });
         });
-    });
-    return transacoesVirtuais;
+        return transacoesVirtuais;
+    } catch (error) {
+        console.error("Erro ao gerar transações virtuais:", error);
+        return [];
+    }
 };
 
 
@@ -180,7 +185,12 @@ export const renderFilters = (type, filters = { mes: 'todos', pesquisa: '' }) =>
         dateKey = 'data';
     }
 
-    const mesesDisponiveis = [...new Set(data.map(item => item[dateKey] ? item[dateKey].substring(0, 7) : null).filter(Boolean))].sort().reverse();
+    const mesesDisponiveis = [...new Set(
+        data
+            .map(item => item[dateKey] ? item[dateKey].substring(0, 7) : null)
+            .filter(Boolean)
+    )].sort().reverse();
+
     const mesOptions = mesesDisponiveis.map(mes => {
         const [ano, mesNum] = mes.split('-');
         const nomeMes = new Date(ano, mesNum - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
@@ -195,18 +205,23 @@ export const renderFilters = (type, filters = { mes: 'todos', pesquisa: '' }) =>
 export const renderLancamentosFuturos = (page = 1, filters = { mes: 'todos', pesquisa: '' }) => {
     const container = document.getElementById('bills-list-container');
     if (!container) return;
-    const { lancamentosFuturos, comprasParceladas } = getState();
-    const pendentes = lancamentosFuturos.filter(l => l.status === 'pendente');
-    const pesquisaLower = filters.pesquisa.toLowerCase();
-    const filtrados = pendentes.filter(l => (filters.mes === 'todos' || l.data_vencimento.startsWith(filters.mes)) && (filters.pesquisa === '' || l.descricao.toLowerCase().includes(pesquisaLower)));
-    
-    renderBillsSummary(filtrados);
+    try {
+        const { lancamentosFuturos, comprasParceladas } = getState();
+        const pendentes = lancamentosFuturos.filter(l => l.status === 'pendente');
+        const pesquisaLower = filters.pesquisa.toLowerCase();
+        const filtrados = pendentes.filter(l => (filters.mes === 'todos' || l.data_vencimento.startsWith(filters.mes)) && (filters.pesquisa === '' || l.descricao.toLowerCase().includes(pesquisaLower)));
+        
+        renderBillsSummary(filtrados);
 
-    const totalPages = Math.ceil(filtrados.length / ITEMS_PER_PAGE);
-    const itensPaginados = filtrados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
-    const itensHTML = itensPaginados.length ? itensPaginados.map(l => renderBillItem(l, comprasParceladas)).join('') : '<p class="placeholder">Nenhum lançamento encontrado.</p>';
-    const paginacaoHTML = totalPages > 1 ? `<div class="pagination-container"><button class="btn" data-action="prev-page-bills" ${page === 1 ? 'disabled' : ''}>&lt;</button><span class="pagination-info">${page} / ${totalPages}</span><button class="btn" data-action="next-page-bills" ${page >= totalPages ? 'disabled' : ''}>&gt;</button></div>` : '';
-    container.innerHTML = itensHTML + paginacaoHTML;
+        const totalPages = Math.ceil(filtrados.length / ITEMS_PER_PAGE);
+        const itensPaginados = filtrados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+        const itensHTML = itensPaginados.length ? itensPaginados.map(l => renderBillItem(l, comprasParceladas)).join('') : '<p class="placeholder">Nenhum lançamento encontrado.</p>';
+        const paginacaoHTML = totalPages > 1 ? `<div class="pagination-container"><button class="btn" data-action="prev-page-bills" ${page === 1 ? 'disabled' : ''}>&lt;</button><span class="pagination-info">${page} / ${totalPages}</span><button class="btn" data-action="next-page-bills" ${page >= totalPages ? 'disabled' : ''}>&gt;</button></div>` : '';
+        container.innerHTML = itensHTML + paginacaoHTML;
+    } catch (error) {
+        console.error("Erro ao renderizar lançamentos futuros:", error);
+        container.innerHTML = '<p class="placeholder" style="color: var(--expense-color);">Ocorreu um erro ao carregar os lançamentos.</p>';
+    }
 };
 const renderBillsSummary = (bills) => {
     const container = document.getElementById('bills-summary-panel');
@@ -216,18 +231,9 @@ const renderBillsSummary = (bills) => {
     
     container.innerHTML = `
         <div class="summary-panel">
-            <div class="summary-panel-item">
-                <span class="label">Lançamentos na Tela</span>
-                <span class="value">${bills.length}</span>
-            </div>
-            <div class="summary-panel-item">
-                <span class="label">Total a Pagar (Visível)</span>
-                <span class="value expense-text">${formatarMoeda(totalPagar)}</span>
-            </div>
-            <div class="summary-panel-item">
-                <span class="label">Total a Receber (Visível)</span>
-                <span class="value income-text">${formatarMoeda(totalReceber)}</span>
-            </div>
+            <div class="summary-panel-item"><span class="label">Lançamentos na Tela</span><span class="value">${bills.length}</span></div>
+            <div class="summary-panel-item"><span class="label">Total a Pagar (Visível)</span><span class="value expense-text">${formatarMoeda(totalPagar)}</span></div>
+            <div class="summary-panel-item"><span class="label">Total a Receber (Visível)</span><span class="value income-text">${formatarMoeda(totalReceber)}</span></div>
         </div>`;
 };
 const renderBillItem = (bill, compras) => {
@@ -246,20 +252,24 @@ const renderBillItem = (bill, compras) => {
 export const renderHistoricoTransacoes = (page = 1, filters = { mes: 'todos', pesquisa: '' }) => {
     const container = document.getElementById('history-list-container');
     if (!container) return;
+    try {
+        const transacoesVirtuais = gerarTransacoesVirtuais();
+        const transacoesCompletas = [...getState().transacoes, ...transacoesVirtuais].sort((a,b) => new Date(b.data) - new Date(a.data));
+        
+        const pesquisaLower = filters.pesquisa.toLowerCase();
+        const filtrados = transacoesCompletas.filter(t => (filters.mes === 'todos' || t.data.startsWith(filters.mes)) && (filters.pesquisa === '' || t.descricao.toLowerCase().includes(pesquisaLower) || t.categoria.toLowerCase().includes(pesquisaLower) || getContaPorId(t.conta_id)?.nome.toLowerCase().includes(pesquisaLower)));
+        
+        renderHistorySummary(filtrados);
 
-    const transacoesVirtuais = gerarTransacoesVirtuais();
-    const transacoesCompletas = [...getState().transacoes, ...transacoesVirtuais].sort((a,b) => new Date(b.data) - new Date(a.data));
-    
-    const pesquisaLower = filters.pesquisa.toLowerCase();
-    const filtrados = transacoesCompletas.filter(t => (filters.mes === 'todos' || t.data.startsWith(filters.mes)) && (filters.pesquisa === '' || t.descricao.toLowerCase().includes(pesquisaLower) || t.categoria.toLowerCase().includes(pesquisaLower) || getContaPorId(t.conta_id)?.nome.toLowerCase().includes(pesquisaLower)));
-    
-    renderHistorySummary(filtrados);
-
-    const totalPages = Math.ceil(filtrados.length / ITEMS_PER_PAGE);
-    const itensPaginados = filtrados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
-    const itensHTML = itensPaginados.length ? itensPaginados.map(renderTransactionCard).join('') : '<p class="placeholder">Nenhuma transação encontrada.</p>';
-    const paginacaoHTML = totalPages > 1 ? `<div class="pagination-container"><button class="btn" data-action="prev-page-history" ${page === 1 ? 'disabled' : ''}>&lt;</button><span class="pagination-info">${page} / ${totalPages}</span><button class="btn" data-action="next-page-history" ${page >= totalPages ? 'disabled' : ''}>&gt;</button></div>` : '';
-    container.innerHTML = itensHTML + paginacaoHTML;
+        const totalPages = Math.ceil(filtrados.length / ITEMS_PER_PAGE);
+        const itensPaginados = filtrados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+        const itensHTML = itensPaginados.length ? itensPaginados.map(renderTransactionCard).join('') : '<p class="placeholder">Nenhuma transação encontrada.</p>';
+        const paginacaoHTML = totalPages > 1 ? `<div class="pagination-container"><button class="btn" data-action="prev-page-history" ${page === 1 ? 'disabled' : ''}>&lt;</button><span class="pagination-info">${page} / ${totalPages}</span><button class="btn" data-action="next-page-history" ${page >= totalPages ? 'disabled' : ''}>&gt;</button></div>` : '';
+        container.innerHTML = itensHTML + paginacaoHTML;
+    } catch (error) {
+        console.error("Erro ao renderizar histórico de transações:", error);
+        container.innerHTML = '<p class="placeholder" style="color: var(--expense-color);">Ocorreu um erro ao carregar o histórico.</p>';
+    }
 };
 const renderHistorySummary = (transactions) => {
     const container = document.getElementById('history-summary-panel');
@@ -270,22 +280,10 @@ const renderHistorySummary = (transactions) => {
 
     container.innerHTML = `
         <div class="summary-panel">
-            <div class="summary-panel-item">
-                <span class="label">Transações na Tela</span>
-                <span class="value">${transactions.length}</span>
-            </div>
-            <div class="summary-panel-item">
-                <span class="label">Receitas (Visível)</span>
-                <span class="value income-text">${formatarMoeda(totalReceitas)}</span>
-            </div>
-            <div class="summary-panel-item">
-                <span class="label">Despesas (Visível)</span>
-                <span class="value expense-text">${formatarMoeda(totalDespesas)}</span>
-            </div>
-             <div class="summary-panel-item">
-                <span class="label">Saldo (Visível)</span>
-                <span class="value ${saldo >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldo)}</span>
-            </div>
+            <div class="summary-panel-item"><span class="label">Transações na Tela</span><span class="value">${transactions.length}</span></div>
+            <div class="summary-panel-item"><span class="label">Receitas (Visível)</span><span class="value income-text">${formatarMoeda(totalReceitas)}</span></div>
+            <div class="summary-panel-item"><span class="label">Despesas (Visível)</span><span class="value expense-text">${formatarMoeda(totalDespesas)}</span></div>
+            <div class="summary-panel-item"><span class="label">Saldo (Visível)</span><span class="value ${saldo >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldo)}</span></div>
         </div>`;
 };
 const renderTransactionCard = (t) => {
@@ -319,56 +317,22 @@ export const renderFormTransacaoRapida = () => {
                 <option value="recorrente">Recorrente (Assinatura)</option>
             </select>
         </div>
-        <div class="form-group">
-            <label>Descrição</label>
-            <input type="text" name="descricao" required>
-        </div>
-        <div class="form-group">
-            <label id="label-valor">Valor</label>
-            <input type="number" name="valor" step="0.01" required>
-        </div>
-        <div class="form-group" id="group-data">
-            <label id="label-data">Data</label>
-            <input type="date" name="data" value="${toISODateString(new Date())}" required>
-        </div>
-        <div class="form-group" id="group-conta">
-            <label id="label-conta">Conta</label>
-            <select name="conta_id" required>${contasOptions}</select>
-        </div>
-        <div id="parcelada-fields" style="display: none;">
-            <div class="form-group">
-                <label>Nº de Parcelas</label>
-                <input name="numero_parcelas" type="number" min="2">
-            </div>
-        </div>
+        <div class="form-group"><label>Descrição</label><input type="text" name="descricao" required></div>
+        <div class="form-group"><label id="label-valor">Valor</label><input type="number" name="valor" step="0.01" required></div>
+        <div class="form-group" id="group-data"><label id="label-data">Data</label><input type="date" name="data" value="${toISODateString(new Date())}" required></div>
+        <div class="form-group" id="group-conta"><label id="label-conta">Conta</label><select name="conta_id" required>${contasOptions}</select></div>
+        <div id="parcelada-fields" style="display: none;"><div class="form-group"><label>Nº de Parcelas</label><input name="numero_parcelas" type="number" min="2"></div></div>
         <div id="recorrente-fields" style="display: none;">
-            <div class="form-group">
-                <label>Frequência</label>
-                <select name="frequencia">
-                    <option value="15d">A cada 15 dias</option>
-                    <option value="30d">A cada 30 dias</option>
-                    <option value="mensal">Mensal (dia fixo)</option>
-                    <option value="anual">Anual</option>
-                </select>
-            </div>
-            <div class="form-group" id="group-dia-vencimento">
-                <label>Dia do Vencimento no Mês</label>
-                <input name="dia_vencimento" type="number" min="1" max="31" value="10">
-            </div>
-            <div class="form-group">
-                <label>Quantidade de Lançamentos</label>
-                <input name="quantidade" type="number" min="1" value="12">
-            </div>
+            <div class="form-group"><label>Frequência</label><select name="frequencia"><option value="15d">A cada 15 dias</option><option value="30d">A cada 30 dias</option><option value="mensal">Mensal (dia fixo)</option><option value="anual">Anual</option></select></div>
+            <div class="form-group" id="group-dia-vencimento"><label>Dia do Vencimento no Mês</label><input name="dia_vencimento" type="number" min="1" max="31" value="10"></div>
+            <div class="form-group"><label>Quantidade de Lançamentos</label><input name="quantidade" type="number" min="1" value="12"></div>
         </div>
-        <div class="form-group">
-            <label>Categoria</label>
-            <select name="categoria" required>${categoriasOptions}</select>
-        </div>
+        <div class="form-group"><label>Categoria</label><select name="categoria" required>${categoriasOptions}</select></div>
         <button type="submit" class="btn">Salvar Transação</button>
     `;
 
     const contaSelect = container.querySelector('select[name="conta_id"]');
-    if (contasCartaoOptions.length > 0) {
+    if (contaSelect) {
         contaSelect.dataset.allOptions = contasOptions;
         contaSelect.dataset.creditCardOptions = contasCartaoOptions;
     }
@@ -468,7 +432,7 @@ export const getStatementModalContent = (contaId) => {
         const [ano, mesNum] = mes.split('-');
         const data = new Date(ano, mesNum - 1);
         const nomeMes = data.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
-        return `<option value="${mes}">${nomeMes}</option>>`;
+        return `<option value="${mes}">${nomeMes}</option>`;
     }).join('');
     return `
         <h2>Fatura - ${conta.nome}</h2>
