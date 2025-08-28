@@ -1,3 +1,4 @@
+// js/ui.js
 import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, HOJE, CHART_COLORS } from './utils.js';
 import { getState, getContaPorId, getContas } from './state.js';
 
@@ -277,7 +278,6 @@ const renderHistorySummary = (transactions) => {
     const totalReceitas = transactions.filter(t => t.tipo === 'receita').reduce((sum, t) => sum + t.valor, 0);
     const totalDespesas = transactions.filter(t => t.tipo === 'despesa').reduce((sum, t) => sum + t.valor, 0);
     const saldo = totalReceitas - totalDespesas;
-
     container.innerHTML = `
         <div class="summary-panel">
             <div class="summary-panel-item"><span class="label">Transações na Tela</span><span class="value">${transactions.length}</span></div>
@@ -342,7 +342,7 @@ export const getAccountModalContent = (id=null) => {
     const isCreditCard = conta?.tipo === 'Cartão de Crédito';
     return `<h2>${id ? 'Editar' : 'Nova'} Conta</h2>
         <form id="form-conta" data-id="${id || ''}">
-            <div class="form-group"><label>Nome da Conta</label><input name="nome" value="${conta.nome || ''}" required></div>
+            <div class="form-group"><label>Nome</label><input name="nome" value="${conta.nome || ''}" required></div>
             <div class="form-group"><label>Tipo</label><select name="tipo" id="conta-tipo">
                 <option ${conta.tipo === 'Conta Corrente' ? 'selected' : ''}>Conta Corrente</option>
                 <option ${conta.tipo === 'Cartão de Crédito' ? 'selected' : ''}>Cartão de Crédito</option>
