@@ -69,7 +69,9 @@
 .toast.error { background-color: #dc3545; }
 
 
-/* Estilo do Modal/Popup */
+/* ===== CORREÇÃO DEFINITIVA DO MODAL ===== */
+
+/* O container principal que serve como fundo escuro (backdrop) */
 #modal-container {
     position: fixed;
     top: 0;
@@ -78,17 +80,17 @@
     height: 100%;
     background-color: rgba(0, 0, 0, 0.6);
     z-index: 1050;
-    display: none;
-    
+    display: none; /* Começa oculto e sem flexbox */
+}
+
+/* Regra que torna o modal visível quando a classe 'active' é adicionada via JS */
+#modal-container.active {
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-#modal-container.active {
-    display: flex;
-}
-
+/* O nosso novo "popup" menor */
 .popup-dialog {
     background-color: var(--bs-body-bg);
     border-radius: 0.5rem;
@@ -173,12 +175,11 @@
 }
 
 #statement-details-container .accordion::-webkit-scrollbar-track {
-  background: var(--bs-light-rgb);
+  background: var(--bs-body-bg);
   border-radius: 4px;
 }
 
 #statement-details-container .accordion::-webkit-scrollbar-thumb {
   background-color: var(--bs-secondary-bg);
   border-radius: 4px;
-  border: 2px solid var(--bs-light-rgb);
 }
