@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Estado dos filtros e paginação
     let historyCurrentPage = 1;
     let historyFilters = { 
-        mes: new Date().toISOString().slice(0, 7),
+        mes: new Date().toISOString().slice(0, 7), // Padrão para o mês atual
         pesquisa: '',
         contaId: 'todas'
     };
@@ -30,27 +30,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- AÇÕES (Salvar, Deletar, etc.) ---
+
     async function criarLancamentosParcelados(dadosCompra) {
         const conta = State.getContaPorId(dadosCompra.conta_id);
         if (!conta || !conta.dia_fechamento_cartao || !conta.dia_vencimento_cartao) {
             throw new Error("Para compras parceladas, o cartão de crédito precisa ter 'Dia de Fechamento' e 'Dia de Vencimento' cadastrados.");
         }
+
         const compraSalva = await API.salvarDados('compras_parceladas', dadosCompra);
         const valorParcela = parseFloat((dadosCompra.valor_total / dadosCompra.numero_parcelas).toFixed(2));
         const lancamentos = [];
+
         const dataCompra = new Date(dadosCompra.data_compra + 'T12:00:00');
         const diaFechamento = conta.dia_fechamento_cartao;
         const diaVencimento = conta.dia_vencimento_cartao;
+
         let dataPrimeiroFechamento = new Date(dataCompra.getFullYear(), dataCompra.getMonth(), diaFechamento, 12);
         if (dataCompra.getDate() >= diaFechamento) {
             dataPrimeiroFechamento.setMonth(dataPrimeiroFechamento.getMonth() + 1);
         }
+
         let dataPrimeiroVencimento = new Date(dataPrimeiroFechamento.getFullYear(), dataPrimeiroFechamento.getMonth(), diaVencimento, 12);
         if (diaVencimento < diaFechamento) {
             dataPrimeiroVencimento.setMonth(dataPrimeiroVencimento.getMonth() + 1);
         }
+        
         for (let i = 0; i < dadosCompra.numero_parcelas; i++) {
             const dataVencimentoFinal = new Date(dataPrimeiroVencimento.getFullYear(), dataPrimeiroVencimento.getMonth() + i, diaVencimento, 12);
+            
             lancamentos.push({
                 descricao: `${dadosCompra.descricao} (${i + 1}/${dadosCompra.numero_parcelas})`, valor: valorParcela,
                 data_vencimento: toISODateString(dataVencimentoFinal), tipo: 'a_pagar',
@@ -59,6 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (lancamentos.length > 0) await API.salvarMultiplosLancamentos(lancamentos);
     }
+
     async function salvarConta(e) {
         const form = e.target;
         const btn = form.querySelector('button[type="submit"]');
@@ -86,6 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
             UI.setLoadingState(btn, false, 'Salvar');
         }
     }
+
     async function deletarConta(id) {
         if (!confirm('Apagar conta? As transações associadas não serão apagadas.')) return;
         try {
@@ -97,6 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
             UI.showToast(err.message, 'error');
         }
     }
+    
     async function confirmarPagamento(e) {
         const form = e.target;
         const btn = form.querySelector('button[type="submit"]');
@@ -119,6 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
             UI.setLoadingState(btn, false, 'Confirmar');
         }
     }
+
     async function salvarTransacaoUnificada(e) {
         const form = e.target;
         const btn = form.querySelector('button[type="submit"]');
@@ -130,12 +141,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (tipoCompra === 'vista') {
                 const transacao = {
-                    descricao: data.descricao, valor: Math.abs(parseFloat(data.valor)),
-                    data: data.data, conta_id: parseInt(data.conta_id),
-                    categoria: data.categoria, tipo: data.tipo
+                    descricao: data.descricao,
+                    valor: Math.abs(parseFloat(data.valor)),
+                    data: data.data,
+                    conta_id: parseInt(data.conta_id),
+                    categoria: data.categoria,
+                    tipo: data.tipo
                 };
                 await API.salvarDados('transacoes', transacao);
                 toastMessage = 'Transação salva!';
+
             } else if (tipoCompra === 'parcelada') {
                 const dadosCompra = {
                     descricao: data.descricao, valor_total: parseFloat(data.valor),
@@ -144,6 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
                 await criarLancamentosParcelados(dadosCompra);
                 toastMessage = 'Compra parcelada lançada!';
+
             } else if (tipoCompra === 'recorrente') {
                 const valor = parseFloat(data.valor);
                 const dataInicio = new Date(data.data + 'T12:00:00');
@@ -183,31 +199,142 @@ document.addEventListener('DOMContentLoaded', () => {
             UI.setLoadingState(btn, false, 'Salvar Transação');
         }
     }
-    async function salvarEdicaoTransacao(e) { /* ... (código anterior sem alterações) ... */ }
-    async function salvarLancamentoFuturo(e) { /* ... (código anterior sem alterações) ... */ }
-    async function salvarCompraParcelada(e) { /* ... (código anterior sem alterações) ... */ }
-    async function deletarCompraParceladaCompleta(compraId) { /* ... (código anterior sem alterações) ... */ }
-    async function deletarLancamento(id, compraId) { /* ... (código anterior sem alterações) ... */ }
-    async function deletarTransacao(id) { /* ... (código anterior sem alterações) ... */ }
+    
+    async function salvarEdicaoTransacao(e) {
+        const form = e.target;
+        const btn = form.querySelector('button[type="submit"]');
+        const id = form.dataset.id;
+        UI.setLoadingState(btn, true);
+        try {
+            const data = Object.fromEntries(new FormData(form));
+            data.valor = parseFloat(data.valor);
+            data.conta_id = parseInt(data.conta_id);
+            await API.salvarDados('transacoes', data, id);
+            UI.closeModal();
+            UI.showToast('Transação atualizada!');
+            await reloadStateAndRender();
+        } catch (err) {
+            UI.showToast(err.message, 'error');
+        } finally {
+            UI.setLoadingState(btn, false, 'Salvar Alterações');
+        }
+    }
+
+    async function salvarLancamentoFuturo(e) {
+        const form = e.target;
+        const btn = form.querySelector('button[type="submit"]');
+        const id = form.dataset.id;
+        UI.setLoadingState(btn, true);
+        try {
+            const data = Object.fromEntries(new FormData(form));
+            data.valor = parseFloat(data.valor);
+            await API.salvarDados('lancamentos_futuros', data, id);
+            UI.closeModal();
+            UI.showToast(`Lançamento ${id ? 'atualizado' : 'salvo'}!`);
+            await reloadStateAndRender();
+        } catch (err) {
+            UI.showToast(err.message, 'error');
+        } finally {
+            UI.setLoadingState(btn, false, 'Salvar');
+        }
+    }
+
+    async function salvarCompraParcelada(e) {
+        const form = e.target;
+        const btn = form.querySelector('button[type="submit"]');
+        const idCompraAntiga = form.dataset.compraAntigaId ? parseInt(form.dataset.compraAntigaId) : null;
+        UI.setLoadingState(btn, true);
+        try {
+            if (idCompraAntiga) {
+                await deletarCompraParceladaCompleta(idCompraAntiga);
+            }
+            const data = Object.fromEntries(new FormData(form));
+            const dadosCompra = {
+                descricao: data.descricao, valor_total: parseFloat(data.valor_total),
+                numero_parcelas: parseInt(data.numero_parcelas), data_compra: data.data_compra,
+                conta_id: parseInt(data.conta_id), categoria: data.categoria,
+            };
+            await criarLancamentosParcelados(dadosCompra);
+            
+            UI.closeModal();
+            UI.showToast(`Compra parcelada ${idCompraAntiga ? 'recriada' : 'salva'}!`);
+            await reloadStateAndRender();
+
+        } catch (err) {
+            UI.showToast(err.message, 'error');
+        } finally {
+            UI.setLoadingState(btn, false, idCompraAntiga ? 'Salvar e Substituir' : 'Salvar Compra');
+        }
+    }
+    
+    async function deletarCompraParceladaCompleta(compraId) {
+        if (!compraId) return;
+        try {
+            await API.deletarLancamentosPorCompraId(compraId);
+            await API.deletarDados('compras_parceladas', compraId);
+        } catch (error) {
+            console.error("Erro ao deletar compra parcelada:", error);
+            UI.showToast(`Erro ao deletar compra: ${error.message}`, 'error');
+            throw error;
+        }
+    }
+    
+    async function deletarLancamento(id, compraId) { 
+        if (compraId) {
+            if (!confirm('Este é um lançamento parcelado. Deseja apagar a compra inteira e todas as suas parcelas?')) return;
+            try {
+                await deletarCompraParceladaCompleta(compraId);
+                UI.showToast('Compra e parcelas deletadas!');
+                await reloadStateAndRender();
+            } catch (err) {
+                UI.showToast(err.message, 'error');
+            }
+        } else {
+            if (!confirm('Apagar este lançamento?')) return;
+            try {
+                await API.deletarDados('lancamentos_futuros', id);
+                UI.showToast('Lançamento deletado.');
+                await reloadStateAndRender();
+            } catch (err) {
+                UI.showToast(err.message, 'error');
+            }
+        }
+    }
+
+    async function deletarTransacao(id) { 
+        if (!confirm('Apagar transação?')) return;
+        try {
+            await API.deletarDados('transacoes', id);
+            UI.showToast('Transação deletada.');
+            await reloadStateAndRender();
+        } catch (err) {
+            UI.showToast(err.message, 'error');
+        }
+    }
 
     // --- LISTENERS DE EVENTOS ---
     function setupEventListeners() {
         document.getElementById('theme-switcher').addEventListener('click', () => {
-            const current = document.documentElement.getAttribute('data-theme');
-            applyTheme(current === 'light' ? 'dark' : 'light');
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+            const nextTheme = currentTheme === 'light' ? 'dark' : 'light';
+            applyTheme(nextTheme);
         });
+
         document.getElementById('btn-add-account').addEventListener('click', () => {
             UI.openModal(UI.getAccountModalContent());
         });
+
         document.body.addEventListener('click', e => {
             if (e.target.matches('#modal-container, #modal-close-btn, .btn-close')) {
                 UI.closeModal();
             }
             const target = e.target.closest('[data-action]');
             if (!target) return;
+            
             const action = target.dataset.action;
             const id = parseInt(target.dataset.id);
             const compraId = parseInt(target.dataset.compraId);
+
             switch (action) {
                 case 'editar-conta': UI.openModal(UI.getAccountModalContent(id)); break;
                 case 'deletar-conta': deletarConta(id); break;
@@ -238,6 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'deletar-transacao': deletarTransacao(id); break;
             }
         });
+
         document.body.addEventListener('change', e => {
             if (e.target.id === 'conta-tipo') {
                 const isCreditCard = e.target.value === 'Cartão de Crédito';
@@ -292,6 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 UI.renderLancamentosFuturos(billsCurrentPage, billsFilters);
             }
         });
+        
         document.body.addEventListener('input', e => {
             if (e.target.id === 'history-search-input') {
                 historyFilters.pesquisa = e.target.value;
@@ -304,6 +433,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 UI.renderLancamentosFuturos(billsCurrentPage, billsFilters);
             }
         });
+
         document.body.addEventListener('submit', e => {
             e.preventDefault();
             switch (e.target.id) {
@@ -320,12 +450,16 @@ document.addEventListener('DOMContentLoaded', () => {
     async function initializeApp() {
         UI.showToast('Carregando dados...');
         try {
+            applyTheme(localStorage.getItem('confin-theme') || 'light');
+            
             const data = await API.fetchData();
             State.setState(data);
-            UI.renderAllComponents({ history: historyFilters, bills: billsFilters });
+            UI.renderAllComponents({ 
+                history: historyFilters,
+                bills: billsFilters
+            });
             
-            // ATIVA A BIBLIOTECA DE ANIMAÇÃO
-            setTimeout(() => AOS.init(), 100);
+            setTimeout(() => AOS.init({ once: true }), 100);
 
         } catch (error) {
             UI.showToast(error.message, 'error');
@@ -333,7 +467,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    applyTheme(localStorage.getItem('confin-theme') || 'light');
     setupEventListeners();
     initializeApp();
 });
