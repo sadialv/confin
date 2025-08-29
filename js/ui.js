@@ -29,7 +29,6 @@ export const openModal = (content) => {
     const container = document.getElementById('modal-container');
     if(!container) return;
 
-    // Nova estrutura HTML para o "popup"
     const modalHTML = `
         <div class="popup-dialog">
             <div class="popup-header">
@@ -394,4 +393,61 @@ export const getPayBillModalContent = (billId) => {
         </form>`;
     return { title, body };
 };
-// Adicione aqui as outras funções get...ModalContent se necessário (getBillModalContent, etc.)
+
+export const getBillModalContent = (id = null) => {
+    const bill = id ? getState().lancamentosFuturos.find(l => l.id === id) : {};
+    const title = id ? 'Editar Lançamento Futuro' : 'Novo Lançamento';
+    const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${bill.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
+    const body = `
+        <form id="form-lancamento" data-id="${id || ''}">
+            <div class="mb-3"><label class="form-label">Descrição</label><input name="descricao" value="${bill.descricao || ''}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Valor</label><input name="valor" type="number" step="0.01" value="${bill.valor || ''}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Data Vencimento</label><input name="data_vencimento" type="date" value="${bill.data_vencimento || toISODateString(new Date())}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Categoria</label><select name="categoria" class="form-select">${categoriasOptions}</select></div>
+            <div class="mb-3"><label class="form-label">Tipo</label><select name="tipo" class="form-select"><option value="a_pagar" ${bill.tipo==='a_pagar'?'selected':''}>A Pagar</option><option value="a_receber" ${bill.tipo==='a_receber'?'selected':''}>A Receber</option></select></div>
+            <div class="text-end"><button type="submit" class="btn btn-primary">Salvar</button></div>
+        </form>`;
+    return { title, body };
+};
+
+export const getTransactionModalContent = (id) => {
+    const transacao = getState().transacoes.find(t => t.id === id);
+    if (!transacao) return { title: 'Erro', body: '<p>Transação não encontrada.</p>' };
+
+    const title = 'Editar Transação';
+    const contasOptions = getContas().map(c => `<option value="${c.id}" ${transacao.conta_id === c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
+    const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${transacao.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
+    
+    const body = `
+        <form id="form-edicao-transacao" data-id="${id}">
+            <div class="mb-3"><label class="form-label">Descrição</label><input name="descricao" value="${transacao.descricao}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Valor</label><input name="valor" type="number" step="0.01" value="${transacao.valor}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Data</label><input name="data" type="date" value="${transacao.data}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Conta</label><select name="conta_id" class="form-select">${contasOptions}</select></div>
+            <div class="mb-3"><label class="form-label">Categoria</label><select name="categoria" class="form-select">${categoriasOptions}</select></div>
+            <div class="mb-3"><label class="form-label">Tipo</label><select name="tipo" class="form-select"><option value="despesa" ${transacao.tipo==='despesa'?'selected':''}>Despesa</option><option value="receita" ${transacao.tipo==='receita'?'selected':''}>Receita</option></select></div>
+            <div class="text-end"><button type="submit" class="btn btn-primary">Salvar Alterações</button></div>
+        </form>`;
+    return { title, body };
+};
+
+export const getInstallmentPurchaseModalContent = (compra) => {
+    if (!compra) return { title: 'Erro', body: '<p>Compra não encontrada.</p>' };
+    const title = 'Recriar Compra Parcelada';
+    const contasCartao = getContas().filter(c => c.tipo === 'Cartão de Crédito');
+    const contasOptions = contasCartao.map(c => `<option value="${c.id}" ${compra.conta_id === c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
+    const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${compra.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
+
+    const body = `
+        <div class="alert alert-warning small">Ajuste os dados e salve. A compra antiga e todas as suas parcelas futuras serão substituídas.</div>
+        <form id="form-compra-parcelada" data-compra-antiga-id="${compra.id}">
+            <div class="mb-3"><label class="form-label">Descrição</label><input name="descricao" value="${compra.descricao}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Valor Total</label><input name="valor_total" type="number" step="0.01" value="${compra.valor_total}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Número de Parcelas</label><input name="numero_parcelas" type="number" min="1" value="${compra.numero_parcelas}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Data da Compra</label><input name="data_compra" type="date" value="${compra.data_compra}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Cartão de Crédito</label><select name="conta_id" class="form-select" required>${contasOptions}</select></div>
+            <div class="mb-3"><label class="form-label">Categoria</label><select name="categoria" class="form-select" required>${categoriasOptions}</select></div>
+            <div class="text-end"><button type="submit" class="btn btn-primary">Salvar e Substituir</button></div>
+        </form>`;
+    return { title, body };
+};
