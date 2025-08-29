@@ -73,7 +73,7 @@ export const renderAllComponents = (initialFilters) => {
     renderFormTransacaoRapida();
     renderVisaoMensal();
     renderVisaoAnual();
-    renderFinancialHealth(); // NOVA FUNÇÃO DE RENDERIZAÇÃO
+    renderFinancialHealth(); 
     renderFilters('bills', initialFilters.bills);
     renderLancamentosFuturos(1, initialFilters.bills);
     renderFilters('history', initialFilters.history);
@@ -143,7 +143,6 @@ const calculateFinancialHealthMetrics = () => {
     const financialScore = (scorePoupanca * 0.4) + (scoreEndividamento * 0.4) + (scoreReserva * 0.2);
 
     // 6. DADOS HISTÓRICOS PARA GRÁFICOS
-    let evolucaoPatrimonio = {};
     let gastosPorCategoria = {};
     let meses = new Set();
     
@@ -159,7 +158,6 @@ const calculateFinancialHealthMetrics = () => {
         .map(([categoria, total]) => ({ categoria, media: total / numMeses }))
         .sort((a,b) => b.media - a.media);
     
-    // Simulação simplificada da evolução do patrimônio
     const historicoPatrimonio = Array.from(meses).sort().slice(-12).map(mes => {
         const transacoesAteMes = transacoes.filter(t => t.data.substring(0,7) <= mes);
         let ativos = 0, passivos = 0;
@@ -182,7 +180,6 @@ const calculateFinancialHealthMetrics = () => {
     };
 };
 
-// --- NOVA FUNÇÃO DE RENDERIZAÇÃO DA SAÚDE FINANCEIRA ---
 export const renderFinancialHealth = () => {
     const container = document.getElementById('health-tab-pane');
     if (!container) return;
@@ -283,7 +280,6 @@ export const renderFinancialHealth = () => {
         </div>
     `;
 
-    // Renderizar Gráfico de Evolução do Patrimônio
     if (netWorthChart) netWorthChart.destroy();
     const nwCtx = document.getElementById('net-worth-chart')?.getContext('2d');
     if (nwCtx && metrics.historicoPatrimonio.length) {
@@ -303,7 +299,6 @@ export const renderFinancialHealth = () => {
         });
     }
 
-    // Renderizar Gráfico de Média de Gastos
     if (avgSpendingChart) avgSpendingChart.destroy();
     const asCtx = document.getElementById('avg-spending-chart')?.getContext('2d');
     if (asCtx && metrics.mediaGastosCategoria.length) {
@@ -322,8 +317,6 @@ export const renderFinancialHealth = () => {
         });
     }
 };
-
-// --- RENDERIZAÇÃO DE COMPONENTES LEGADOS (agora dentro do painel Visão Geral) ---
 
 export const renderVisaoMensal = () => {
     const container = document.getElementById('dashboard-monthly-container');
@@ -363,43 +356,73 @@ export const renderVisaoAnual = () => {
     }
 };
 
-// O restante do arquivo (renderContas, renderFormTransacaoRapida, modais, etc.) continua aqui sem alterações...
-// ... (código omitido para brevidade, mas ele permanece no arquivo)
+// =======================================================
+// A FUNÇÃO RENDERCONTAS FOI ATUALIZADA A SEGUIR
+// =======================================================
 export const renderContas = () => {
     const container = document.getElementById('accounts-container');
     const { contas, transacoes } = getState();
+
     if (!contas || !contas.length) { 
-        container.innerHTML = '<p class="text-center text-body-secondary p-3">Nenhuma conta.</p>'; 
+        container.innerHTML = '<p class="text-center text-body-secondary p-3">Nenhuma conta cadastrada.</p>'; 
         return; 
     }
-    const listHtml = contas.map(conta => {
-        const saldo = transacoes.filter(t => t.conta_id === conta.id).reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, conta.saldo_inicial);
+
+    // Mapeamento de tipos de conta para ícones
+    const ACCOUNT_TYPE_ICONS = {
+        'Conta Corrente': 'fas fa-university',
+        'Cartão de Crédito': 'far fa-credit-card',
+        'Dinheiro': 'fas fa-money-bill-wave',
+        'Poupança': 'fas fa-piggy-bank',
+        'default': 'fas fa-wallet'
+    };
+
+    const cardsHtml = contas.map(conta => {
+        const saldo = transacoes
+            .filter(t => t.conta_id === conta.id)
+            .reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, conta.saldo_inicial);
         
+        const iconClass = ACCOUNT_TYPE_ICONS[conta.tipo] || ACCOUNT_TYPE_ICONS['default'];
+
         let acoesEspecificas = '';
         if (conta.tipo === 'Cartão de Crédito') {
-            acoesEspecificas = `<button class="btn btn-outline-info btn-sm" data-action="ver-fatura" data-id="${conta.id}" title="Ver Fatura"><i class="fas fa-file-invoice"></i></button>`;
-        } else if (conta.tipo === 'Conta Corrente' || conta.tipo === 'Dinheiro' || conta.tipo === 'Poupança') {
-            acoesEspecificas = `<button class="btn btn-outline-info btn-sm" data-action="ver-extrato" data-id="${conta.id}" title="Ver Extrato"><i class="fas fa-list-alt"></i></button>`;
+            acoesEspecificas = `<button class="btn btn-outline-secondary btn-sm" data-action="ver-fatura" data-id="${conta.id}" title="Ver Fatura"><i class="fas fa-receipt fa-fw"></i></button>`;
+        } else if (['Conta Corrente', 'Dinheiro', 'Poupança'].includes(conta.tipo)) {
+            acoesEspecificas = `<button class="btn btn-outline-secondary btn-sm" data-action="ver-extrato" data-id="${conta.id}" title="Ver Extrato"><i class="fas fa-chart-bar fa-fw"></i></button>`;
         }
 
-        const botoesGerais = `<button class="btn btn-outline-secondary btn-sm" data-action="editar-conta" data-id="${conta.id}" title="Editar"><i class="fas fa-edit"></i></button>
-                              <button class="btn btn-outline-danger btn-sm" data-action="deletar-conta" data-id="${conta.id}" title="Deletar"><i class="fas fa-trash"></i></button>`;
+        const botoesGerais = `
+            <button class="btn btn-outline-secondary btn-sm" data-action="editar-conta" data-id="${conta.id}" title="Editar"><i class="fas fa-pen fa-fw"></i></button>
+            <button class="btn btn-outline-danger btn-sm" data-action="deletar-conta" data-id="${conta.id}" title="Deletar"><i class="fas fa-trash-can fa-fw"></i></button>
+        `;
 
-        return `<li class="list-group-item d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="fw-bold">${conta.nome}</div>
-                        <small class="text-body-secondary">${conta.tipo}</small>
-                    </div>
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="fw-bold ${saldo >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldo)}</span>
-                        <div class="btn-group">
-                            ${acoesEspecificas}
-                            ${botoesGerais}
+        return `
+            <div class="card shadow-sm mb-2">
+                <div class="card-body p-3">
+                    <div class="d-flex align-items-center">
+                        <div class="me-3 fs-2 text-primary opacity-75">
+                            <i class="${iconClass}"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="fw-bold">${conta.nome}</div>
+                            <small class="text-body-secondary">${conta.tipo}</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="fw-bold fs-5 ${saldo >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldo)}</span>
                         </div>
                     </div>
-                </li>`;
+                    <div class="d-flex justify-content-end gap-1 border-top pt-2 mt-2">
+                        ${acoesEspecificas}
+                        ${botoesGerais}
+                    </div>
+                </div>
+            </div>
+        `;
     }).join('');
-    container.innerHTML = `<ul class="list-group list-group-flush">${listHtml}</ul>`;
+    
+    // Ajusta o preenchimento do container para os cards
+    container.classList.remove('p-0');
+    container.innerHTML = `<div class="p-2">${cardsHtml}</div>`;
 };
 
 export const renderFormTransacaoRapida = () => {
@@ -607,8 +630,7 @@ export const renderLancamentosFuturos = (page = 1, filters) => {
         .filter(l => l.status === 'pendente')
         .filter(l => (filters.mes === 'todos' || !filters.mes) || l.data_vencimento.startsWith(filters.mes))
         .filter(l => {
-            if (filters.contaId === 'todas' || !filters.contaId) return true;
-            if (!l.compra_parcelada_id) return true; // Lançamentos avulsos não têm conta associada diretamente
+            if (filters.contaId === 'todas' || !filters.contaId) return true; 
             const compra = comprasParceladas.find(c => c.id === l.compra_parcelada_id);
             return compra && compra.conta_id == filters.contaId;
         })
