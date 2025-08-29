@@ -45,29 +45,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const diaFechamento = conta.dia_fechamento_cartao;
         const diaVencimento = conta.dia_vencimento_cartao;
 
-        let anoFechamento = dataCompra.getFullYear();
-        let mesFechamento = dataCompra.getMonth();
-
-        // Se a compra foi feita depois (ou no mesmo dia) do fechamento deste mês, ela entra na próxima fatura.
+        // 1. Determina a data de fechamento da primeira fatura em que a compra se encaixa
+        let dataPrimeiroFechamento = new Date(dataCompra.getFullYear(), dataCompra.getMonth(), diaFechamento, 12);
         if (dataCompra.getDate() >= diaFechamento) {
-            mesFechamento += 1;
+            dataPrimeiroFechamento.setMonth(dataPrimeiroFechamento.getMonth() + 1);
+        }
+
+        // 2. Determina a data de vencimento da primeira fatura
+        let dataPrimeiroVencimento = new Date(dataPrimeiroFechamento.getFullYear(), dataPrimeiroFechamento.getMonth(), diaVencimento, 12);
+        if (diaVencimento < diaFechamento) {
+            dataPrimeiroVencimento.setMonth(dataPrimeiroVencimento.getMonth() + 1);
         }
         
-        for (let i = 1; i <= dadosCompra.numero_parcelas; i++) {
-            const dataFechamentoAtual = new Date(anoFechamento, mesFechamento + (i - 1), diaFechamento);
-            
-            let anoVencimento = dataFechamentoAtual.getFullYear();
-            let mesVencimento = dataFechamentoAtual.getMonth();
-
-            // Se o vencimento é em um dia "menor" que o fechamento (ex: fecha dia 20, vence dia 05), o vencimento é no mês seguinte.
-            if (diaVencimento < diaFechamento) {
-                mesVencimento += 1;
-            }
-
-            const dataVencimentoFinal = new Date(anoVencimento, mesVencimento, diaVencimento);
+        for (let i = 0; i < dadosCompra.numero_parcelas; i++) {
+            // Calcula o vencimento de cada parcela adicionando meses à primeira data de vencimento
+            const dataVencimentoFinal = new Date(dataPrimeiroVencimento.getFullYear(), dataPrimeiroVencimento.getMonth() + i, diaVencimento, 12);
             
             lancamentos.push({
-                descricao: `${dadosCompra.descricao} (${i}/${dadosCompra.numero_parcelas})`, valor: valorParcela,
+                descricao: `${dadosCompra.descricao} (${i + 1}/${dadosCompra.numero_parcelas})`, valor: valorParcela,
                 data_vencimento: toISODateString(dataVencimentoFinal), tipo: 'a_pagar',
                 status: 'pendente', compra_parcelada_id: compraSalva.id, categoria: dadosCompra.categoria
             });
