@@ -369,11 +369,25 @@ export const renderHistoricoTransacoes = (page = 1, filters) => {
 export const getAccountModalContent = (id = null) => {
     const conta = id ? getContaPorId(id) : {};
     const title = id ? 'Editar Conta' : 'Nova Conta';
+    const isCreditCard = conta?.tipo === 'Cartão de Crédito';
     const body = `
         <form id="form-conta" data-id="${id || ''}">
             <div class="mb-3"><label class="form-label">Nome da Conta</label><input name="nome" class="form-control" value="${conta.nome || ''}" required></div>
-            <div class="mb-3"><label class="form-label">Tipo</label><select name="tipo" class="form-select"><option>Conta Corrente</option><option>Cartão de Crédito</option><option>Dinheiro</option><option>Poupança</option></select></div>
+            <div class="mb-3"><label class="form-label">Tipo</label>
+                <select name="tipo" id="conta-tipo" class="form-select">
+                    <option ${conta.tipo === 'Conta Corrente' ? 'selected' : ''}>Conta Corrente</option>
+                    <option ${conta.tipo === 'Cartão de Crédito' ? 'selected' : ''}>Cartão de Crédito</option>
+                    <option ${conta.tipo === 'Dinheiro' ? 'selected' : ''}>Dinheiro</option>
+                    <option ${conta.tipo === 'Poupança' ? 'selected' : ''}>Poupança</option>
+                </select>
+            </div>
             <div class="mb-3"><label class="form-label">Saldo Inicial</label><input name="saldo_inicial" type="number" step="0.01" class="form-control" value="${conta.saldo_inicial || 0}" ${id ? 'disabled' : ''}></div>
+            <div id="cartao-credito-fields" style="display: ${isCreditCard ? 'block' : 'none'};">
+                 <div class="mb-3">
+                    <label class="form-label">Dia do Fechamento da Fatura</label>
+                    <input name="dia_fechamento_cartao" type="number" min="1" max="31" class="form-control" value="${conta.dia_fechamento_cartao || ''}">
+                </div>
+            </div>
             <div class="text-end"><button type="submit" class="btn btn-primary">Salvar</button></div>
         </form>`;
     return { title, body };
@@ -450,4 +464,85 @@ export const getInstallmentPurchaseModalContent = (compra) => {
             <div class="text-end"><button type="submit" class="btn btn-primary">Salvar e Substituir</button></div>
         </form>`;
     return { title, body };
+};
+
+export const getStatementModalContent = (contaId) => {
+    const conta = getContaPorId(contaId);
+    if (!conta) return { title: 'Erro', body: 'Conta não encontrada.' };
+
+    const title = `Fatura - ${conta.nome}`;
+    const { transacoes } = getState();
+    const mesesDisponiveis = [...new Set(
+        transacoes
+            .filter(t => t.conta_id === contaId)
+            .map(t => t.data.substring(0, 7))
+    )].sort().reverse();
+
+    const options = mesesDisponiveis.map(mes => {
+        const [ano, mesNum] = mes.split('-');
+        const data = new Date(ano, mesNum - 1);
+        const nomeMes = data.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        return `<option value="${mes}">${nomeMes}</option>`;
+    }).join('');
+
+    const body = `
+        <div class="mb-3">
+            <label for="statement-month-select" class="form-label">Selecione a Fatura:</label>
+            <select id="statement-month-select" class="form-select" data-conta-id="${contaId}">
+                <option value="">Selecione...</option>
+                ${options}
+            </select>
+        </div>
+        <div id="statement-details-container" class="mt-4">
+            <p class="text-center text-body-secondary">Selecione um mês para ver os detalhes da fatura.</p>
+        </div>`;
+    
+    return { title, body };
+};
+
+export const renderStatementDetails = (contaId, mesSelecionado) => {
+    const container = document.getElementById('statement-details-container');
+    if (!container) return;
+
+    if (!mesSelecionado) {
+        container.innerHTML = '<p class="text-center text-body-secondary">Selecione um mês para ver os detalhes da fatura.</p>';
+        return;
+    }
+
+    const conta = getContaPorId(contaId);
+    const { transacoes } = getState();
+    const diaFechamento = conta.dia_fechamento_cartao || 28;
+
+    const [ano, mes] = mesSelecionado.split('-').map(Number);
+    const fimCiclo = new Date(ano, mes - 1, diaFechamento);
+    const inicioCiclo = new Date(fimCiclo);
+    inicioCiclo.setMonth(inicioCiclo.getMonth() - 1);
+
+    const transacoesFatura = transacoes.filter(t => {
+        const dataTransacao = new Date(t.data + 'T12:00:00');
+        return t.conta_id === contaId &&
+               dataTransacao > inicioCiclo &&
+               dataTransacao <= fimCiclo &&
+               t.tipo === 'despesa';
+    }).sort((a, b) => new Date(a.data) - new Date(b.data));
+
+    const totalFatura = transacoesFatura.reduce((acc, t) => acc + t.valor, 0);
+
+    const itemsHtml = transacoesFatura.length ? 
+        transacoesFatura.map(renderTransactionCard).join('') : 
+        '<p class="text-center text-body-secondary p-3">Nenhuma despesa nesta fatura.</p>';
+
+    container.innerHTML = `
+        <div>
+            <h5 class="d-flex justify-content-between">
+                <span>Total da Fatura:</span>
+                <span class="expense-text">${formatarMoeda(totalFatura)}</span>
+            </h5>
+            <p class="text-body-secondary small">
+                Período de ${inicioCiclo.toLocaleDateString('pt-BR')} a ${fimCiclo.toLocaleDateString('pt-BR')}
+            </p>
+        </div>
+        <div class="accordion mt-3">
+            ${itemsHtml}
+        </div>`;
 };
