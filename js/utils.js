@@ -1,34 +1,27 @@
 // js/utils.js
 export const CATEGORIAS_PADRAO = ['Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Lazer', 'Educação', 'Salário', 'Investimentos', 'Contas', 'Ajustes', 'Pagamento de Fatura', 'Compras', 'Outros'];
 
-// PALETA DE ÍCONES ATUALIZADA PARA COMBINAR COM O TEMA NORDIC
+// PALETA DE ÍCONES ATUALIZADA
 export const CATEGORY_ICONS = {
-    'Alimentação': { icon: 'fas fa-utensils', color: '#D08770' }, // Laranja
-    'Transporte': { icon: 'fas fa-car', color: '#8FBCBB' }, // Turquesa
-    'Moradia': { icon: 'fas fa-home', color: '#A3BE8C' }, // Verde
-    'Saúde': { icon: 'fas fa-heartbeat', color: '#BF616A' }, // Vermelho
-    'Lazer': { icon: 'fas fa-film', color: '#B48EAD' }, // Roxo
-    'Educação': { icon: 'fas fa-graduation-cap', color: '#88C0D0' }, // Azul Gelo
-    'Salário': { icon: 'fas fa-dollar-sign', color: '#A3BE8C' },
-    'Investimentos': { icon: 'fas fa-chart-line', color: '#81A1C1' }, // Azul
-    'Contas': { icon: 'fas fa-file-invoice-dollar', color: '#EBCB8B' }, // Amarelo
-    'Ajustes': { icon: 'fas fa-sliders-h', color: '#D8DEE9' }, // Cinza
-    'Pagamento de Fatura': { icon: 'fas fa-credit-card', color: '#88C0D0' },
-    'Compras': { icon: 'fas fa-shopping-bag', color: '#D08770' },
-    'Outros': { icon: 'fas fa-question-circle', color: '#4C566A' } 
+    'Alimentação': { icon: 'fas fa-utensils', color: '#EF4444' }, // Red
+    'Transporte': { icon: 'fas fa-car', color: '#3B82F6' },     // Blue
+    'Moradia': { icon: 'fas fa-home', color: '#10B981' },      // Green
+    'Saúde': { icon: 'fas fa-heartbeat', color: '#EC4899' },    // Pink
+    'Lazer': { icon: 'fas fa-film', color: '#8B5CF6' },      // Purple
+    'Educação': { icon: 'fas fa-graduation-cap', color: '#14B8A6' }, // Teal
+    'Salário': { icon: 'fas fa-dollar-sign', color: '#22C55E' },
+    'Investimentos': { icon: 'fas fa-chart-line', color: '#06B6D4' },
+    'Contas': { icon: 'fas fa-file-invoice-dollar', color: '#F97316' }, // Orange
+    'Ajustes': { icon: 'fas fa-sliders-h', color: '#64748B' },
+    'Pagamento de Fatura': { icon: 'fas fa-credit-card', color: '#A855F7' },
+    'Compras': { icon: 'fas fa-shopping-bag', color: '#D946EF' },
+    'Outros': { icon: 'fas fa-question-circle', color: '#6B7280' } 
 };
 
-// NOVA PALETA DE CORES PARA OS GRÁFICOS (NORDIC)
+// NOVA PALETA DE CORES PARA OS GRÁFICOS
 export const CHART_COLORS = [
-    '#BF616A', // Vermelho
-    '#D08770', // Laranja
-    '#EBCB8B', // Amarelo
-    '#A3BE8C', // Verde
-    '#8FBCBB', // Turquesa
-    '#88C0D0', // Azul Gelo
-    '#81A1C1', // Azul
-    '#B48EAD', // Roxo
-    '#4C566A', // Cinza
+    '#EF4444', '#F97316', '#10B981', '#3B82F6', '#8B5CF6', 
+    '#EC4899', '#14B8A6', '#D946EF', '#64748B'
 ];
 
 export const formatarMoeda = (valor) => (valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
