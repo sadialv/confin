@@ -59,45 +59,32 @@
                     <div class="card-header">
                          <ul class="nav nav-tabs card-header-tabs" role="tablist">
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#dashboard-monthly-pane" type="button" role="tab">Visão Mensal</button>
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#dashboard-monthly-pane" type="button" role="tab">Visão Geral</button>
+                            </li>
+                             <li class="nav-item" role="presentation">
+                                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#health-tab-pane" type="button" role="tab">Saúde Financeira</button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#dashboard-yearly-pane" type="button" role="tab">Visão Anual</button>
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#bills-tab-pane" type="button" role="tab">Contas a Pagar/Receber</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#history-tab-pane" type="button" role="tab">Histórico</button>
                             </li>
                         </ul>
                     </div>
                     <div class="card-body tab-content">
-                        <div id="dashboard-monthly-pane" class="tab-pane fade show active" role="tabpanel">
-                             <p class="text-center text-body-secondary">Carregando...</p>
+                        <div id="dashboard-monthly-pane" class="tab-pane fade" role="tabpanel">
+                             <div class="row">
+                                 <div class="col-md-6" id="dashboard-monthly-container"></div>
+                                 <div class="col-md-6" id="dashboard-yearly-container"></div>
+                             </div>
                         </div>
-                        <div id="dashboard-yearly-pane" class="tab-pane fade" role="tabpanel">
-                             <p class="text-center text-body-secondary">Carregando...</p>
+                        
+                        <div id="health-tab-pane" class="tab-pane fade show active" role="tabpanel">
+                            <p class="text-center text-body-secondary">Calculando indicadores...</p>
                         </div>
-                    </div>
-                </div>
-                
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Análises Financeiras</h5>
-                    </div>
-                    <div class="card-body" id="financial-analysis-container">
-                        <p class="text-center text-body-secondary">Carregando...</p>
-                    </div>
-                </div>
 
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header">
-                        <ul class="nav nav-tabs card-header-tabs" role="tablist">
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#bills-tab-pane" type="button" role="tab">Contas a Pagar/Receber</button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#history-tab-pane" type="button" role="tab">Histórico de Transações</button>
-                            </li>
-                        </ul>
-                    </div>
-                    <div class="card-body tab-content">
-                        <div id="bills-tab-pane" class="tab-pane fade show active" role="tabpanel">
+                        <div id="bills-tab-pane" class="tab-pane fade" role="tabpanel">
                             <div id="bills-filters-container"></div>
                             <div id="bills-summary-panel" class="mb-3"></div>
                             <div class="accordion" id="bills-list-container">
