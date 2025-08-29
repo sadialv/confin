@@ -315,9 +315,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- LISTENERS DE EVENTOS ---
     function setupEventListeners() {
         document.getElementById('theme-switcher').addEventListener('click', () => {
-            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-            const nextTheme = currentTheme === 'light' ? 'dark' : 'light';
-            applyTheme(nextTheme);
+            const current = document.documentElement.getAttribute('data-theme');
+            applyTheme(current === 'light' ? 'dark' : 'light');
         });
 
         document.getElementById('btn-add-account').addEventListener('click', () => {
@@ -336,33 +335,48 @@ document.addEventListener('DOMContentLoaded', () => {
             const compraId = parseInt(target.dataset.compraId);
 
             switch (action) {
-                case 'editar-conta': UI.openModal(UI.getAccountModalContent(id)); break;
-                case 'deletar-conta': deletarConta(id); break;
+                case 'editar-conta': 
+                    UI.openModal(UI.getAccountModalContent(id)); 
+                    break;
+                case 'deletar-conta': 
+                    deletarConta(id); 
+                    break;
                 case 'ver-fatura':
                     UI.openModal(UI.getStatementModalContent(id));
-                    document.getElementById('statement-month-select')?.addEventListener('change', (evt) => {
-                        const contaId = parseInt(evt.target.dataset.contaId);
-                        const mesSelecionado = evt.target.value;
+                    document.getElementById('statement-month-select')?.addEventListener('change', (e) => {
+                        const contaId = parseInt(e.target.dataset.contaId);
+                        const mesSelecionado = e.target.value;
                         UI.renderStatementDetails(contaId, mesSelecionado);
                     });
                     break;
+                // NOVO: Listener para o extrato de conta corrente/carteira
                 case 'ver-extrato':
                     UI.openModal(UI.getAccountStatementModalContent(id));
-                    document.getElementById('account-statement-month-select')?.addEventListener('change', (evt) => {
-                        const contaId = parseInt(evt.target.dataset.contaId);
-                        const mesSelecionado = evt.target.value;
+                    document.getElementById('account-statement-month-select')?.addEventListener('change', (e) => {
+                        const contaId = parseInt(e.target.dataset.contaId);
+                        const mesSelecionado = e.target.value;
                         UI.renderAccountStatementDetails(contaId, mesSelecionado);
                     });
                     break;
-                case 'pagar-conta': UI.openModal(UI.getPayBillModalContent(id)); break;
-                case 'editar-lancamento': UI.openModal(UI.getBillModalContent(id)); break;
-                case 'deletar-lancamento': deletarLancamento(id, compraId); break;
+                case 'pagar-conta': 
+                    UI.openModal(UI.getPayBillModalContent(id)); 
+                    break;
+                case 'editar-lancamento': 
+                    UI.openModal(UI.getBillModalContent(id)); 
+                    break;
+                case 'deletar-lancamento': 
+                    deletarLancamento(id, compraId); 
+                    break;
                 case 'recriar-compra-parcelada':
                     const compra = State.getState().comprasParceladas.find(c => c.id === id);
                     if (compra) UI.openModal(UI.getInstallmentPurchaseModalContent(compra));
                     break;
-                case 'editar-transacao': UI.openModal(UI.getTransactionModalContent(id)); break;
-                case 'deletar-transacao': deletarTransacao(id); break;
+                case 'editar-transacao': 
+                    UI.openModal(UI.getTransactionModalContent(id)); 
+                    break;
+                case 'deletar-transacao': 
+                    deletarTransacao(id); 
+                    break;
             }
         });
 
@@ -450,23 +464,16 @@ document.addEventListener('DOMContentLoaded', () => {
     async function initializeApp() {
         UI.showToast('Carregando dados...');
         try {
-            applyTheme(localStorage.getItem('confin-theme') || 'light');
-            
             const data = await API.fetchData();
             State.setState(data);
-            UI.renderAllComponents({ 
-                history: historyFilters,
-                bills: billsFilters
-            });
-            
-            setTimeout(() => AOS.init({ once: true }), 100);
-
+            UI.renderAllComponents({ history: historyFilters, bills: billsFilters });
         } catch (error) {
             UI.showToast(error.message, 'error');
             console.error("Falha na inicialização:", error);
         }
     }
 
+    applyTheme(localStorage.getItem('confin-theme') || 'light');
     setupEventListeners();
     initializeApp();
 });

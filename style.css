@@ -1,119 +1,104 @@
 /* =================================
-   FONTES E CONFIGURAÇÕES GLOBAIS
+   PALETAS DE CORES E TEMAS
    ================================= */
-body {
-    font-family: 'Poppins', sans-serif;
-    background-image: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    background-attachment: fixed;
-    color: var(--text-color);
-}
 
-
-/* =================================
-   TEMA "GLASSMORPHISM" (LIGHT)
-   ================================= */
+/* TEMA CLARO (PADRÃO) */
 :root {
-    --primary-color: #8B5CF6; /* Roxo vibrante */
-    --card-background-color: rgba(255, 255, 255, 0.2);
-    --text-color: #1F2937; /* Cinza bem escuro */
-    --text-secondary-color: #4B5563;
-    --border-color: rgba(255, 255, 255, 0.3);
-    --income-color: #16A34A; /* Verde vibrante */
-    --expense-color: #DC2626; /* Vermelho vibrante */
-    --shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    --primary-color: #4A5568; 
+    --background-color: #F7FAFC;
+    --card-background-color: #FFFFFF;
+    --text-color: #2D3748;
+    --text-secondary-color: #718096;
+    --border-color: #E2E8F0;
+    --income-color: #38A169;
+    --expense-color: #E53E3E;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-/* =================================
-   TEMA "NORDIC NIGHT" (DARK)
-   ================================= */
+/* TEMA ESCURO (ALTO CONTRASTE) */
 [data-theme="dark"] {
-    --primary-color: #88C0D0;
-    --card-background-color: rgba(59, 66, 82, 0.7); /* Fundo do card com transparência */
-    --text-color: #ECEFF4;
-    --text-secondary-color: #D8DEE9;
-    --border-color: rgba(216, 222, 233, 0.2);
-    --income-color: #A3BE8C;
-    --expense-color: #BF616A;
+    --primary-color: #90cdf4;
+    --background-color: #121212;
+    --card-background-color: #1E1E1E;
+    --text-color: #EAEAEA;
+    --text-secondary-color: #A0AEC0;
+    --border-color: #4A5568;
     
-    --bs-body-bg: transparent; /* Permite que o gradiente do body apareça */
+    --bs-body-bg: #121212;
+    --bs-body-color: #EAEAEA;
+    --bs-tertiary-bg: #1E1E1E;
+    --bs-secondary-bg: #333333;
+    --bs-border-color: #4A5568;
+    --bs-light-rgb: 30, 30, 30;
+}
+
+/* NOVO TEMA: NORDIC NIGHT */
+[data-theme="nordic-night"] {
+    --primary-color: #88C0D0; /* Azul Gelo */
+    --background-color: #2E3440; /* Noite Polar (Fundo) */
+    --card-background-color: #3B4252; /* Noite Polar (Card) */
+    --text-color: #ECEFF4; /* Neve */
+    --text-secondary-color: #D8DEE9; /* Neve Clara */
+    --border-color: #4C566A; /* Noite Polar (Borda) */
+    --income-color: #A3BE8C; /* Verde Aurora */
+    --expense-color: #BF616A; /* Vermelho Aurora */
+
+    --bs-body-bg: #2E3440;
     --bs-body-color: #ECEFF4;
-    --bs-tertiary-bg: transparent;
+    --bs-tertiary-bg: #3B4252;
     --bs-secondary-bg: #4C566A;
     --bs-border-color: #4C566A;
     --bs-light-rgb: 59, 66, 82;
 }
 
-/* --- Lógica dos ícones de tema --- */
-[data-theme="dark"] .fa-sun { display: none; }
+/* Lógica para mostrar o ícone de tema correto */
+[data-theme="dark"] .fa-sun, [data-theme="nordic-night"] .fa-sun { display: none; }
 [data-theme="light"] .fa-moon { display: none; }
 
 
-/* =================================
-   EFEITO GLASSMORPHISM NOS COMPONENTES
-   ================================= */
-.card, .popup-dialog, .list-group-item, .accordion-item {
-    background: var(--card-background-color) !important;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px); /* Para Safari */
-    border: 1px solid var(--border-color) !important;
-    border-radius: 1rem !important;
-    box-shadow: var(--shadow);
+/* AJUSTES FINOS PARA TEMAS ESCUROS */
+[data-theme="dark"] .popup-dialog,
+[data-theme="dark"] .accordion-button,
+[data-theme="nordic-night"] .popup-dialog,
+[data-theme="nordic-night"] .accordion-button {
+    background-color: var(--bs-tertiary-bg);
 }
-
-.navbar, .accordion-header {
-    background: var(--card-background-color) !important;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid var(--border-color) !important;
+[data-theme="dark"] .nav-tabs .nav-link.active,
+[data-theme="nordic-night"] .nav-tabs .nav-link.active {
+    background-color: var(--bs-body-bg);
 }
-.card-header { border-bottom: 1px solid var(--border-color) !important; }
-.accordion-button { border-radius: 1rem !important; }
-.accordion-button:not(.collapsed) { box-shadow: none; }
-
-[data-theme="dark"] .accordion-button::after {
+[data-theme="dark"] .accordion-button:not(.collapsed),
+[data-theme="nordic-night"] .accordion-button:not(.collapsed) {
+    background-color: var(--bs-secondary-bg);
+}
+[data-theme="dark"] .accordion-button::after,
+[data-theme="nordic-night"] .accordion-button::after {
     filter: invert(1) grayscale(100) brightness(200%);
 }
-
-
-/* =================================
-   ANIMAÇÕES E INTERATIVIDADE
-   ================================= */
-.card, .btn, .list-group-item, .accordion-item {
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-.card:hover, .list-group-item:hover, .accordion-item:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 12px 36px 0 rgba(20, 24, 82, 0.4);
-}
-.btn:hover, .nav-link:hover {
-    transform: scale(1.05);
-}
-.btn-primary {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
-}
-.btn-primary:hover {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
-    filter: brightness(1.1);
+[data-theme="dark"] .list-group-item,
+[data-theme="nordic-night"] .list-group-item {
+    background-color: var(--bs-tertiary-bg);
 }
 
-/* O restante do CSS (modal, toast, etc.) continua o mesmo */
+/* O restante do CSS continua igual */
 #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 1100; }
 .toast { padding: 1rem 1.5rem; margin-bottom: 1rem; border-radius: 0.25rem; color: white; opacity: 0; transition: opacity 0.3s ease-in-out; }
 .toast.show { opacity: 1; }
-.toast.success { background-color: #16A34A; }
-.toast.error { background-color: #DC2626; }
-#modal-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; backdrop-filter: blur(5px); z-index: 1050; display: none; align-items: center; justify-content: center; }
+.toast.success { background-color: #198754; }
+.toast.error { background-color: #dc3545; }
+#modal-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); z-index: 1050; display: none; align-items: center; justify-content: center; }
 #modal-container.active { display: flex; }
+.popup-dialog { background-color: var(--card-background-color); border-radius: 0.5rem; box-shadow: 0 5px 15px rgba(0,0,0,0.5); width: 90%; max-width: 500px; animation: fadeIn 0.3s ease-out; }
 .popup-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid var(--border-color); }
 .popup-body { padding: 1.5rem; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
 .income-text { color: var(--income-color) !important; }
 .expense-text { color: var(--expense-color) !important; }
+.accordion-button::after { transition: transform 0.2s ease-in-out; }
+.accordion-button:not(.collapsed)::after { transform: rotate(-180deg); }
 .transaction-icon-wrapper { width: 38px; height: 38px; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: white; font-size: 1rem; flex-shrink: 0; }
 .extra-fields { display: none; }
 #statement-details-container .accordion { max-height: 40vh; overflow-y: auto; padding-right: 8px; }
 #statement-details-container .accordion::-webkit-scrollbar { width: 8px; }
-#statement-details-container .accordion::-webkit-scrollbar-track { background: transparent; }
-#statement-details-container .accordion::-webkit-scrollbar-thumb { background-color: var(--text-secondary-color); border-radius: 4px; }
+#statement-details-container .accordion::-webkit-scrollbar-track { background: var(--bs-body-bg); border-radius: 4px; }
+#statement-details-container .accordion::-webkit-scrollbar-thumb { background-color: var(--bs-secondary-bg); border-radius: 4px; }
