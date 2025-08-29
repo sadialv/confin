@@ -267,8 +267,80 @@ const renderSummaryPanel = (containerId, items, type) => {
 };
 
 // --- RENDERIZAÇÃO DAS LISTAS EM ACORDEÃO ---
-const renderBillItem = (bill, compras) => { /* ... (código anterior) ... */ };
-const renderTransactionCard = (t) => { /* ... (código anterior) ... */ };
+const renderBillItem = (bill, compras) => {
+    const isParcela = !!bill.compra_parcelada_id;
+    let cat = bill.categoria;
+    if (isParcela) {
+        const c = compras.find(compra => compra.id === bill.compra_parcelada_id);
+        if(c) cat = c.categoria;
+    }
+    const icon = CATEGORY_ICONS[cat] || CATEGORY_ICONS['Outros'];
+    const editAction = isParcela ? 'recriar-compra-parcelada' : 'editar-lancamento';
+    const editId = isParcela ? bill.compra_parcelada_id : bill.id;
+    const collapseId = `collapse-bill-${bill.id}`;
+
+    return `
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
+                    <div class="d-flex w-100 align-items-center">
+                        <span class="transaction-icon-wrapper me-3" style="background-color:${icon.color};"><i class="${icon.icon}"></i></span>
+                        <span>${bill.descricao}</span>
+                        <span class="ms-auto fw-bold ${bill.tipo === 'a_pagar' ? 'expense-text' : 'income-text'}">${formatarMoeda(bill.valor)}</span>
+                    </div>
+                </button>
+            </h2>
+            <div id="${collapseId}" class="accordion-collapse collapse">
+                <div class="accordion-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-body-secondary">Vencimento: ${new Date(bill.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}</small>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-success btn-sm" data-action="pagar-conta" data-id="${bill.id}">Pagar</button>
+                        <button class="btn btn-outline-secondary btn-sm" data-action="${editAction}" data-id="${editId}" title="Editar"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-outline-danger btn-sm" data-action="deletar-lancamento" data-id="${bill.id}" data-compra-id="${bill.compra_parcelada_id || ''}"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+};
+
+const renderTransactionCard = (t) => {
+    const conta = getContaPorId(t.conta_id);
+    const icon = CATEGORY_ICONS[t.categoria] || CATEGORY_ICONS['Outros'];
+    const collapseId = `collapse-trans-${t.id || t.descricao.replace(/\W/g, '')}`;
+    
+    const actions = t.isVirtual ? '<small class="text-info">Parcela Futura (Virtual)</small>' : `
+        <div class="btn-group">
+            <button class="btn btn-outline-secondary btn-sm" data-action="editar-transacao" data-id="${t.id}" title="Editar"><i class="fas fa-edit"></i></button>
+            <button class="btn btn-outline-danger btn-sm" data-action="deletar-transacao" data-id="${t.id}" title="Deletar"><i class="fas fa-trash"></i></button>
+        </div>`;
+
+    return `
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
+                    <div class="d-flex w-100 align-items-center">
+                        <span class="transaction-icon-wrapper me-3" style="background-color:${icon.color};"><i class="${icon.icon}"></i></span>
+                        <span>${t.descricao}</span>
+                        <span class="ms-auto fw-bold ${t.tipo === 'despesa' ? 'expense-text' : 'income-text'}">${t.tipo === 'despesa' ? '-' : '+'} ${formatarMoeda(t.valor)}</span>
+                    </div>
+                </button>
+            </h2>
+            <div id="${collapseId}" class="accordion-collapse collapse">
+                <div class="accordion-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-body-secondary">
+                            <i class="fas fa-calendar-alt"></i> ${new Date(t.data + 'T12:00:00').toLocaleDateString('pt-BR')} |
+                            <i class="fas fa-tag"></i> ${t.categoria} |
+                            <i class="fas fa-wallet"></i> ${conta ? conta.nome : 'N/A'}
+                        </small>
+                    </div>
+                    ${actions}
+                </div>
+            </div>
+        </div>`;
+};
 
 export const renderLancamentosFuturos = (page = 1, filters) => {
     const container = document.getElementById('bills-list-container');
@@ -288,6 +360,7 @@ export const renderLancamentosFuturos = (page = 1, filters) => {
         .sort((a,b) => new Date(a.data_vencimento) - new Date(b.data_vencimento));
     
     renderSummaryPanel('bills-summary-panel', filtrados, 'bills');
+
     const paginados = filtrados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
     if (!paginados.length) { 
         container.innerHTML = '<p class="text-center text-body-secondary p-3">Nenhum lançamento futuro encontrado.</p>'; 
@@ -308,19 +381,193 @@ export const renderHistoricoTransacoes = (page = 1, filters) => {
         .sort((a,b) => new Date(b.data) - new Date(a.data));
 
     renderSummaryPanel('history-summary-panel', filtrados, 'history');
+    
     const paginados = filtrados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
     if (!paginados.length) { 
-        container.innerHTML = '<p class="text-center text-body-secondary p-3">Nenhuma transação encontrada.</p>'; 
+        container.innerHTML = '<p class="text-center text-body-secondary p-3">Nenhuma transação encontrada para os filtros selecionados.</p>'; 
         return; 
     }
     container.innerHTML = paginados.map(renderTransactionCard).join('');
 };
 
 // --- GERADORES DE CONTEÚDO PARA MODAL ---
-export const getAccountModalContent = (id = null) => { /* ... (código anterior) ... */ };
-export const getPayBillModalContent = (billId) => { /* ... (código anterior) ... */ };
-export const getBillModalContent = (id = null) => { /* ... (código anterior) ... */ };
-export const getTransactionModalContent = (id) => { /* ... (código anterior) ... */ };
-export const getInstallmentPurchaseModalContent = (compra) => { /* ... (código anterior) ... */ };
-export const getStatementModalContent = (contaId) => { /* ... (código anterior) ... */ };
-export const renderStatementDetails = (contaId, mesSelecionado) => { /* ... (código anterior) ... */ };
+export const getAccountModalContent = (id = null) => {
+    const conta = id ? getContaPorId(id) : {};
+    const title = id ? 'Editar Conta' : 'Nova Conta';
+    const isCreditCard = conta?.tipo === 'Cartão de Crédito';
+    const body = `
+        <form id="form-conta" data-id="${id || ''}">
+            <div class="mb-3"><label class="form-label">Nome da Conta</label><input name="nome" class="form-control" value="${conta.nome || ''}" required></div>
+            <div class="mb-3"><label class="form-label">Tipo</label>
+                <select name="tipo" id="conta-tipo" class="form-select">
+                    <option ${conta.tipo === 'Conta Corrente' ? 'selected' : ''}>Conta Corrente</option>
+                    <option ${conta.tipo === 'Cartão de Crédito' ? 'selected' : ''}>Cartão de Crédito</option>
+                    <option ${conta.tipo === 'Dinheiro' ? 'selected' : ''}>Dinheiro</option>
+                    <option ${conta.tipo === 'Poupança' ? 'selected' : ''}>Poupança</option>
+                </select>
+            </div>
+            <div class="mb-3"><label class="form-label">Saldo Inicial</label><input name="saldo_inicial" type="number" step="0.01" class="form-control" value="${conta.saldo_inicial || 0}" ${id ? 'disabled' : ''}></div>
+            <div id="cartao-credito-fields" style="display: ${isCreditCard ? 'block' : 'none'};">
+                 <div class="mb-3">
+                    <label class="form-label">Dia do Fechamento da Fatura</label>
+                    <input name="dia_fechamento_cartao" type="number" min="1" max="31" class="form-control" value="${conta.dia_fechamento_cartao || ''}">
+                </div>
+            </div>
+            <div class="text-end"><button type="submit" class="btn btn-primary">Salvar</button></div>
+        </form>`;
+    return { title, body };
+};
+
+export const getPayBillModalContent = (billId) => {
+    const bill = getState().lancamentosFuturos.find(b=>b.id===billId);
+    if (!bill) return { title: 'Erro', body: 'Lançamento não encontrado.' };
+    const title = `Pagar Lançamento`;
+    const body = `
+        <form id="form-pagamento" data-bill-id="${bill.id}" data-valor="${bill.valor}" data-desc="${bill.descricao}" data-cat="${bill.categoria || 'Contas'}">
+            <p>Você está pagando <strong>${bill.descricao}</strong> no valor de:</p>
+            <p class="h3 text-center my-3">${formatarMoeda(bill.valor)}</p>
+            <div class="mb-3"><label class="form-label">Data do Pagamento</label><input type="date" name="data" value="${toISODateString(new Date())}" class="form-control"></div>
+            <div class="mb-3"><label class="form-label">Pagar com a conta</label><select name="conta_id" class="form-select">${getContas().filter(c=>c.tipo!=='Cartão de Crédito').map(c=>`<option value="${c.id}">${c.nome}</option>`).join('')}</select></div>
+            <div class="text-end"><button type="submit" class="btn btn-success">Confirmar Pagamento</button></div>
+        </form>`;
+    return { title, body };
+};
+
+export const getBillModalContent = (id = null) => {
+    const bill = id ? getState().lancamentosFuturos.find(l => l.id === id) : {};
+    const title = id ? 'Editar Lançamento Futuro' : 'Novo Lançamento';
+    const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${bill.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
+    const body = `
+        <form id="form-lancamento" data-id="${id || ''}">
+            <div class="mb-3"><label class="form-label">Descrição</label><input name="descricao" value="${bill.descricao || ''}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Valor</label><input name="valor" type="number" step="0.01" value="${bill.valor || ''}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Data Vencimento</label><input name="data_vencimento" type="date" value="${bill.data_vencimento || toISODateString(new Date())}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Categoria</label><select name="categoria" class="form-select">${categoriasOptions}</select></div>
+            <div class="mb-3"><label class="form-label">Tipo</label><select name="tipo" class="form-select"><option value="a_pagar" ${bill.tipo==='a_pagar'?'selected':''}>A Pagar</option><option value="a_receber" ${bill.tipo==='a_receber'?'selected':''}>A Receber</option></select></div>
+            <div class="text-end"><button type="submit" class="btn btn-primary">Salvar</button></div>
+        </form>`;
+    return { title, body };
+};
+
+export const getTransactionModalContent = (id) => {
+    const transacao = getState().transacoes.find(t => t.id === id);
+    if (!transacao) return { title: 'Erro', body: '<p>Transação não encontrada.</p>' };
+
+    const title = 'Editar Transação';
+    const contasOptions = getContas().map(c => `<option value="${c.id}" ${transacao.conta_id === c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
+    const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${transacao.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
+    
+    const body = `
+        <form id="form-edicao-transacao" data-id="${id}">
+            <div class="mb-3"><label class="form-label">Descrição</label><input name="descricao" value="${transacao.descricao}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Valor</label><input name="valor" type="number" step="0.01" value="${transacao.valor}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Data</label><input name="data" type="date" value="${transacao.data}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Conta</label><select name="conta_id" class="form-select">${contasOptions}</select></div>
+            <div class="mb-3"><label class="form-label">Categoria</label><select name="categoria" class="form-select">${categoriasOptions}</select></div>
+            <div class="mb-3"><label class="form-label">Tipo</label><select name="tipo" class="form-select"><option value="despesa" ${transacao.tipo==='despesa'?'selected':''}>Despesa</option><option value="receita" ${transacao.tipo==='receita'?'selected':''}>Receita</option></select></div>
+            <div class="text-end"><button type="submit" class="btn btn-primary">Salvar Alterações</button></div>
+        </form>`;
+    return { title, body };
+};
+
+export const getInstallmentPurchaseModalContent = (compra) => {
+    if (!compra) return { title: 'Erro', body: '<p>Compra não encontrada.</p>' };
+    const title = 'Recriar Compra Parcelada';
+    const contasCartao = getContas().filter(c => c.tipo === 'Cartão de Crédito');
+    const contasOptions = contasCartao.map(c => `<option value="${c.id}" ${compra.conta_id === c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
+    const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${compra.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
+
+    const body = `
+        <div class="alert alert-warning small">Ajuste os dados e salve. A compra antiga e todas as suas parcelas futuras serão substituídas.</div>
+        <form id="form-compra-parcelada" data-compra-antiga-id="${compra.id}">
+            <div class="mb-3"><label class="form-label">Descrição</label><input name="descricao" value="${compra.descricao}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Valor Total</label><input name="valor_total" type="number" step="0.01" value="${compra.valor_total}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Número de Parcelas</label><input name="numero_parcelas" type="number" min="1" value="${compra.numero_parcelas}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Data da Compra</label><input name="data_compra" type="date" value="${compra.data_compra}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Cartão de Crédito</label><select name="conta_id" class="form-select" required>${contasOptions}</select></div>
+            <div class="mb-3"><label class="form-label">Categoria</label><select name="categoria" class="form-select" required>${categoriasOptions}</select></div>
+            <div class="text-end"><button type="submit" class="btn btn-primary">Salvar e Substituir</button></div>
+        </form>`;
+    return { title, body };
+};
+
+export const getStatementModalContent = (contaId) => {
+    const conta = getContaPorId(contaId);
+    if (!conta) return { title: 'Erro', body: 'Conta não encontrada.' };
+
+    const title = `Fatura - ${conta.nome}`;
+    const { transacoes } = getState();
+    const mesesDisponiveis = [...new Set(
+        transacoes
+            .filter(t => t.conta_id === contaId)
+            .map(t => t.data.substring(0, 7))
+    )].sort().reverse();
+
+    const options = mesesDisponiveis.map(mes => {
+        const [ano, mesNum] = mes.split('-');
+        const data = new Date(ano, mesNum - 1);
+        const nomeMes = data.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        return `<option value="${mes}">${nomeMes}</option>`;
+    }).join('');
+
+    const body = `
+        <div class="mb-3">
+            <label for="statement-month-select" class="form-label">Selecione a Fatura:</label>
+            <select id="statement-month-select" class="form-select" data-conta-id="${contaId}">
+                <option value="">Selecione...</option>
+                ${options}
+            </select>
+        </div>
+        <div id="statement-details-container" class="mt-4">
+            <p class="text-center text-body-secondary">Selecione um mês para ver os detalhes da fatura.</p>
+        </div>`;
+    
+    return { title, body };
+};
+
+export const renderStatementDetails = (contaId, mesSelecionado) => {
+    const container = document.getElementById('statement-details-container');
+    if (!container) return;
+
+    if (!mesSelecionado) {
+        container.innerHTML = '<p class="text-center text-body-secondary">Selecione um mês para ver os detalhes da fatura.</p>';
+        return;
+    }
+
+    const conta = getContaPorId(contaId);
+    const { transacoes } = getState();
+    const diaFechamento = conta.dia_fechamento_cartao || 28;
+
+    const [ano, mes] = mesSelecionado.split('-').map(Number);
+    const fimCiclo = new Date(ano, mes - 1, diaFechamento);
+    const inicioCiclo = new Date(fimCiclo);
+    inicioCiclo.setMonth(inicioCiclo.getMonth() - 1);
+
+    const transacoesFatura = transacoes.filter(t => {
+        const dataTransacao = new Date(t.data + 'T12:00:00');
+        return t.conta_id === contaId &&
+               dataTransacao > inicioCiclo &&
+               dataTransacao <= fimCiclo &&
+               t.tipo === 'despesa';
+    }).sort((a, b) => new Date(a.data) - new Date(b.data));
+
+    const totalFatura = transacoesFatura.reduce((acc, t) => acc + t.valor, 0);
+
+    const itemsHtml = transacoesFatura.length ? 
+        transacoesFatura.map(renderTransactionCard).join('') : 
+        '<p class="text-center text-body-secondary p-3">Nenhuma despesa nesta fatura.</p>';
+
+    container.innerHTML = `
+        <div>
+            <h5 class="d-flex justify-content-between">
+                <span>Total da Fatura:</span>
+                <span class="expense-text">${formatarMoeda(totalFatura)}</span>
+            </h5>
+            <p class="text-body-secondary small">
+                Período de ${inicioCiclo.toLocaleDateString('pt-BR')} a ${fimCiclo.toLocaleDateString('pt-BR')}
+            </p>
+        </div>
+        <div class="accordion mt-3">
+            ${itemsHtml}
+        </div>`;
+};
