@@ -71,10 +71,135 @@ export const renderAllComponents = (initialFilters) => {
     renderFormTransacaoRapida();
     renderVisaoMensal();
     renderVisaoAnual();
+    renderFinancialAnalysis(); // <-- FUNÇÃO ADICIONADA AQUI
     renderFilters('bills', initialFilters.bills);
     renderLancamentosFuturos(1, initialFilters.bills);
     renderFilters('history', initialFilters.history);
     renderHistoricoTransacoes(1, initialFilters.history);
+};
+
+// --- LÓGICA DE CÁLCULO DAS MÉTRICAS FINANCEIRAS ---
+const calculateFinancialMetrics = () => {
+    const { contas, transacoes, lancamentosFuturos } = getState();
+    const mesAtual = new Date().toISOString().slice(0, 7);
+
+    // 1. Ativos e Dívidas
+    let totalAtivos = 0;
+    let totalDividasCartoes = 0;
+
+    contas.forEach(conta => {
+        const saldoConta = transacoes
+            .filter(t => t.conta_id === conta.id)
+            .reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, conta.saldo_inicial);
+            
+        if (conta.tipo !== 'Cartão de Crédito') {
+            totalAtivos += saldoConta;
+        } else {
+            // Saldo de cartão de crédito é negativo, representa uma dívida
+            if (saldoConta < 0) {
+                totalDividasCartoes += Math.abs(saldoConta);
+            }
+        }
+    });
+
+    const totalDividasFuturas = lancamentosFuturos
+        .filter(l => l.status === 'pendente' && l.tipo === 'a_pagar')
+        .reduce((acc, l) => acc + l.valor, 0);
+
+    const totalDividas = totalDividasCartoes + totalDividasFuturas;
+    const grauEndividamento = totalAtivos > 0 ? (totalDividas / totalAtivos) * 100 : 0;
+
+    // 2. Renda e Despesas Mensais (mês atual)
+    const transacoesMes = transacoes.filter(t => t.data?.startsWith(mesAtual));
+    const rendaMensal = transacoesMes
+        .filter(t => t.tipo === 'receita')
+        .reduce((acc, t) => acc + t.valor, 0);
+    const despesasMensais = transacoesMes
+        .filter(t => t.tipo === 'despesa')
+        .reduce((acc, t) => acc + t.valor, 0);
+
+    // 3. Taxa de Poupança
+    const taxaPoupanca = rendaMensal > 0 ? ((rendaMensal - despesasMensais) / rendaMensal) * 100 : 0;
+
+    // 4. Autonomia Financeira (Reserva de Emergência)
+    const autonomiaFinanceira = despesasMensais > 0 ? totalAtivos / despesasMensais : Infinity; // Em meses
+
+    // 5. Ponto de Equilíbrio (baseado em despesas fixas)
+    const categoriasFixas = ['Moradia', 'Contas', 'Educação', 'Saúde', 'Pagamento de Fatura'];
+    const despesasFixasMensais = transacoesMes
+        .filter(t => t.tipo === 'despesa' && categoriasFixas.includes(t.categoria))
+        .reduce((acc, t) => acc + t.valor, 0);
+
+    return {
+        grauEndividamento,
+        taxaPoupanca,
+        autonomiaFinanceira,
+        pontoEquilibrio: despesasFixasMensais
+    };
+};
+
+// --- RENDERIZAÇÃO DAS NOVAS ANÁLISES FINANCEIRAS ---
+export const renderFinancialAnalysis = () => {
+    const container = document.getElementById('financial-analysis-container');
+    if (!container) return;
+
+    const metrics = calculateFinancialMetrics();
+
+    const formatarAutonomia = (meses) => {
+        if (meses === Infinity || meses < 0) return '<div><i class="fas fa-infinity fa-2x text-success"></i></div><div class="fw-bold">N/A</div>';
+        if (meses >= 24) {
+             return `<div class="h3 text-success">${(meses/12).toFixed(1)}</div><div class="fw-bold">anos</div>`;
+        }
+        return `<div class="h3">${meses.toFixed(1)}</div><div class="fw-bold">mes(es)</div>`;
+    };
+
+    container.innerHTML = `
+        <div class="row">
+            <div class="col-md-6 col-lg-3 mb-3 mb-lg-0">
+                <div class="card h-100 text-center">
+                    <div class="card-body d-flex flex-column justify-content-center">
+                        <h6 class="card-title text-body-secondary">Taxa de Poupança</h6>
+                        <div class="progress my-2" style="height: 20px;" title="${metrics.taxaPoupanca.toFixed(0)}% de sua renda foi poupada este mês">
+                            <div class="progress-bar ${metrics.taxaPoupanca >= 20 ? 'bg-success' : (metrics.taxaPoupanca > 0 ? 'bg-warning' : 'bg-danger')}" role="progressbar" style="width: ${Math.max(0, metrics.taxaPoupanca)}%;" aria-valuenow="${metrics.taxaPoupanca.toFixed(0)}">${metrics.taxaPoupanca.toFixed(0)}%</div>
+                        </div>
+                        <small class="text-body-secondary">Ideal: Acima de 20%</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3 mb-3 mb-lg-0">
+                <div class="card h-100 text-center">
+                    <div class="card-body d-flex flex-column justify-content-center">
+                        <h6 class="card-title text-body-secondary">Grau de Endividamento</h6>
+                        <div class="progress my-2" style="height: 20px;" title="${metrics.grauEndividamento.toFixed(0)}% dos seus ativos estão comprometidos com dívidas">
+                            <div class="progress-bar ${metrics.grauEndividamento <= 40 ? 'bg-success' : (metrics.grauEndividamento <= 70 ? 'bg-warning' : 'bg-danger')}" role="progressbar" style="width: ${Math.min(100, metrics.grauEndividamento)}%;" aria-valuenow="${metrics.grauEndividamento.toFixed(0)}">${metrics.grauEndividamento.toFixed(0)}%</div>
+                        </div>
+                        <small class="text-body-secondary">Ideal: Abaixo de 40%</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3 mb-3 mb-md-0">
+                <div class="card h-100 text-center">
+                    <div class="card-body d-flex flex-column justify-content-center">
+                        <h6 class="card-title text-body-secondary">Ponto de Equilíbrio</h6>
+                        <p class="h4 my-2" title="Renda mínima para cobrir custos fixos">${formatarMoeda(metrics.pontoEquilibrio)}</p>
+                        <small class="text-body-secondary">Custo Fixo Mensal</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 text-center">
+                    <div class="card-body d-flex flex-column justify-content-center">
+                        <h6 class="card-title text-body-secondary">Autonomia Financeira</h6>
+                        <div class="my-2" title="Tempo que seus ativos cobririam suas despesas mensais">${formatarAutonomia(metrics.autonomiaFinanceira)}</div>
+                        <small class="text-body-secondary">Reserva de Emergência</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
 };
 
 
@@ -116,6 +241,10 @@ export const renderContas = () => {
     }).join('');
     container.innerHTML = `<ul class="list-group list-group-flush">${listHtml}</ul>`;
 };
+
+// O restante do arquivo ui.js continua aqui, sem alterações...
+// (renderFormTransacaoRapida, renderVisaoMensal, etc.)
+// ...
 
 export const renderFormTransacaoRapida = () => {
     const container = document.getElementById('form-transacao-unificada');
@@ -361,7 +490,7 @@ export const renderLancamentosFuturos = (page = 1, filters) => {
         .filter(l => (filters.mes === 'todos' || !filters.mes) || l.data_vencimento.startsWith(filters.mes))
         .filter(l => {
             if (filters.contaId === 'todas' || !filters.contaId) return true;
-            if (!l.compra_parcelada_id) return true;
+            if (!l.compra_parcelada_id) return true; // Lançamentos avulsos não têm conta associada diretamente
             const compra = comprasParceladas.find(c => c.id === l.compra_parcelada_id);
             return compra && compra.conta_id == filters.contaId;
         })
