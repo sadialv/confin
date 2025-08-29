@@ -414,7 +414,7 @@ export const getAccountModalContent = (id = null) => {
                 </div>
                  <div class="mb-3">
                     <label class="form-label">Dia do Vencimento da Fatura</label>
-                    <input name="dia_vencimento_fatura" type="number" min="1" max="31" class="form-control" value="${conta.dia_vencimento_fatura || ''}">
+                    <input name="dia_vencimento_cartao" type="number" min="1" max="31" class="form-control" value="${conta.dia_vencimento_cartao || ''}">
                 </div>
             </div>
             <div class="text-end"><button type="submit" class="btn btn-primary">Salvar</button></div>
