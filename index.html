@@ -33,24 +33,36 @@
 
             <div class="col-lg-4">
                 <div class="card shadow-sm mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Minhas Contas</h5>
-                        <button id="btn-add-account" class="btn btn-primary btn-sm" title="Adicionar Conta">
-                            <i class="fas fa-plus"></i>
-                        </button>
-                    </div>
-                    <div class="card-body p-0" id="accounts-container">
-                        <p class="text-center text-body-secondary p-3">Carregando...</p>
-                    </div>
-                </div>
-
-                <div class="card shadow-sm mb-4">
                     <div class="card-header">
-                        <h5 class="mb-0">Nova Transação</h5>
+                        <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#lancamentos-pane" type="button" role="tab">Lançamentos</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#cadastro-pane" type="button" role="tab">Cadastro</button>
+                            </li>
+                        </ul>
                     </div>
-                    <form id="form-transacao-unificada" class="card-body">
-                        <p class="text-center text-body-secondary">Carregando...</p>
-                    </form>
+                    <div class="card-body tab-content p-3">
+                        <div id="lancamentos-pane" class="tab-pane fade show active" role="tabpanel">
+                            <h5 class="mb-3">Nova Transação</h5>
+                            <form id="form-transacao-unificada">
+                                <p class="text-center text-body-secondary">Carregando...</p>
+                            </form>
+                        </div>
+
+                        <div id="cadastro-pane" class="tab-pane fade" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="mb-0">Minhas Contas</h5>
+                                <button id="btn-add-account" class="btn btn-primary d-flex align-items-center">
+                                    <i class="fas fa-plus me-2"></i>Cadastrar
+                                </button>
+                            </div>
+                            <div id="accounts-container">
+                                <p class="text-center text-body-secondary">Carregando...</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
