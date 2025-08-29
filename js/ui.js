@@ -410,11 +410,11 @@ export const getAccountModalContent = (id = null) => {
             <div id="cartao-credito-fields" style="display: ${isCreditCard ? 'block' : 'none'};">
                  <div class="mb-3">
                     <label class="form-label">Dia do Fechamento da Fatura</label>
-                    <input name="dia_fechamento_cartao" type="number" min="1" max="31" class="form-control" value="${conta.dia_fechamento_cartao || ''}">
+                    <input name="dia_fechamento_cartao" type="number" min="1" max="31" class="form-control" value="${conta.dia_fechamento_cartao || ''}" placeholder="Ex: 20">
                 </div>
                  <div class="mb-3">
                     <label class="form-label">Dia do Vencimento da Fatura</label>
-                    <input name="dia_vencimento_cartao" type="number" min="1" max="31" class="form-control" value="${conta.dia_vencimento_cartao || ''}">
+                    <input name="dia_vencimento_cartao" type="number" min="1" max="31" class="form-control" value="${conta.dia_vencimento_cartao || ''}" placeholder="Ex: 28">
                 </div>
             </div>
             <div class="text-end"><button type="submit" class="btn btn-primary">Salvar</button></div>
