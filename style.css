@@ -1,107 +1,104 @@
 /* =================================
-   NOVA PALETA DE CORES E TEMA
+   PALETAS DE CORES E TEMAS
    ================================= */
+
+/* TEMA CLARO (PADRÃO) */
 :root {
-    --primary-color: #4A5568; /* Cinza-azulado escuro para destaque */
-    --background-color: #F7FAFC; /* Fundo cinza muito claro */
+    --primary-color: #4A5568; 
+    --background-color: #F7FAFC;
     --card-background-color: #FFFFFF;
-    --text-color: #2D3748; /* Texto cinza escuro */
-    --text-secondary-color: #718096; /* Texto secundário cinza */
-    --border-color: #E2E8F0; /* Borda cinza claro */
-    --income-color: #38A169; /* Verde sóbrio */
-    --expense-color: #E53E3E; /* Vermelho suave */
+    --text-color: #2D3748;
+    --text-secondary-color: #718096;
+    --border-color: #E2E8F0;
+    --income-color: #38A169;
+    --expense-color: #E53E3E;
     --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
+/* TEMA ESCURO (ALTO CONTRASTE) */
 [data-theme="dark"] {
-    --primary-color: #7f8daa;
-    --background-color: #1A202C; /* Fundo azul-marinho muito escuro */
-    --card-background-color: #2D3748; /* Card cinza-azulado */
-    --text-color: #E2E8F0; /* Texto cinza claro */
-    --text-secondary-color: #A0AEC0; /* Texto secundário cinza médio */
+    --primary-color: #90cdf4;
+    --background-color: #121212;
+    --card-background-color: #1E1E1E;
+    --text-color: #EAEAEA;
+    --text-secondary-color: #A0AEC0;
     --border-color: #4A5568;
     
-    /* Sobrescreve as variáveis do Bootstrap para o tema escuro */
-    --bs-body-bg: #1A202C;
-    --bs-body-color: #E2E8F0;
-    --bs-tertiary-bg: #2D3748;
-    --bs-secondary-bg: #4A5568;
+    --bs-body-bg: #121212;
+    --bs-body-color: #EAEAEA;
+    --bs-tertiary-bg: #1E1E1E;
+    --bs-secondary-bg: #333333;
     --bs-border-color: #4A5568;
-    --bs-light-rgb: 45, 55, 72;
+    --bs-light-rgb: 30, 30, 30;
 }
 
-/* Esconde o ícone de tema inadequado */
-[data-theme="dark"] .fa-sun { display: none; }
+/* NOVO TEMA: NORDIC NIGHT */
+[data-theme="nordic-night"] {
+    --primary-color: #88C0D0; /* Azul Gelo */
+    --background-color: #2E3440; /* Noite Polar (Fundo) */
+    --card-background-color: #3B4252; /* Noite Polar (Card) */
+    --text-color: #ECEFF4; /* Neve */
+    --text-secondary-color: #D8DEE9; /* Neve Clara */
+    --border-color: #4C566A; /* Noite Polar (Borda) */
+    --income-color: #A3BE8C; /* Verde Aurora */
+    --expense-color: #BF616A; /* Vermelho Aurora */
+
+    --bs-body-bg: #2E3440;
+    --bs-body-color: #ECEFF4;
+    --bs-tertiary-bg: #3B4252;
+    --bs-secondary-bg: #4C566A;
+    --bs-border-color: #4C566A;
+    --bs-light-rgb: 59, 66, 82;
+}
+
+/* Lógica para mostrar o ícone de tema correto */
+[data-theme="dark"] .fa-sun, [data-theme="nordic-night"] .fa-sun { display: none; }
 [data-theme="light"] .fa-moon { display: none; }
 
-/* Ajustes finos para componentes no tema escuro */
+
+/* AJUSTES FINOS PARA TEMAS ESCUROS */
 [data-theme="dark"] .popup-dialog,
-[data-theme="dark"] .accordion-button {
+[data-theme="dark"] .accordion-button,
+[data-theme="nordic-night"] .popup-dialog,
+[data-theme="nordic-night"] .accordion-button {
     background-color: var(--bs-tertiary-bg);
 }
-[data-theme="dark"] .nav-tabs .nav-link.active {
+[data-theme="dark"] .nav-tabs .nav-link.active,
+[data-theme="nordic-night"] .nav-tabs .nav-link.active {
     background-color: var(--bs-body-bg);
 }
-[data-theme="dark"] .accordion-button:not(.collapsed) {
+[data-theme="dark"] .accordion-button:not(.collapsed),
+[data-theme="nordic-night"] .accordion-button:not(.collapsed) {
     background-color: var(--bs-secondary-bg);
 }
-[data-theme="dark"] .accordion-button::after {
+[data-theme="dark"] .accordion-button::after,
+[data-theme="nordic-night"] .accordion-button::after {
     filter: invert(1) grayscale(100) brightness(200%);
 }
-[data-theme="dark"] .list-group-item {
+[data-theme="dark"] .list-group-item,
+[data-theme="nordic-night"] .list-group-item {
     background-color: var(--bs-tertiary-bg);
 }
 
-/* =================================
-   COMPONENTES CUSTOMIZADOS (MODAL/POPUP E TOAST)
-   ================================= */
-#toast-container { /* ... (código anterior sem alterações) ... */ }
-.toast { /* ... */ } .toast.show { /* ... */ } .toast.success { /* ... */ } .toast.error { /* ... */ }
-
-#modal-container {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background-color: rgba(0, 0, 0, 0.6);
-    z-index: 1050;
-    display: none;
-    align-items: center; justify-content: center;
-}
+/* O restante do CSS continua igual */
+#toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 1100; }
+.toast { padding: 1rem 1.5rem; margin-bottom: 1rem; border-radius: 0.25rem; color: white; opacity: 0; transition: opacity 0.3s ease-in-out; }
+.toast.show { opacity: 1; }
+.toast.success { background-color: #198754; }
+.toast.error { background-color: #dc3545; }
+#modal-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); z-index: 1050; display: none; align-items: center; justify-content: center; }
 #modal-container.active { display: flex; }
-
-.popup-dialog {
-    background-color: var(--card-background-color);
-    border-radius: 0.5rem;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-    width: 90%; max-width: 500px;
-    animation: fadeIn 0.3s ease-out;
-}
+.popup-dialog { background-color: var(--card-background-color); border-radius: 0.5rem; box-shadow: 0 5px 15px rgba(0,0,0,0.5); width: 90%; max-width: 500px; animation: fadeIn 0.3s ease-out; }
 .popup-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid var(--border-color); }
 .popup-body { padding: 1.5rem; }
-
 @keyframes fadeIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-
-/* =================================
-   UTILITÁRIOS E AJUSTES
-   ================================= */
 .income-text { color: var(--income-color) !important; }
 .expense-text { color: var(--expense-color) !important; }
 .accordion-button::after { transition: transform 0.2s ease-in-out; }
 .accordion-button:not(.collapsed)::after { transform: rotate(-180deg); }
-
-.transaction-icon-wrapper {
-    width: 38px; height: 38px; border-radius: 50%;
-    display: flex; justify-content: center; align-items: center;
-    color: white; font-size: 1rem; flex-shrink: 0;
-}
+.transaction-icon-wrapper { width: 38px; height: 38px; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: white; font-size: 1rem; flex-shrink: 0; }
 .extra-fields { display: none; }
-
-/* =================================
-   SCROLL NA LISTA DE TRANSAÇÕES DA FATURA
-   ================================= */
-#statement-details-container .accordion {
-    max-height: 40vh;
-    overflow-y: auto;
-    padding-right: 8px;
-}
+#statement-details-container .accordion { max-height: 40vh; overflow-y: auto; padding-right: 8px; }
 #statement-details-container .accordion::-webkit-scrollbar { width: 8px; }
 #statement-details-container .accordion::-webkit-scrollbar-track { background: var(--bs-body-bg); border-radius: 4px; }
 #statement-details-container .accordion::-webkit-scrollbar-thumb { background-color: var(--bs-secondary-bg); border-radius: 4px; }
