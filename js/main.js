@@ -10,13 +10,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let historyFilters = { 
         mes: new Date().toISOString().slice(0, 7), // Padrão para o mês atual
         pesquisa: '',
-        contaId: 'todas' // NOVO: Filtro de conta
+        contaId: 'todas'
     };
     let billsCurrentPage = 1;
     let billsFilters = { 
         mes: 'todos', 
         pesquisa: '',
-        contaId: 'todas' // NOVO: Filtro de conta
+        contaId: 'todas'
     };
 
     async function reloadStateAndRender() {
@@ -38,9 +38,12 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const id = form.dataset.id;
             const data = Object.fromEntries(new FormData(form));
-            data.saldo_inicial = parseFloat(data.saldo_inicial);
-            if(data.dia_fechamento_cartao) {
+            data.saldo_inicial = parseFloat(data.saldo_inicial) || 0;
+            if (data.dia_fechamento_cartao) {
                 data.dia_fechamento_cartao = parseInt(data.dia_fechamento_cartao);
+            }
+            if (data.dia_vencimento_fatura) {
+                data.dia_vencimento_fatura = parseInt(data.dia_vencimento_fatura);
             }
             const saved = await API.salvarDados('contas', data, id);
             const state = State.getState();
@@ -111,54 +114,78 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
                 await API.salvarDados('transacoes', transacao);
                 toastMessage = 'Transação salva!';
-            } else if (tipoCompra === 'parcelada' || tipoCompra === 'recorrente') {
+
+            } else if (tipoCompra === 'parcelada') {
+                const dadosCompra = {
+                    descricao: data.descricao, valor_total: parseFloat(data.valor),
+                    numero_parcelas: parseInt(data.numero_parcelas), data_compra: data.data,
+                    conta_id: parseInt(data.conta_id), categoria: data.categoria,
+                };
+                const conta = State.getContaPorId(dadosCompra.conta_id);
+                if (!conta || !conta.dia_fechamento_cartao || !conta.dia_vencimento_fatura) {
+                    throw new Error("Para compras parceladas, o cartão de crédito precisa ter 'Dia de Fechamento' e 'Dia de Vencimento' cadastrados.");
+                }
+                const compraSalva = await API.salvarDados('compras_parceladas', dadosCompra);
+                const valorParcela = parseFloat((dadosCompra.valor_total / dadosCompra.numero_parcelas).toFixed(2));
+                const lancamentos = [];
+                const dataCompra = new Date(dadosCompra.data_compra + 'T12:00:00');
+                const diaFechamento = conta.dia_fechamento_cartao;
+                const diaVencimento = conta.dia_vencimento_fatura;
+                
+                let anoFechamento = dataCompra.getFullYear();
+                let mesFechamento = dataCompra.getMonth();
+
+                if (dataCompra.getDate() > diaFechamento) {
+                    mesFechamento += 1;
+                }
+                
+                for (let i = 1; i <= dadosCompra.numero_parcelas; i++) {
+                    const dataFechamentoAtual = new Date(anoFechamento, mesFechamento + (i - 1), diaFechamento);
+                    let anoVencimento = dataFechamentoAtual.getFullYear();
+                    let mesVencimento = dataFechamentoAtual.getMonth();
+
+                    if (diaVencimento < diaFechamento) {
+                        mesVencimento += 1;
+                    }
+
+                    const dataVencimentoFinal = new Date(anoVencimento, mesVencimento, diaVencimento);
+                    
+                    lancamentos.push({
+                        descricao: `${dadosCompra.descricao} (${i}/${dadosCompra.numero_parcelas})`, valor: valorParcela,
+                        data_vencimento: toISODateString(dataVencimentoFinal), tipo: 'a_pagar',
+                        status: 'pendente', compra_parcelada_id: compraSalva.id, categoria: dadosCompra.categoria
+                    });
+                }
+                if (lancamentos.length > 0) await API.salvarMultiplosLancamentos(lancamentos);
+                toastMessage = 'Compra parcelada lançada!';
+
+            } else if (tipoCompra === 'recorrente') {
                 const valor = parseFloat(data.valor);
                 const dataInicio = new Date(data.data + 'T12:00:00');
                 const lancamentos = [];
-                
-                if (tipoCompra === 'parcelada') {
-                    const dadosCompra = {
-                        descricao: data.descricao, valor_total: valor,
-                        numero_parcelas: parseInt(data.numero_parcelas), data_compra: data.data,
-                        conta_id: parseInt(data.conta_id), categoria: data.categoria,
-                    };
-                    const compraSalva = await API.salvarDados('compras_parceladas', dadosCompra);
-                    const valorParcela = parseFloat((dadosCompra.valor_total / dadosCompra.numero_parcelas).toFixed(2));
-                    for (let i = 1; i <= dadosCompra.numero_parcelas; i++) {
-                        const dataVencimento = new Date(dataInicio);
-                        dataVencimento.setMonth(dataVencimento.getMonth() + i);
-                        lancamentos.push({
-                            descricao: `${dadosCompra.descricao} (${i}/${dadosCompra.numero_parcelas})`, valor: valorParcela,
-                            data_vencimento: toISODateString(dataVencimento), tipo: 'a_pagar',
-                            status: 'pendente', compra_parcelada_id: compraSalva.id, categoria: dadosCompra.categoria
-                        });
+                const quantidade = parseInt(data.quantidade);
+                const diaVencimento = parseInt(data.dia_vencimento);
+                const frequencia = data.frequencia;
+                for (let i = 0; i < quantidade; i++) {
+                    let proximaData;
+                    if (frequencia === 'mensal') {
+                        proximaData = new Date(dataInicio.getFullYear(), dataInicio.getMonth() + i, 1);
+                        proximaData.setDate(Math.min(diaVencimento, new Date(proximaData.getFullYear(), proximaData.getMonth() + 1, 0).getDate()));
+                    } else if (frequencia === 'anual') {
+                        proximaData = new Date(dataInicio.getFullYear() + i, dataInicio.getMonth(), diaVencimento);
+                    } else if (frequencia === 'quinzenal') {
+                        proximaData = new Date(dataInicio.getTime() + (15 * i * 24 * 60 * 60 * 1000));
+                    } else { // diaria
+                        proximaData = new Date(dataInicio.getTime() + (i * 24 * 60 * 60 * 1000));
                     }
-                    toastMessage = 'Compra parcelada lançada!';
-                } else { // Recorrente
-                    const quantidade = parseInt(data.quantidade);
-                    const diaVencimento = parseInt(data.dia_vencimento);
-                    const frequencia = data.frequencia;
-                     for (let i = 0; i < quantidade; i++) {
-                        let proximaData;
-                        if (frequencia === 'mensal') {
-                            proximaData = new Date(dataInicio.getFullYear(), dataInicio.getMonth() + i, 1);
-                            proximaData.setDate(Math.min(diaVencimento, new Date(proximaData.getFullYear(), proximaData.getMonth() + 1, 0).getDate()));
-                        } else if (frequencia === 'anual') {
-                            proximaData = new Date(dataInicio.getFullYear() + i, dataInicio.getMonth(), diaVencimento);
-                        } else if (frequencia === 'quinzenal') {
-                            proximaData = new Date(dataInicio.getTime() + (15 * i * 24 * 60 * 60 * 1000));
-                        } else { // diaria
-                            proximaData = new Date(dataInicio.getTime() + (i * 24 * 60 * 60 * 1000));
-                        }
-                        lancamentos.push({
-                            descricao: data.descricao, valor: Math.abs(valor),
-                            data_vencimento: toISODateString(proximaData), tipo: 'a_pagar',
-                            status: 'pendente', categoria: data.categoria
-                        });
-                    }
-                    toastMessage = `${lancamentos.length} lançamentos recorrentes criados!`;
+                    lancamentos.push({
+                        descricao: data.descricao, valor: Math.abs(valor),
+                        data_vencimento: toISODateString(proximaData), tipo: 'a_pagar',
+                        status: 'pendente', categoria: data.categoria
+                    });
                 }
                 if (lancamentos.length > 0) await API.salvarMultiplosLancamentos(lancamentos);
+                toastMessage = `${lancamentos.length} lançamentos recorrentes criados!`;
             }
             
             form.reset();
@@ -220,32 +247,24 @@ document.addEventListener('DOMContentLoaded', () => {
             if (idCompraAntiga) {
                 await deletarCompraParceladaCompleta(idCompraAntiga);
             }
-            // A lógica de criação é a mesma do formulário principal
+            
             const data = Object.fromEntries(new FormData(form));
-            const dadosCompra = {
-                descricao: data.descricao, valor_total: parseFloat(data.valor_total),
-                numero_parcelas: parseInt(data.numero_parcelas), data_compra: data.data_compra,
-                conta_id: parseInt(data.conta_id), categoria: data.categoria,
-            };
-            const compraSalva = await API.salvarDados('compras_parceladas', dadosCompra);
-            const valorParcela = parseFloat((dadosCompra.valor_total / dadosCompra.numero_parcelas).toFixed(2));
-            const dataCompraObj = new Date(dadosCompra.data_compra + 'T12:00:00');
-            const lancamentos = [];
-            for (let i = 1; i <= dadosCompra.numero_parcelas; i++) {
-                const dataVencimento = new Date(dataCompraObj);
-                dataVencimento.setMonth(dataVencimento.getMonth() + i);
-                lancamentos.push({
-                    descricao: `${dadosCompra.descricao} (${i}/${dadosCompra.numero_parcelas})`, valor: valorParcela,
-                    data_vencimento: toISODateString(dataVencimento), tipo: 'a_pagar',
-                    status: 'pendente', compra_parcelada_id: compraSalva.id
-                });
-            }
-            await API.salvarMultiplosLancamentos(lancamentos);
-
+            // Simula um evento de formulário para reutilizar a lógica principal
+            const fakeForm = document.createElement('form');
+            const formData = new FormData(fakeForm);
+            formData.set('tipo_compra', 'parcelada');
+            formData.set('descricao', data.descricao);
+            formData.set('valor', data.valor_total);
+            formData.set('numero_parcelas', data.numero_parcelas);
+            formData.set('data', data.data_compra);
+            formData.set('conta_id', data.conta_id);
+            formData.set('categoria', data.categoria);
+            
+            const fakeEvent = { target: fakeForm, preventDefault: () => {} };
+            await salvarTransacaoUnificada(fakeEvent);
+            
             UI.closeModal();
-            UI.showToast(`Compra parcelada ${idCompraAntiga ? 'recriada' : 'salva'}!`);
-            await reloadStateAndRender();
-
+            // A mensagem de toast já é mostrada pela salvarTransacaoUnificada
         } catch (err) {
             UI.showToast(err.message, 'error');
         } finally {
