@@ -2,22 +2,33 @@
 export const CATEGORIAS_PADRAO = ['Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Lazer', 'Educação', 'Salário', 'Investimentos', 'Contas', 'Ajustes', 'Pagamento de Fatura', 'Compras', 'Outros'];
 
 export const CATEGORY_ICONS = {
-    'Alimentação': { icon: 'fas fa-utensils', color: '#f97316' },
-    'Transporte': { icon: 'fas fa-car', color: '#3b82f6' },
-    'Moradia': { icon: 'fas fa-home', color: '#10b981' },
-    'Saúde': { icon: 'fas fa-heartbeat', color: '#ef4444' },
-    'Lazer': { icon: 'fas fa-film', color: '#8b5cf6' },
-    'Educação': { icon: 'fas fa-graduation-cap', color: '#14b8a6' },
-    'Salário': { icon: 'fas fa-dollar-sign', color: '#22c55e' },
-    'Investimentos': { icon: 'fas fa-chart-line', color: '#06b6d4' },
-    'Contas': { icon: 'fas fa-file-invoice-dollar', color: '#eab308' },
-    'Ajustes': { icon: 'fas fa-sliders-h', color: '#64748b' },
-    'Pagamento de Fatura': { icon: 'fas fa-credit-card', color: '#a855f7' },
-    'Compras': { icon: 'fas fa-shopping-bag', color: '#d946ef' },
-    'Outros': { icon: 'fas fa-question-circle', color: '#78716c' }
+    'Alimentação': { icon: 'fas fa-utensils', color: '#F6AD55' }, // Laranja
+    'Transporte': { icon: 'fas fa-car', color: '#4FD1C5' }, // Turquesa
+    'Moradia': { icon: 'fas fa-home', color: '#48BB78' }, // Verde
+    'Saúde': { icon: 'fas fa-heartbeat', color: '#F56565' }, // Vermelho
+    'Lazer': { icon: 'fas fa-film', color: '#B794F4' }, // Roxo
+    'Educação': { icon: 'fas fa-graduation-cap', color: '#63B3ED' }, // Azul
+    'Salário': { icon: 'fas fa-dollar-sign', color: '#38A169' }, // Verde (Renda)
+    'Investimentos': { icon: 'fas fa-chart-line', color: '#0BC5EA' }, // Ciano
+    'Contas': { icon: 'fas fa-file-invoice-dollar', color: '#ECC94B' }, // Amarelo
+    'Ajustes': { icon: 'fas fa-sliders-h', color: '#A0AEC0' }, // Cinza
+    'Pagamento de Fatura': { icon: 'fas fa-credit-card', color: '#7f8daa' }, // Cinza-azulado
+    'Compras': { icon: 'fas fa-shopping-bag', color: '#ED8936' }, // Laranja escuro
+    'Outros': { icon: 'fas fa-question-circle', color: '#718096' } // Cinza escuro
 };
 
-export const CHART_COLORS = ['#f97316', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6', '#14b8a6', '#eab308', '#d946ef', '#64748b'];
+// NOVA PALETA DE CORES PARA OS GRÁFICOS
+export const CHART_COLORS = [
+    '#ED8936', // Laranja
+    '#4FD1C5', // Turquesa
+    '#F56565', // Vermelho
+    '#B794F4', // Roxo
+    '#63B3ED', // Azul
+    '#48BB78', // Verde
+    '#ECC94B', // Amarelo
+    '#F687B3', // Rosa
+    '#718096', // Cinza
+];
 
 export const formatarMoeda = (valor) => (valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
