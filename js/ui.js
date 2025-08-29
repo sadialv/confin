@@ -89,11 +89,17 @@ export const renderContas = () => {
     }
     const listHtml = contas.map(conta => {
         const saldo = transacoes.filter(t => t.conta_id === conta.id).reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, conta.saldo_inicial);
-        let botoes = `<button class="btn btn-outline-secondary btn-sm" data-action="editar-conta" data-id="${conta.id}" title="Editar"><i class="fas fa-edit"></i></button>
-                      <button class="btn btn-outline-danger btn-sm" data-action="deletar-conta" data-id="${conta.id}" title="Deletar"><i class="fas fa-trash"></i></button>`;
+        
+        let acoesEspecificas = '';
         if (conta.tipo === 'Cartão de Crédito') {
-            botoes = `<button class="btn btn-outline-info btn-sm" data-action="ver-fatura" data-id="${conta.id}" title="Ver Fatura"><i class="fas fa-file-invoice"></i></button>` + botoes;
+            acoesEspecificas = `<button class="btn btn-outline-info btn-sm" data-action="ver-fatura" data-id="${conta.id}" title="Ver Fatura"><i class="fas fa-file-invoice"></i></button>`;
+        } else if (conta.tipo === 'Conta Corrente' || conta.tipo === 'Dinheiro' || conta.tipo === 'Poupança') {
+            acoesEspecificas = `<button class="btn btn-outline-info btn-sm" data-action="ver-extrato" data-id="${conta.id}" title="Ver Extrato"><i class="fas fa-list-alt"></i></button>`;
         }
+
+        const botoesGerais = `<button class="btn btn-outline-secondary btn-sm" data-action="editar-conta" data-id="${conta.id}" title="Editar"><i class="fas fa-edit"></i></button>
+                              <button class="btn btn-outline-danger btn-sm" data-action="deletar-conta" data-id="${conta.id}" title="Deletar"><i class="fas fa-trash"></i></button>`;
+
         return `<li class="list-group-item d-flex justify-content-between align-items-center">
                     <div>
                         <div class="fw-bold">${conta.nome}</div>
@@ -101,7 +107,10 @@ export const renderContas = () => {
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <span class="fw-bold ${saldo >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldo)}</span>
-                        <div class="btn-group">${botoes}</div>
+                        <div class="btn-group">
+                            ${acoesEspecificas}
+                            ${botoesGerais}
+                        </div>
                     </div>
                 </li>`;
     }).join('');
@@ -582,6 +591,87 @@ export const renderStatementDetails = (contaId, mesSelecionado) => {
             </p>
         </div>
         <div class="accordion mt-3">
+            ${itemsHtml}
+        </div>`;
+};
+
+export const getAccountStatementModalContent = (contaId) => {
+    const conta = getContaPorId(contaId);
+    if (!conta) return { title: 'Erro', body: 'Conta não encontrada.' };
+
+    const title = `Extrato - ${conta.nome}`;
+    const { transacoes } = getState();
+
+    const mesesDisponiveis = [...new Set(
+        transacoes
+            .filter(t => t.conta_id === contaId)
+            .map(t => t.data.substring(0, 7))
+    )].sort().reverse();
+
+    const options = mesesDisponiveis.map(mes => {
+        const [ano, mesNum] = mes.split('-');
+        const data = new Date(ano, mesNum - 1);
+        const nomeMes = data.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        return `<option value="${mes}">${nomeMes}</option>`;
+    }).join('');
+
+    const body = `
+        <div class="mb-3">
+            <label for="account-statement-month-select" class="form-label">Selecione o Mês:</label>
+            <select id="account-statement-month-select" class="form-select" data-conta-id="${contaId}">
+                <option value="">Selecione...</option>
+                ${options}
+            </select>
+        </div>
+        <div id="account-statement-details-container" class="mt-4">
+            <p class="text-center text-body-secondary">Selecione um mês para ver os detalhes do extrato.</p>
+        </div>`;
+    
+    return { title, body };
+};
+
+export const renderAccountStatementDetails = (contaId, mesSelecionado) => {
+    const container = document.getElementById('account-statement-details-container');
+    if (!container) return;
+
+    if (!mesSelecionado) {
+        container.innerHTML = '<p class="text-center text-body-secondary">Selecione um mês para ver os detalhes.</p>';
+        return;
+    }
+
+    const conta = getContaPorId(contaId);
+    const { transacoes } = getState();
+    const [ano, mes] = mesSelecionado.split('-').map(Number);
+    const inicioDoMes = new Date(ano, mes - 1, 1);
+
+    const transacoesAnteriores = transacoes.filter(t => {
+        const dataTransacao = new Date(t.data + 'T12:00:00');
+        return t.conta_id === contaId && dataTransacao < inicioDoMes;
+    });
+    const saldoAnterior = transacoesAnteriores.reduce((acc, t) => {
+        return t.tipo === 'receita' ? acc + t.valor : acc - t.valor;
+    }, conta.saldo_inicial);
+
+    const transacoesDoMes = transacoes
+        .filter(t => t.conta_id === contaId && t.data.startsWith(mesSelecionado))
+        .sort((a, b) => new Date(a.data) - new Date(b.data));
+
+    const totalEntradas = transacoesDoMes.filter(t => t.tipo === 'receita').reduce((acc, t) => acc + t.valor, 0);
+    const totalSaidas = transacoesDoMes.filter(t => t.tipo === 'despesa').reduce((acc, t) => acc + t.valor, 0);
+    const saldoFinal = saldoAnterior + totalEntradas - totalSaidas;
+
+    const itemsHtml = transacoesDoMes.length ?
+        transacoesDoMes.map(renderTransactionCard).join('') :
+        '<p class="text-center text-body-secondary p-3">Nenhuma transação neste mês.</p>';
+
+    container.innerHTML = `
+        <ul class="list-group list-group-flush mb-3">
+            <li class="list-group-item d-flex justify-content-between"><span>Saldo Anterior:</span> <span>${formatarMoeda(saldoAnterior)}</span></li>
+            <li class="list-group-item d-flex justify-content-between"><span>Total de Entradas:</span> <span class="income-text">${formatarMoeda(totalEntradas)}</span></li>
+            <li class="list-group-item d-flex justify-content-between"><span>Total de Saídas:</span> <span class="expense-text">${formatarMoeda(totalSaidas)}</span></li>
+            <li class="list-group-item d-flex justify-content-between fw-bold"><span>Saldo Final:</span> <span>${formatarMoeda(saldoFinal)}</span></li>
+        </ul>
+        <div class="accordion">
             ${itemsHtml}
         </div>`;
 };
