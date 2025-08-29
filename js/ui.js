@@ -207,7 +207,7 @@ export const renderVisaoMensal = () => {
         chart: { type: 'donut', height: 250 },
         colors: CHART_COLORS,
         legend: { position: 'bottom' },
-        theme: { mode: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light' },
+        theme: { mode: document.documentElement.getAttribute('data-theme') === 'dark' || document.documentElement.getAttribute('data-theme') === 'nordic-night' ? 'dark' : 'light' },
         responsive: [{ breakpoint: 480, options: { chart: { width: 200 }, legend: { position: 'bottom' } } }]
     };
 
@@ -215,7 +215,7 @@ export const renderVisaoMensal = () => {
         summaryChart = new ApexCharts(document.querySelector("#summary-chart-monthly"), options);
         summaryChart.render();
     } else {
-        document.querySelector("#summary-chart-monthly").innerHTML = '<p class="text-center text-body-secondary p-5">Sem despesas no mês.</p>';
+        container.querySelector("#summary-chart-monthly").innerHTML = '<p class="text-center text-body-secondary p-5">Sem despesas no mês.</p>';
     }
 };
 
@@ -242,7 +242,7 @@ export const renderVisaoAnual = () => {
         yaxis: { labels: { formatter: (val) => `R$ ${val.toFixed(0)}` } },
         colors: [getComputedStyle(document.documentElement).getPropertyValue('--income-color').trim(), getComputedStyle(document.documentElement).getPropertyValue('--expense-color').trim()],
         legend: { position: 'top' },
-        theme: { mode: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light' }
+        theme: { mode: document.documentElement.getAttribute('data-theme') === 'dark' || document.documentElement.getAttribute('data-theme') === 'nordic-night' ? 'dark' : 'light' }
     };
 
     annualChart = new ApexCharts(document.querySelector("#annual-chart"), options);
@@ -394,7 +394,7 @@ export const renderLancamentosFuturos = (page = 1, filters) => {
         .filter(l => (filters.mes === 'todos' || !filters.mes) || l.data_vencimento.startsWith(filters.mes))
         .filter(l => {
             if (filters.contaId === 'todas' || !filters.contaId) return true;
-            if (!l.compra_parcelada_id) return true; // TODO: Melhorar esta lógica se lançamentos futuros puderem ter conta
+            if (!l.compra_parcelada_id) return true; 
             const compra = comprasParceladas.find(c => c.id === l.compra_parcelada_id);
             return compra && compra.conta_id == filters.contaId;
         })
@@ -539,9 +539,7 @@ export const getStatementModalContent = (contaId) => {
     if (!conta) return { title: 'Erro', body: 'Conta não encontrada.' };
     const title = `Fatura - ${conta.nome}`;
     const { transacoes, lancamentosFuturos, comprasParceladas } = getState();
-    const mesesDeTransacoes = transacoes
-        .filter(t => t.conta_id === contaId)
-        .map(t => t.data.substring(0, 7));
+    const mesesDeTransacoes = transacoes.filter(t => t.conta_id === contaId).map(t => t.data.substring(0, 7));
     const mesesDeLancamentos = lancamentosFuturos
         .filter(l => {
             if (!l.compra_parcelada_id) return false;
@@ -557,16 +555,8 @@ export const getStatementModalContent = (contaId) => {
         return `<option value="${mes}">${nomeMes}</option>`;
     }).join('');
     const body = `
-        <div class="mb-3">
-            <label for="statement-month-select" class="form-label">Selecione a Fatura:</label>
-            <select id="statement-month-select" class="form-select" data-conta-id="${contaId}">
-                <option value="">Selecione...</option>
-                ${options}
-            </select>
-        </div>
-        <div id="statement-details-container" class="mt-4">
-            <p class="text-center text-body-secondary">Selecione um mês para ver os detalhes da fatura.</p>
-        </div>`;
+        <div class="mb-3"><label for="statement-month-select" class="form-label">Selecione a Fatura:</label><select id="statement-month-select" class="form-select" data-conta-id="${contaId}"><option value="">Selecione...</option>${options}</select></div>
+        <div id="statement-details-container" class="mt-4"><p class="text-center text-body-secondary">Selecione um mês para ver os detalhes da fatura.</p></div>`;
     return { title, body };
 };
 
@@ -586,10 +576,7 @@ export const renderStatementDetails = (contaId, mesSelecionado) => {
     inicioCiclo.setMonth(inicioCiclo.getMonth() - 1);
     const transacoesFatura = transacoesCompletas.filter(t => {
         const dataTransacao = new Date(t.data + 'T12:00:00');
-        return t.conta_id === contaId &&
-               dataTransacao > inicioCiclo &&
-               dataTransacao <= fimCiclo &&
-               t.tipo === 'despesa';
+        return t.conta_id === contaId && dataTransacao > inicioCiclo && dataTransacao <= fimCiclo && t.tipo === 'despesa';
     }).sort((a, b) => new Date(a.data) - new Date(b.data));
     const totalFatura = transacoesFatura.reduce((acc, t) => acc + t.valor, 0);
     const itemsHtml = transacoesFatura.length ? 
@@ -597,17 +584,10 @@ export const renderStatementDetails = (contaId, mesSelecionado) => {
         '<p class="text-center text-body-secondary p-3">Nenhuma despesa nesta fatura.</p>';
     container.innerHTML = `
         <div>
-            <h5 class="d-flex justify-content-between">
-                <span>Total da Fatura:</span>
-                <span class="expense-text">${formatarMoeda(totalFatura)}</span>
-            </h5>
-            <p class="text-body-secondary small">
-                Período de ${inicioCiclo.toLocaleDateString('pt-BR')} a ${fimCiclo.toLocaleDateString('pt-BR')}
-            </p>
+            <h5 class="d-flex justify-content-between"><span>Total da Fatura:</span><span class="expense-text">${formatarMoeda(totalFatura)}</span></h5>
+            <p class="text-body-secondary small">Período de ${inicioCiclo.toLocaleDateString('pt-BR')} a ${fimCiclo.toLocaleDateString('pt-BR')}</p>
         </div>
-        <div class="accordion mt-3">
-            ${itemsHtml}
-        </div>`;
+        <div class="accordion mt-3">${itemsHtml}</div>`;
 };
 
 export const getAccountStatementModalContent = (contaId) => {
@@ -615,11 +595,7 @@ export const getAccountStatementModalContent = (contaId) => {
     if (!conta) return { title: 'Erro', body: 'Conta não encontrada.' };
     const title = `Extrato - ${conta.nome}`;
     const { transacoes } = getState();
-    const mesesDisponiveis = [...new Set(
-        transacoes
-            .filter(t => t.conta_id === contaId)
-            .map(t => t.data.substring(0, 7))
-    )].sort().reverse();
+    const mesesDisponiveis = [...new Set(transacoes.filter(t => t.conta_id === contaId).map(t => t.data.substring(0, 7)))].sort().reverse();
     const options = mesesDisponiveis.map(mes => {
         const [ano, mesNum] = mes.split('-');
         const data = new Date(ano, mesNum - 1);
@@ -627,16 +603,8 @@ export const getAccountStatementModalContent = (contaId) => {
         return `<option value="${mes}">${nomeMes}</option>`;
     }).join('');
     const body = `
-        <div class="mb-3">
-            <label for="account-statement-month-select" class="form-label">Selecione o Mês:</label>
-            <select id="account-statement-month-select" class="form-select" data-conta-id="${contaId}">
-                <option value="">Selecione...</option>
-                ${options}
-            </select>
-        </div>
-        <div id="account-statement-details-container" class="mt-4">
-            <p class="text-center text-body-secondary">Selecione um mês para ver os detalhes do extrato.</p>
-        </div>`;
+        <div class="mb-3"><label for="account-statement-month-select" class="form-label">Selecione o Mês:</label><select id="account-statement-month-select" class="form-select" data-conta-id="${contaId}"><option value="">Selecione...</option>${options}</select></div>
+        <div id="account-statement-details-container" class="mt-4"><p class="text-center text-body-secondary">Selecione um mês para ver os detalhes do extrato.</p></div>`;
     return { title, body };
 };
 
