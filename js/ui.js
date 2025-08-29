@@ -500,12 +500,21 @@ export const getStatementModalContent = (contaId) => {
     if (!conta) return { title: 'Erro', body: 'Conta não encontrada.' };
 
     const title = `Fatura - ${conta.nome}`;
-    const { transacoes } = getState();
-    const mesesDisponiveis = [...new Set(
-        transacoes
-            .filter(t => t.conta_id === contaId)
-            .map(t => t.data.substring(0, 7))
-    )].sort().reverse();
+    const { transacoes, lancamentosFuturos, comprasParceladas } = getState();
+
+    const mesesDeTransacoes = transacoes
+        .filter(t => t.conta_id === contaId)
+        .map(t => t.data.substring(0, 7));
+
+    const mesesDeLancamentos = lancamentosFuturos
+        .filter(l => {
+            if (!l.compra_parcelada_id) return false;
+            const compra = comprasParceladas.find(c => c.id === l.compra_parcelada_id);
+            return compra && compra.conta_id === contaId;
+        })
+        .map(l => l.data_vencimento.substring(0, 7));
+
+    const mesesDisponiveis = [...new Set([...mesesDeTransacoes, ...mesesDeLancamentos])].sort().reverse();
 
     const options = mesesDisponiveis.map(mes => {
         const [ano, mesNum] = mes.split('-');
@@ -534,20 +543,21 @@ export const renderStatementDetails = (contaId, mesSelecionado) => {
     if (!container) return;
 
     if (!mesSelecionado) {
-        container.innerHTML = '<p class="text-center text-body-secondary">Selecione um mês para ver os detalhes da fatura.</p>';
+        container.innerHTML = '<p class="text-center text-body-secondary">Selecione um mês para ver os detalhes.</p>';
         return;
     }
 
     const conta = getContaPorId(contaId);
-    const { transacoes } = getState();
+    const transacoesCompletas = [...getState().transacoes, ...gerarTransacoesVirtuais()];
     const diaFechamento = conta.dia_fechamento_cartao || 28;
 
     const [ano, mes] = mesSelecionado.split('-').map(Number);
-    const fimCiclo = new Date(ano, mes - 1, diaFechamento);
+    
+    const fimCiclo = new Date(ano, mes - 1, diaFechamento, 12);
     const inicioCiclo = new Date(fimCiclo);
     inicioCiclo.setMonth(inicioCiclo.getMonth() - 1);
 
-    const transacoesFatura = transacoes.filter(t => {
+    const transacoesFatura = transacoesCompletas.filter(t => {
         const dataTransacao = new Date(t.data + 'T12:00:00');
         return t.conta_id === contaId &&
                dataTransacao > inicioCiclo &&
