@@ -128,7 +128,17 @@ export const renderFormTransacaoRapida = () => {
             </select>
         </div>
         <div class="mb-3"><label class="form-label">Descrição</label><input type="text" name="descricao" class="form-control form-control-sm" required></div>
-        <div class="mb-3"><label id="label-valor" class="form-label">Valor</label><input type="number" name="valor" step="0.01" class="form-control form-control-sm" required></div>
+        
+        <div class="mb-3">
+            <label for="tipo-transacao" class="form-label">Tipo</label>
+            <select id="tipo-transacao" name="tipo" class="form-select form-select-sm">
+                <option value="despesa" selected>Despesa (Débito)</option>
+                <option value="receita">Receita (Crédito)</option>
+            </select>
+        </div>
+
+        <div class="mb-3"><label id="label-valor" class="form-label">Valor</label><input type="number" name="valor" min="0" step="0.01" class="form-control form-control-sm" required></div>
+        
         <div class="mb-3" id="group-data"><label id="label-data" class="form-label">Data</label><input type="date" name="data" value="${toISODateString(new Date())}" class="form-control form-control-sm" required></div>
         <div class="mb-3" id="group-conta"><label id="label-conta" class="form-label">Conta</label><select name="conta_id" class="form-select form-select-sm" required>${contasOptions}</select></div>
         
