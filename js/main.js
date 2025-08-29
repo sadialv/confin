@@ -33,6 +33,11 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const id = form.dataset.id;
             const data = Object.fromEntries(new FormData(form));
+            // Converte o saldo inicial para número
+            data.saldo_inicial = parseFloat(data.saldo_inicial);
+            if(data.dia_fechamento_cartao) {
+                data.dia_fechamento_cartao = parseInt(data.dia_fechamento_cartao);
+            }
             const saved = await API.salvarDados('contas', data, id);
             const state = State.getState();
             const newContas = id ? state.contas.map(c => c.id == saved.id ? saved : c) : [...state.contas, saved];
@@ -228,22 +233,51 @@ document.addEventListener('DOMContentLoaded', () => {
             const compraId = parseInt(target.dataset.compraId);
 
             switch (action) {
-                case 'editar-conta': UI.openModal(UI.getAccountModalContent(id)); break;
-                case 'deletar-conta': deletarConta(id); break;
-                case 'ver-fatura': UI.showToast('Função "Ver Fatura" não implementada.', 'error'); break;
-                case 'pagar-conta': UI.openModal(UI.getPayBillModalContent(id)); break;
-                case 'editar-lancamento': UI.openModal(UI.getBillModalContent(id)); break;
-                case 'deletar-lancamento': deletarLancamento(id, compraId); break;
+                case 'editar-conta': 
+                    UI.openModal(UI.getAccountModalContent(id)); 
+                    break;
+                case 'deletar-conta': 
+                    deletarConta(id); 
+                    break;
+                case 'ver-fatura':
+                    UI.openModal(UI.getStatementModalContent(id));
+                    document.getElementById('statement-month-select')?.addEventListener('change', (e) => {
+                        const contaId = parseInt(e.target.dataset.contaId);
+                        const mesSelecionado = e.target.value;
+                        UI.renderStatementDetails(contaId, mesSelecionado);
+                    });
+                    break;
+                case 'pagar-conta': 
+                    UI.openModal(UI.getPayBillModalContent(id)); 
+                    break;
+                case 'editar-lancamento': 
+                    UI.openModal(UI.getBillModalContent(id)); 
+                    break;
+                case 'deletar-lancamento': 
+                    deletarLancamento(id, compraId); 
+                    break;
                 case 'recriar-compra-parcelada':
                     const compra = State.getState().comprasParceladas.find(c => c.id === id);
                     if (compra) UI.openModal(UI.getInstallmentPurchaseModalContent(compra));
                     break;
-                case 'editar-transacao': UI.openModal(UI.getTransactionModalContent(id)); break;
-                case 'deletar-transacao': deletarTransacao(id); break;
+                case 'editar-transacao': 
+                    UI.openModal(UI.getTransactionModalContent(id)); 
+                    break;
+                case 'deletar-transacao': 
+                    deletarTransacao(id); 
+                    break;
             }
         });
 
         document.body.addEventListener('change', e => {
+            if (e.target.id === 'conta-tipo') {
+                const isCreditCard = e.target.value === 'Cartão de Crédito';
+                const cartaoFields = document.getElementById('cartao-credito-fields');
+                if (cartaoFields) {
+                    cartaoFields.style.display = isCreditCard ? 'block' : 'none';
+                }
+            }
+
             if (e.target.id === 'tipo-compra') {
                 const tipo = e.target.value;
                 const form = e.target.closest('form');
