@@ -3,6 +3,8 @@ import { getState, getContaPorId, getContas } from './state.js';
 
 let summaryChart = null;
 let annualChart = null;
+let netWorthChart = null;
+let avgSpendingChart = null;
 const ITEMS_PER_PAGE = 10;
 
 // --- FUNÇÕES GERAIS DE UI ---
@@ -71,140 +73,298 @@ export const renderAllComponents = (initialFilters) => {
     renderFormTransacaoRapida();
     renderVisaoMensal();
     renderVisaoAnual();
-    renderFinancialAnalysis(); // <-- FUNÇÃO ADICIONADA AQUI
+    renderFinancialHealth(); // NOVA FUNÇÃO DE RENDERIZAÇÃO
     renderFilters('bills', initialFilters.bills);
     renderLancamentosFuturos(1, initialFilters.bills);
     renderFilters('history', initialFilters.history);
     renderHistoricoTransacoes(1, initialFilters.history);
 };
 
-// --- LÓGICA DE CÁLCULO DAS MÉTRICAS FINANCEIRAS ---
-const calculateFinancialMetrics = () => {
+// --- NOVA CENTRAL DE CÁLCULOS FINANCEIROS ---
+const calculateFinancialHealthMetrics = () => {
     const { contas, transacoes, lancamentosFuturos } = getState();
-    const mesAtual = new Date().toISOString().slice(0, 7);
+    const hoje = new Date();
+    const mesAtual = hoje.toISOString().slice(0, 7);
 
-    // 1. Ativos e Dívidas
+    // 1. CÁLCULO DE PATRIMÔNIO LÍQUIDO
     let totalAtivos = 0;
-    let totalDividasCartoes = 0;
-
+    let totalPassivos = 0;
+    
     contas.forEach(conta => {
         const saldoConta = transacoes
             .filter(t => t.conta_id === conta.id)
             .reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, conta.saldo_inicial);
             
         if (conta.tipo !== 'Cartão de Crédito') {
-            totalAtivos += saldoConta;
+            totalAtivos += saldoConta > 0 ? saldoConta : 0;
         } else {
-            // Saldo de cartão de crédito é negativo, representa uma dívida
-            if (saldoConta < 0) {
-                totalDividasCartoes += Math.abs(saldoConta);
-            }
+            if (saldoConta < 0) totalPassivos += Math.abs(saldoConta);
         }
     });
-
-    const totalDividasFuturas = lancamentosFuturos
+    totalPassivos += lancamentosFuturos
         .filter(l => l.status === 'pendente' && l.tipo === 'a_pagar')
         .reduce((acc, l) => acc + l.valor, 0);
+    
+    const patrimonioLiquido = totalAtivos - totalPassivos;
 
-    const totalDividas = totalDividasCartoes + totalDividasFuturas;
-    const grauEndividamento = totalAtivos > 0 ? (totalDividas / totalAtivos) * 100 : 0;
-
-    // 2. Renda e Despesas Mensais (mês atual)
+    // 2. DIAGNÓSTICO DO MÊS ATUAL
     const transacoesMes = transacoes.filter(t => t.data?.startsWith(mesAtual));
-    const rendaMensal = transacoesMes
-        .filter(t => t.tipo === 'receita')
-        .reduce((acc, t) => acc + t.valor, 0);
-    const despesasMensais = transacoesMes
-        .filter(t => t.tipo === 'despesa')
-        .reduce((acc, t) => acc + t.valor, 0);
+    const rendaMensal = transacoesMes.filter(t => t.tipo === 'receita').reduce((acc, t) => acc + t.valor, 0);
+    
+    const catsFixas = ['Moradia', 'Contas', 'Educação', 'Saúde', 'Transporte'];
+    const catsVariaveis = ['Alimentação', 'Lazer', 'Compras', 'Outros'];
+    
+    const despesasFixas = transacoesMes.filter(t => t.tipo === 'despesa' && catsFixas.includes(t.categoria)).reduce((acc, t) => acc + t.valor, 0);
+    const despesasVariaveis = transacoesMes.filter(t => t.tipo === 'despesa' && catsVariaveis.includes(t.categoria)).reduce((acc, t) => acc + t.valor, 0);
+    const pagamentoFaturas = transacoesMes.filter(t => t.tipo === 'despesa' && t.categoria === 'Pagamento de Fatura').reduce((acc, t) => acc + t.valor, 0);
+    const totalDespesas = despesasFixas + despesasVariaveis + pagamentoFaturas;
+    const saldoMensal = rendaMensal - totalDespesas;
 
-    // 3. Taxa de Poupança
-    const taxaPoupanca = rendaMensal > 0 ? ((rendaMensal - despesasMensais) / rendaMensal) * 100 : 0;
+    // 3. INDICADORES
+    const indiceEndividamento = totalAtivos > 0 ? (totalPassivos / totalAtivos) * 100 : 0;
+    const comprometimentoRenda = rendaMensal > 0 ? (pagamentoFaturas / rendaMensal) * 100 : 0;
+    const reservaEmergenciaMeses = despesasFixas > 0 ? (totalAtivos / despesasFixas) : Infinity;
+    const taxaPoupanca = rendaMensal > 0 ? (saldoMensal / rendaMensal) * 100 : 0;
 
-    // 4. Autonomia Financeira (Reserva de Emergência)
-    const autonomiaFinanceira = despesasMensais > 0 ? totalAtivos / despesasMensais : Infinity; // Em meses
+    // 4. REGRA 50-30-20
+    const catsNecessidades = ['Moradia', 'Contas', 'Educação', 'Saúde', 'Transporte', 'Alimentação'];
+    const catsDesejos = ['Lazer', 'Compras', 'Outros'];
+    const gastosNecessidades = transacoesMes.filter(t => t.tipo === 'despesa' && catsNecessidades.includes(t.categoria)).reduce((acc, t) => acc + t.valor, 0);
+    const gastosDesejos = transacoesMes.filter(t => t.tipo === 'despesa' && catsDesejos.includes(t.categoria)).reduce((acc, t) => acc + t.valor, 0);
+    
+    const percNecessidades = rendaMensal > 0 ? (gastosNecessidades / rendaMensal) * 100 : 0;
+    const percDesejos = rendaMensal > 0 ? (gastosDesejos / rendaMensal) * 100 : 0;
+    const percPoupanca = taxaPoupanca;
 
-    // 5. Ponto de Equilíbrio (baseado em despesas fixas)
-    const categoriasFixas = ['Moradia', 'Contas', 'Educação', 'Saúde', 'Pagamento de Fatura'];
-    const despesasFixasMensais = transacoesMes
-        .filter(t => t.tipo === 'despesa' && categoriasFixas.includes(t.categoria))
-        .reduce((acc, t) => acc + t.valor, 0);
+    // 5. SCORE DE SAÚDE FINANCEIRA (Modelo Simples)
+    const scorePoupanca = Math.min(100, Math.max(0, (taxaPoupanca / 20) * 100)); // 20% = nota 100
+    const scoreEndividamento = Math.min(100, Math.max(0, (1 - (indiceEndividamento / 50)) * 100)); // 50% = nota 0
+    const scoreReserva = Math.min(100, Math.max(0, (reservaEmergenciaMeses / 6) * 100)); // 6 meses = nota 100
+    const financialScore = (scorePoupanca * 0.4) + (scoreEndividamento * 0.4) + (scoreReserva * 0.2);
+
+    // 6. DADOS HISTÓRICOS PARA GRÁFICOS
+    let evolucaoPatrimonio = {};
+    let gastosPorCategoria = {};
+    let meses = new Set();
+    
+    transacoes.forEach(t => {
+        const mes = t.data.substring(0, 7);
+        meses.add(mes);
+        if (t.tipo === 'despesa') {
+            gastosPorCategoria[t.categoria] = (gastosPorCategoria[t.categoria] || 0) + t.valor;
+        }
+    });
+    const numMeses = meses.size || 1;
+    const mediaGastosCategoria = Object.entries(gastosPorCategoria)
+        .map(([categoria, total]) => ({ categoria, media: total / numMeses }))
+        .sort((a,b) => b.media - a.media);
+    
+    // Simulação simplificada da evolução do patrimônio
+    const historicoPatrimonio = Array.from(meses).sort().slice(-12).map(mes => {
+        const transacoesAteMes = transacoes.filter(t => t.data.substring(0,7) <= mes);
+        let ativos = 0, passivos = 0;
+        contas.forEach(c => {
+            const saldo = transacoesAteMes.filter(t => t.conta_id === c.id).reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, c.saldo_inicial);
+            if (c.tipo !== 'Cartão de Crédito') ativos += saldo > 0 ? saldo : 0;
+            else if (saldo < 0) passivos += Math.abs(saldo);
+        });
+        return { mes, valor: ativos - passivos };
+    });
 
     return {
-        grauEndividamento,
-        taxaPoupanca,
-        autonomiaFinanceira,
-        pontoEquilibrio: despesasFixasMensais
+        rendaMensal, despesasFixas, despesasVariaveis, saldoMensal, totalDespesas,
+        totalAtivos, totalPassivos, patrimonioLiquido,
+        indiceEndividamento, comprometimentoRenda, reservaEmergenciaMeses, taxaPoupanca,
+        percNecessidades, percDesejos, percPoupanca,
+        financialScore,
+        mediaGastosCategoria,
+        historicoPatrimonio
     };
 };
 
-// --- RENDERIZAÇÃO DAS NOVAS ANÁLISES FINANCEIRAS ---
-export const renderFinancialAnalysis = () => {
-    const container = document.getElementById('financial-analysis-container');
+// --- NOVA FUNÇÃO DE RENDERIZAÇÃO DA SAÚDE FINANCEIRA ---
+export const renderFinancialHealth = () => {
+    const container = document.getElementById('health-tab-pane');
     if (!container) return;
 
-    const metrics = calculateFinancialMetrics();
+    const metrics = calculateFinancialHealthMetrics();
 
-    const formatarAutonomia = (meses) => {
-        if (meses === Infinity || meses < 0) return '<div><i class="fas fa-infinity fa-2x text-success"></i></div><div class="fw-bold">N/A</div>';
-        if (meses >= 24) {
-             return `<div class="h3 text-success">${(meses/12).toFixed(1)}</div><div class="fw-bold">anos</div>`;
-        }
-        return `<div class="h3">${meses.toFixed(1)}</div><div class="fw-bold">mes(es)</div>`;
-    };
+    const scoreColor = metrics.financialScore >= 75 ? 'success' : metrics.financialScore >= 40 ? 'warning' : 'danger';
 
     container.innerHTML = `
         <div class="row">
-            <div class="col-md-6 col-lg-3 mb-3 mb-lg-0">
-                <div class="card h-100 text-center">
-                    <div class="card-body d-flex flex-column justify-content-center">
-                        <h6 class="card-title text-body-secondary">Taxa de Poupança</h6>
-                        <div class="progress my-2" style="height: 20px;" title="${metrics.taxaPoupanca.toFixed(0)}% de sua renda foi poupada este mês">
-                            <div class="progress-bar ${metrics.taxaPoupanca >= 20 ? 'bg-success' : (metrics.taxaPoupanca > 0 ? 'bg-warning' : 'bg-danger')}" role="progressbar" style="width: ${Math.max(0, metrics.taxaPoupanca)}%;" aria-valuenow="${metrics.taxaPoupanca.toFixed(0)}">${metrics.taxaPoupanca.toFixed(0)}%</div>
+            <div class="col-12">
+                <div class="card mb-3">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Score de Saúde Financeira</h5>
+                        <div class="progress mx-auto my-3" style="height: 25px; max-width: 400px;">
+                            <div class="progress-bar bg-${scoreColor}" role="progressbar" style="width: ${metrics.financialScore.toFixed(0)}%;" aria-valuenow="${metrics.financialScore.toFixed(0)}">${metrics.financialScore.toFixed(0)} / 100</div>
                         </div>
-                        <small class="text-body-secondary">Ideal: Acima de 20%</small>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-3 mb-3 mb-lg-0">
-                <div class="card h-100 text-center">
-                    <div class="card-body d-flex flex-column justify-content-center">
-                        <h6 class="card-title text-body-secondary">Grau de Endividamento</h6>
-                        <div class="progress my-2" style="height: 20px;" title="${metrics.grauEndividamento.toFixed(0)}% dos seus ativos estão comprometidos com dívidas">
-                            <div class="progress-bar ${metrics.grauEndividamento <= 40 ? 'bg-success' : (metrics.grauEndividamento <= 70 ? 'bg-warning' : 'bg-danger')}" role="progressbar" style="width: ${Math.min(100, metrics.grauEndividamento)}%;" aria-valuenow="${metrics.grauEndividamento.toFixed(0)}">${metrics.grauEndividamento.toFixed(0)}%</div>
-                        </div>
-                        <small class="text-body-secondary">Ideal: Abaixo de 40%</small>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-3 mb-3 mb-md-0">
-                <div class="card h-100 text-center">
-                    <div class="card-body d-flex flex-column justify-content-center">
-                        <h6 class="card-title text-body-secondary">Ponto de Equilíbrio</h6>
-                        <p class="h4 my-2" title="Renda mínima para cobrir custos fixos">${formatarMoeda(metrics.pontoEquilibrio)}</p>
-                        <small class="text-body-secondary">Custo Fixo Mensal</small>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-3">
-                <div class="card h-100 text-center">
-                    <div class="card-body d-flex flex-column justify-content-center">
-                        <h6 class="card-title text-body-secondary">Autonomia Financeira</h6>
-                        <div class="my-2" title="Tempo que seus ativos cobririam suas despesas mensais">${formatarAutonomia(metrics.autonomiaFinanceira)}</div>
-                        <small class="text-body-secondary">Reserva de Emergência</small>
+                        <p class="small text-body-secondary">Uma nota geral baseada na sua poupança, dívidas e reservas.</p>
                     </div>
                 </div>
             </div>
         </div>
+
+        <div class="row">
+            <div class="col-lg-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-header"><h6 class="mb-0">Diagnóstico do Mês</h6></div>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between"><span>Renda Total</span> <strong class="income-text">${formatarMoeda(metrics.rendaMensal)}</strong></li>
+                        <li class="list-group-item d-flex justify-content-between"><span>Despesas Fixas</span> <span>${formatarMoeda(metrics.despesasFixas)}</span></li>
+                        <li class="list-group-item d-flex justify-content-between"><span>Despesas Variáveis</span> <span>${formatarMoeda(metrics.despesasVariaveis)}</span></li>
+                        <li class="list-group-item d-flex justify-content-between"><span>Total Despesas</span> <strong class="expense-text">${formatarMoeda(metrics.totalDespesas)}</strong></li>
+                        <li class="list-group-item d-flex justify-content-between"><span>Saldo Mensal</span> <strong class="${metrics.saldoMensal >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(metrics.saldoMensal)}</strong></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="col-lg-4 mb-3">
+                 <div class="card h-100">
+                    <div class="card-header"><h6 class="mb-0">Patrimônio Líquido</h6></div>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between"><span>Ativos</span> <span class="text-success">${formatarMoeda(metrics.totalAtivos)}</span></li>
+                        <li class="list-group-item d-flex justify-content-between"><span>Passivos (Dívidas)</span> <span class="text-danger">${formatarMoeda(metrics.totalPassivos)}</span></li>
+                        <li class="list-group-item d-flex justify-content-between"><strong>Patrimônio Líquido</strong> <strong>${formatarMoeda(metrics.patrimonioLiquido)}</strong></li>
+                    </ul>
+                    <div class="card-body">
+                        <h6 class="small">Índice de Endividamento</h6>
+                        <div class="progress"><div class="progress-bar bg-danger" role="progressbar" style="width: ${metrics.indiceEndividamento.toFixed(0)}%">${metrics.indiceEndividamento.toFixed(0)}%</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-header"><h6 class="mb-0">Indicadores Chave</h6></div>
+                    <div class="card-body text-center">
+                        <h6>Reserva de Emergência</h6>
+                        <p class="h3 ${metrics.reservaEmergenciaMeses >= 6 ? 'text-success' : 'text-warning'}">${isFinite(metrics.reservaEmergenciaMeses) ? metrics.reservaEmergenciaMeses.toFixed(1) : '∞'} meses</p>
+                        <hr>
+                        <h6>Taxa de Poupança</h6>
+                        <p class="h4 ${metrics.taxaPoupanca >= 20 ? 'text-success' : 'text-warning'}">${metrics.taxaPoupanca.toFixed(1)}%</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-3">
+            <div class="card-header"><h6 class="mb-0">Equilíbrio de Gastos (Regra 50-30-20)</h6></div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <label class="form-label small d-flex justify-content-between">Necessidades (Ideal: 50%) <span>${metrics.percNecessidades.toFixed(0)}%</span></label>
+                    <div class="progress"><div class="progress-bar" role="progressbar" style="width: ${metrics.percNecessidades.toFixed(0)}%"></div></div>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small d-flex justify-content-between">Desejos (Ideal: 30%) <span>${metrics.percDesejos.toFixed(0)}%</span></label>
+                    <div class="progress"><div class="progress-bar bg-warning" role="progressbar" style="width: ${metrics.percDesejos.toFixed(0)}%"></div></div>
+                </div>
+                <div>
+                    <label class="form-label small d-flex justify-content-between">Poupança (Ideal: 20%) <span>${metrics.percPoupanca.toFixed(0)}%</span></label>
+                    <div class="progress"><div class="progress-bar bg-success" role="progressbar" style="width: ${metrics.percPoupanca.toFixed(0)}%"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-6 mb-3">
+                <div class="card h-100">
+                    <div class="card-header"><h6 class="mb-0">Evolução do Patrimônio</h6></div>
+                    <div class="card-body"><canvas id="net-worth-chart"></canvas></div>
+                </div>
+            </div>
+            <div class="col-lg-6 mb-3">
+                <div class="card h-100">
+                    <div class="card-header"><h6 class="mb-0">Média de Gastos por Categoria</h6></div>
+                    <div class="card-body"><canvas id="avg-spending-chart"></canvas></div>
+                </div>
+            </div>
+        </div>
     `;
+
+    // Renderizar Gráfico de Evolução do Patrimônio
+    if (netWorthChart) netWorthChart.destroy();
+    const nwCtx = document.getElementById('net-worth-chart')?.getContext('2d');
+    if (nwCtx && metrics.historicoPatrimonio.length) {
+        netWorthChart = new Chart(nwCtx, {
+            type: 'line',
+            data: {
+                labels: metrics.historicoPatrimonio.map(h => h.mes),
+                datasets: [{
+                    label: 'Patrimônio Líquido',
+                    data: metrics.historicoPatrimonio.map(h => h.valor),
+                    borderColor: '#4A5568',
+                    tension: 0.1,
+                    fill: false
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    // Renderizar Gráfico de Média de Gastos
+    if (avgSpendingChart) avgSpendingChart.destroy();
+    const asCtx = document.getElementById('avg-spending-chart')?.getContext('2d');
+    if (asCtx && metrics.mediaGastosCategoria.length) {
+        const top5 = metrics.mediaGastosCategoria.slice(0, 5);
+        avgSpendingChart = new Chart(asCtx, {
+            type: 'bar',
+            data: {
+                labels: top5.map(item => item.categoria),
+                datasets: [{
+                    label: 'Média Mensal',
+                    data: top5.map(item => item.media),
+                    backgroundColor: CHART_COLORS
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y' }
+        });
+    }
 };
 
+// --- RENDERIZAÇÃO DE COMPONENTES LEGADOS (agora dentro do painel Visão Geral) ---
 
-// --- RENDERIZAÇÃO DE COMPONENTES ESPECÍFICOS ---
+export const renderVisaoMensal = () => {
+    const container = document.getElementById('dashboard-monthly-container');
+    if (!container) return;
+    const mes = new Date().toISOString().slice(0, 7);
+    const transacoesMes = [...getState().transacoes, ...gerarTransacoesVirtuais()].filter(t => t.data?.startsWith(mes));
+    const receitas = transacoesMes.filter(t => t.tipo === 'receita').reduce((s, t) => s + t.valor, 0);
+    const despesas = transacoesMes.filter(t => t.tipo === 'despesa').reduce((s, t) => s + t.valor, 0);
+    container.innerHTML = `
+        <h5 class="mb-3">Resumo do Mês</h5>
+        <div class="row text-center mb-3">
+            <div class="col-4"><h6>Receitas</h6><p class="h4 income-text mb-0">${formatarMoeda(receitas)}</p></div>
+            <div class="col-4"><h6>Despesas</h6><p class="h4 expense-text mb-0">${formatarMoeda(despesas)}</p></div>
+            <div class="col-4"><h6>Saldo</h6><p class="h4 ${(receitas-despesas) >= 0 ? 'income-text':'expense-text'} mb-0">${formatarMoeda(receitas-despesas)}</p></div>
+        </div>
+        <div style="height: 250px;"><canvas id="summary-chart-monthly"></canvas></div>`;
+    if (summaryChart) summaryChart.destroy();
+    const ctx = document.getElementById('summary-chart-monthly')?.getContext('2d');
+    const despesasPorCat = transacoesMes.filter(t=>t.tipo==='despesa').reduce((acc,t)=>{acc[t.categoria]=(acc[t.categoria]||0)+t.valor;return acc;},{});
+    if(ctx && Object.keys(despesasPorCat).length > 0) {
+        summaryChart = new Chart(ctx, {type:'doughnut',data:{labels:Object.keys(despesasPorCat),datasets:[{data:Object.values(despesasPorCat),backgroundColor:CHART_COLORS}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+    }
+};
 
+export const renderVisaoAnual = () => {
+    const container = document.getElementById('dashboard-yearly-container');
+    if (!container) return;
+    const ano = new Date().getFullYear();
+    const transacoesAno = [...getState().transacoes,...gerarTransacoesVirtuais()].filter(t => t.data?.startsWith(ano));
+    let receitasPorMes = Array(12).fill(0), despesasPorMes = Array(12).fill(0);
+    transacoesAno.forEach(t => {const mes = new Date(t.data+'T12:00:00').getMonth(); if(t.tipo==='receita') receitasPorMes[mes]+=t.valor; else despesasPorMes[mes]+=t.valor;});
+    container.innerHTML = `<h5 class="mb-3">Fluxo de Caixa Anual</h5><div style="height: 300px;"><canvas id="annual-chart"></canvas></div>`;
+    if(annualChart) annualChart.destroy();
+    const ctx = document.getElementById('annual-chart')?.getContext('2d');
+    if(ctx) {
+        annualChart = new Chart(ctx, {type:'bar',data:{labels:['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'],datasets:[{label:'Receitas',data:receitasPorMes,backgroundColor:'rgba(25,135,84,0.7)'},{label:'Despesas',data:despesasPorMes,backgroundColor:'rgba(220,53,69,0.7)'}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true}}}});
+    }
+};
+
+// O restante do arquivo (renderContas, renderFormTransacaoRapida, modais, etc.) continua aqui sem alterações...
+// ... (código omitido para brevidade, mas ele permanece no arquivo)
 export const renderContas = () => {
     const container = document.getElementById('accounts-container');
     const { contas, transacoes } = getState();
@@ -241,10 +401,6 @@ export const renderContas = () => {
     }).join('');
     container.innerHTML = `<ul class="list-group list-group-flush">${listHtml}</ul>`;
 };
-
-// O restante do arquivo ui.js continua aqui, sem alterações...
-// (renderFormTransacaoRapida, renderVisaoMensal, etc.)
-// ...
 
 export const renderFormTransacaoRapida = () => {
     const container = document.getElementById('form-transacao-unificada');
@@ -308,43 +464,6 @@ export const renderFormTransacaoRapida = () => {
     }
 };
 
-export const renderVisaoMensal = () => {
-    const container = document.getElementById('dashboard-monthly-pane');
-    if (!container) return;
-    const mes = new Date().toISOString().slice(0, 7);
-    const transacoesMes = [...getState().transacoes, ...gerarTransacoesVirtuais()].filter(t => t.data?.startsWith(mes));
-    const receitas = transacoesMes.filter(t => t.tipo === 'receita').reduce((s, t) => s + t.valor, 0);
-    const despesas = transacoesMes.filter(t => t.tipo === 'despesa').reduce((s, t) => s + t.valor, 0);
-    container.innerHTML = `
-        <div class="row text-center mb-3">
-            <div class="col-4"><h6>Receitas</h6><p class="h4 income-text mb-0">${formatarMoeda(receitas)}</p></div>
-            <div class="col-4"><h6>Despesas</h6><p class="h4 expense-text mb-0">${formatarMoeda(despesas)}</p></div>
-            <div class="col-4"><h6>Saldo</h6><p class="h4 ${(receitas-despesas) >= 0 ? 'income-text':'expense-text'} mb-0">${formatarMoeda(receitas-despesas)}</p></div>
-        </div>
-        <div style="height: 250px;"><canvas id="summary-chart-monthly"></canvas></div>`;
-    if (summaryChart) summaryChart.destroy();
-    const ctx = document.getElementById('summary-chart-monthly')?.getContext('2d');
-    const despesasPorCat = transacoesMes.filter(t=>t.tipo==='despesa').reduce((acc,t)=>{acc[t.categoria]=(acc[t.categoria]||0)+t.valor;return acc;},{});
-    if(ctx && Object.keys(despesasPorCat).length > 0) {
-        summaryChart = new Chart(ctx, {type:'doughnut',data:{labels:Object.keys(despesasPorCat),datasets:[{data:Object.values(despesasPorCat),backgroundColor:CHART_COLORS}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'right'}}}});
-    }
-};
-
-export const renderVisaoAnual = () => {
-    const container = document.getElementById('dashboard-yearly-pane');
-    if (!container) return;
-    const ano = new Date().getFullYear();
-    const transacoesAno = [...getState().transacoes,...gerarTransacoesVirtuais()].filter(t => t.data?.startsWith(ano));
-    let receitasPorMes = Array(12).fill(0), despesasPorMes = Array(12).fill(0);
-    transacoesAno.forEach(t => {const mes = new Date(t.data+'T12:00:00').getMonth(); if(t.tipo==='receita') receitasPorMes[mes]+=t.valor; else despesasPorMes[mes]+=t.valor;});
-    container.innerHTML = `<div style="height: 300px;"><canvas id="annual-chart"></canvas></div>`;
-    if(annualChart) annualChart.destroy();
-    const ctx = document.getElementById('annual-chart')?.getContext('2d');
-    if(ctx) {
-        annualChart = new Chart(ctx, {type:'bar',data:{labels:['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'],datasets:[{label:'Receitas',data:receitasPorMes,backgroundColor:'rgba(25,135,84,0.7)'},{label:'Despesas',data:despesasPorMes,backgroundColor:'rgba(220,53,69,0.7)'}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true}}}});
-    }
-};
-
 export const renderFilters = (type, currentFilters = {}) => {
     const container = document.getElementById(`${type}-filters-container`);
     if (!container) return;
@@ -404,7 +523,6 @@ const renderSummaryPanel = (containerId, items, type) => {
         </div>`;
 };
 
-// --- RENDERIZAÇÃO DAS LISTAS EM ACORDEÃO ---
 const renderBillItem = (bill, compras) => {
     const isParcela = !!bill.compra_parcelada_id;
     let cat = bill.categoria;
@@ -528,7 +646,6 @@ export const renderHistoricoTransacoes = (page = 1, filters) => {
     container.innerHTML = paginados.map(renderTransactionCard).join('');
 };
 
-// --- GERADORES DE CONTEÚDO PARA MODAL ---
 export const getAccountModalContent = (id = null) => {
     const conta = id ? getContaPorId(id) : {};
     const title = id ? 'Editar Conta' : 'Nova Conta';
