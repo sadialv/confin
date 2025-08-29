@@ -1,40 +1,49 @@
 /* =================================
-   VARIÁVEIS GLOBAIS E TEMA
+   NOVA PALETA DE CORES E TEMA
    ================================= */
+:root {
+    --primary-color: #4A5568; /* Cinza-azulado escuro para destaque */
+    --background-color: #F7FAFC; /* Fundo cinza muito claro */
+    --card-background-color: #FFFFFF;
+    --text-color: #2D3748; /* Texto cinza escuro */
+    --text-secondary-color: #718096; /* Texto secundário cinza */
+    --border-color: #E2E8F0; /* Borda cinza claro */
+    --income-color: #38A169; /* Verde sóbrio */
+    --expense-color: #E53E3E; /* Vermelho suave */
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="dark"] {
+    --primary-color: #7f8daa;
+    --background-color: #1A202C; /* Fundo azul-marinho muito escuro */
+    --card-background-color: #2D3748; /* Card cinza-azulado */
+    --text-color: #E2E8F0; /* Texto cinza claro */
+    --text-secondary-color: #A0AEC0; /* Texto secundário cinza médio */
+    --border-color: #4A5568;
+    
+    /* Sobrescreve as variáveis do Bootstrap para o tema escuro */
+    --bs-body-bg: #1A202C;
+    --bs-body-color: #E2E8F0;
+    --bs-tertiary-bg: #2D3748;
+    --bs-secondary-bg: #4A5568;
+    --bs-border-color: #4A5568;
+    --bs-light-rgb: 45, 55, 72;
+}
 
 /* Esconde o ícone de tema inadequado */
 [data-theme="dark"] .fa-sun { display: none; }
 [data-theme="light"] .fa-moon { display: none; }
 
-/* Sobrescreve as variáveis do Bootstrap para o tema escuro */
-[data-theme="dark"] {
-    --bs-body-bg: #212529;
-    --bs-body-color: #dee2e6;
-    --bs-tertiary-bg: #343a40;
-    --bs-secondary-bg: #495057;
-    --bs-border-color: #495057;
-    --bs-body-secondary: #a0a0a0;
-    --bs-light-rgb: 43, 48, 53; /* Usado em .alert-light */
-}
-
 /* Ajustes finos para componentes no tema escuro */
-[data-theme="dark"] .modal-content,
-[data-theme="dark"] .popup-dialog {
-    background-color: #343a40;
-}
-[data-theme="dark"] .nav-tabs .nav-link {
-    border-color: #495057;
+[data-theme="dark"] .popup-dialog,
+[data-theme="dark"] .accordion-button {
+    background-color: var(--bs-tertiary-bg);
 }
 [data-theme="dark"] .nav-tabs .nav-link.active {
-    background-color: #212529;
-    border-color: #495057;
-}
-[data-theme="dark"] .accordion-button {
-    background-color: #343a40;
-    color: #dee2e6;
+    background-color: var(--bs-body-bg);
 }
 [data-theme="dark"] .accordion-button:not(.collapsed) {
-    background-color: #495057;
+    background-color: var(--bs-secondary-bg);
 }
 [data-theme="dark"] .accordion-button::after {
     filter: invert(1) grayscale(100) brightness(200%);
@@ -43,143 +52,56 @@
     background-color: var(--bs-tertiary-bg);
 }
 
-
 /* =================================
    COMPONENTES CUSTOMIZADOS (MODAL/POPUP E TOAST)
    ================================= */
+#toast-container { /* ... (código anterior sem alterações) ... */ }
+.toast { /* ... */ } .toast.show { /* ... */ } .toast.success { /* ... */ } .toast.error { /* ... */ }
 
-/* Container para notificações (toasts) */
-#toast-container {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 1100;
-}
-
-.toast {
-    padding: 1rem 1.5rem;
-    margin-bottom: 1rem;
-    border-radius: 0.25rem;
-    color: white;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-}
-.toast.show { opacity: 1; }
-.toast.success { background-color: #198754; }
-.toast.error { background-color: #dc3545; }
-
-
-/* ===== CORREÇÃO DEFINITIVA DO MODAL ===== */
-
-/* O container principal que serve como fundo escuro (backdrop) */
 #modal-container {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background-color: rgba(0, 0, 0, 0.6);
     z-index: 1050;
-    display: none; /* Começa oculto e sem flexbox */
+    display: none;
+    align-items: center; justify-content: center;
 }
+#modal-container.active { display: flex; }
 
-/* Regra que torna o modal visível quando a classe 'active' é adicionada via JS */
-#modal-container.active {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* O nosso novo "popup" menor */
 .popup-dialog {
-    background-color: var(--bs-body-bg);
+    background-color: var(--card-background-color);
     border-radius: 0.5rem;
     box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-    width: 90%;
-    max-width: 500px;
+    width: 90%; max-width: 500px;
     animation: fadeIn 0.3s ease-out;
 }
+.popup-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid var(--border-color); }
+.popup-body { padding: 1.5rem; }
 
-.popup-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    border-bottom: 1px solid var(--bs-border-color);
-}
-
-.popup-body {
-    padding: 1.5rem;
-}
-
-/* Animação para o popup */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
 
 /* =================================
    UTILITÁRIOS E AJUSTES
    ================================= */
-
-.income-text {
-    color: var(--bs-success) !important;
-}
-.expense-text {
-    color: var(--bs-danger) !important;
-}
-
-.accordion-button::after {
-    transition: transform 0.2s ease-in-out;
-}
-.accordion-button:not(.collapsed)::after {
-    transform: rotate(-180deg);
-}
+.income-text { color: var(--income-color) !important; }
+.expense-text { color: var(--expense-color) !important; }
+.accordion-button::after { transition: transform 0.2s ease-in-out; }
+.accordion-button:not(.collapsed)::after { transform: rotate(-180deg); }
 
 .transaction-icon-wrapper {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    color: white;
-    font-size: 1rem;
-    flex-shrink: 0;
+    width: 38px; height: 38px; border-radius: 50%;
+    display: flex; justify-content: center; align-items: center;
+    color: white; font-size: 1rem; flex-shrink: 0;
 }
-
-.extra-fields {
-    display: none;
-}
-
+.extra-fields { display: none; }
 
 /* =================================
    SCROLL NA LISTA DE TRANSAÇÕES DA FATURA
    ================================= */
 #statement-details-container .accordion {
-    max-height: 40vh; /* Define uma altura máxima (40% da altura da tela) */
-    overflow-y: auto; /* Adiciona uma barra de rolagem vertical apenas se necessário */
-    padding-right: 8px; /* Um pequeno espaço para a barra de rolagem não sobrepor o conteúdo */
+    max-height: 40vh;
+    overflow-y: auto;
+    padding-right: 8px;
 }
-
-/* Estilização da barra de rolagem para um visual mais moderno (opcional) */
-#statement-details-container .accordion::-webkit-scrollbar {
-  width: 8px;
-}
-
-#statement-details-container .accordion::-webkit-scrollbar-track {
-  background: var(--bs-body-bg);
-  border-radius: 4px;
-}
-
-#statement-details-container .accordion::-webkit-scrollbar-thumb {
-  background-color: var(--bs-secondary-bg);
-  border-radius: 4px;
-}
+#statement-details-container .accordion::-webkit-scrollbar { width: 8px; }
+#statement-details-container .accordion::-webkit-scrollbar-track { background: var(--bs-body-bg); border-radius: 4px; }
+#statement-details-container .accordion::-webkit-scrollbar-thumb { background-color: var(--bs-secondary-bg); border-radius: 4px; }
