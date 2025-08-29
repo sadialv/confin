@@ -45,20 +45,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const diaFechamento = conta.dia_fechamento_cartao;
         const diaVencimento = conta.dia_vencimento_cartao;
 
-        // 1. Determina a data de fechamento da primeira fatura em que a compra se encaixa
         let dataPrimeiroFechamento = new Date(dataCompra.getFullYear(), dataCompra.getMonth(), diaFechamento, 12);
         if (dataCompra.getDate() >= diaFechamento) {
             dataPrimeiroFechamento.setMonth(dataPrimeiroFechamento.getMonth() + 1);
         }
 
-        // 2. Determina a data de vencimento da primeira fatura
         let dataPrimeiroVencimento = new Date(dataPrimeiroFechamento.getFullYear(), dataPrimeiroFechamento.getMonth(), diaVencimento, 12);
         if (diaVencimento < diaFechamento) {
             dataPrimeiroVencimento.setMonth(dataPrimeiroVencimento.getMonth() + 1);
         }
         
         for (let i = 0; i < dadosCompra.numero_parcelas; i++) {
-            // Calcula o vencimento de cada parcela adicionando meses à primeira data de vencimento
             const dataVencimentoFinal = new Date(dataPrimeiroVencimento.getFullYear(), dataPrimeiroVencimento.getMonth() + i, diaVencimento, 12);
             
             lancamentos.push({
@@ -338,8 +335,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const compraId = parseInt(target.dataset.compraId);
 
             switch (action) {
-                case 'editar-conta': UI.openModal(UI.getAccountModalContent(id)); break;
-                case 'deletar-conta': deletarConta(id); break;
+                case 'editar-conta': 
+                    UI.openModal(UI.getAccountModalContent(id)); 
+                    break;
+                case 'deletar-conta': 
+                    deletarConta(id); 
+                    break;
                 case 'ver-fatura':
                     UI.openModal(UI.getStatementModalContent(id));
                     document.getElementById('statement-month-select')?.addEventListener('change', (e) => {
@@ -348,15 +349,34 @@ document.addEventListener('DOMContentLoaded', () => {
                         UI.renderStatementDetails(contaId, mesSelecionado);
                     });
                     break;
-                case 'pagar-conta': UI.openModal(UI.getPayBillModalContent(id)); break;
-                case 'editar-lancamento': UI.openModal(UI.getBillModalContent(id)); break;
-                case 'deletar-lancamento': deletarLancamento(id, compraId); break;
+                // NOVO: Listener para o extrato de conta corrente/carteira
+                case 'ver-extrato':
+                    UI.openModal(UI.getAccountStatementModalContent(id));
+                    document.getElementById('account-statement-month-select')?.addEventListener('change', (e) => {
+                        const contaId = parseInt(e.target.dataset.contaId);
+                        const mesSelecionado = e.target.value;
+                        UI.renderAccountStatementDetails(contaId, mesSelecionado);
+                    });
+                    break;
+                case 'pagar-conta': 
+                    UI.openModal(UI.getPayBillModalContent(id)); 
+                    break;
+                case 'editar-lancamento': 
+                    UI.openModal(UI.getBillModalContent(id)); 
+                    break;
+                case 'deletar-lancamento': 
+                    deletarLancamento(id, compraId); 
+                    break;
                 case 'recriar-compra-parcelada':
                     const compra = State.getState().comprasParceladas.find(c => c.id === id);
                     if (compra) UI.openModal(UI.getInstallmentPurchaseModalContent(compra));
                     break;
-                case 'editar-transacao': UI.openModal(UI.getTransactionModalContent(id)); break;
-                case 'deletar-transacao': deletarTransacao(id); break;
+                case 'editar-transacao': 
+                    UI.openModal(UI.getTransactionModalContent(id)); 
+                    break;
+                case 'deletar-transacao': 
+                    deletarTransacao(id); 
+                    break;
             }
         });
 
