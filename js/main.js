@@ -31,6 +31,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- AÇÕES (Salvar, Deletar, etc.) ---
 
+    async function criarLancamentosParcelados(dadosCompra) {
+        const conta = State.getContaPorId(dadosCompra.conta_id);
+        if (!conta || !conta.dia_fechamento_cartao || !conta.dia_vencimento_cartao) {
+            throw new Error("Para compras parceladas, o cartão de crédito precisa ter 'Dia de Fechamento' e 'Dia de Vencimento' cadastrados.");
+        }
+
+        const compraSalva = await API.salvarDados('compras_parceladas', dadosCompra);
+        const valorParcela = parseFloat((dadosCompra.valor_total / dadosCompra.numero_parcelas).toFixed(2));
+        const lancamentos = [];
+
+        const dataCompra = new Date(dadosCompra.data_compra + 'T12:00:00');
+        const diaFechamento = conta.dia_fechamento_cartao;
+        const diaVencimento = conta.dia_vencimento_cartao;
+
+        let anoFechamento = dataCompra.getFullYear();
+        let mesFechamento = dataCompra.getMonth();
+
+        // Se a compra foi feita depois (ou no mesmo dia) do fechamento deste mês, ela entra na próxima fatura.
+        if (dataCompra.getDate() >= diaFechamento) {
+            mesFechamento += 1;
+        }
+        
+        for (let i = 1; i <= dadosCompra.numero_parcelas; i++) {
+            const dataFechamentoAtual = new Date(anoFechamento, mesFechamento + (i - 1), diaFechamento);
+            
+            let anoVencimento = dataFechamentoAtual.getFullYear();
+            let mesVencimento = dataFechamentoAtual.getMonth();
+
+            // Se o vencimento é em um dia "menor" que o fechamento (ex: fecha dia 20, vence dia 05), o vencimento é no mês seguinte.
+            if (diaVencimento < diaFechamento) {
+                mesVencimento += 1;
+            }
+
+            const dataVencimentoFinal = new Date(anoVencimento, mesVencimento, diaVencimento);
+            
+            lancamentos.push({
+                descricao: `${dadosCompra.descricao} (${i}/${dadosCompra.numero_parcelas})`, valor: valorParcela,
+                data_vencimento: toISODateString(dataVencimentoFinal), tipo: 'a_pagar',
+                status: 'pendente', compra_parcelada_id: compraSalva.id, categoria: dadosCompra.categoria
+            });
+        }
+        if (lancamentos.length > 0) await API.salvarMultiplosLancamentos(lancamentos);
+    }
+
     async function salvarConta(e) {
         const form = e.target;
         const btn = form.querySelector('button[type="submit"]');
@@ -114,50 +158,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
                 await API.salvarDados('transacoes', transacao);
                 toastMessage = 'Transação salva!';
+
             } else if (tipoCompra === 'parcelada') {
                 const dadosCompra = {
                     descricao: data.descricao, valor_total: parseFloat(data.valor),
                     numero_parcelas: parseInt(data.numero_parcelas), data_compra: data.data,
                     conta_id: parseInt(data.conta_id), categoria: data.categoria,
                 };
-
-                const conta = State.getContaPorId(dadosCompra.conta_id);
-                if (!conta || !conta.dia_fechamento_cartao || !conta.dia_vencimento_cartao) {
-                    throw new Error("Para compras parceladas, o cartão de crédito precisa ter 'Dia de Fechamento' e 'Dia de Vencimento' cadastrados.");
-                }
-
-                const compraSalva = await API.salvarDados('compras_parceladas', dadosCompra);
-                const valorParcela = parseFloat((dadosCompra.valor_total / dadosCompra.numero_parcelas).toFixed(2));
-                const lancamentos = [];
-                const dataCompra = new Date(dadosCompra.data_compra + 'T12:00:00');
-                const diaFechamento = conta.dia_fechamento_cartao;
-                const diaVencimento = conta.dia_vencimento_cartao;
-                
-                let anoFechamento = dataCompra.getFullYear();
-                let mesFechamento = dataCompra.getMonth();
-
-                if (dataCompra.getDate() > diaFechamento) {
-                    mesFechamento += 1;
-                }
-                
-                for (let i = 1; i <= dadosCompra.numero_parcelas; i++) {
-                    const dataFechamentoAtual = new Date(anoFechamento, mesFechamento + (i - 1), diaFechamento);
-                    let anoVencimento = dataFechamentoAtual.getFullYear();
-                    let mesVencimento = dataFechamentoAtual.getMonth();
-
-                    if (diaVencimento < diaFechamento) {
-                        mesVencimento += 1;
-                    }
-
-                    const dataVencimentoFinal = new Date(anoVencimento, mesVencimento, diaVencimento);
-                    
-                    lancamentos.push({
-                        descricao: `${dadosCompra.descricao} (${i}/${dadosCompra.numero_parcelas})`, valor: valorParcela,
-                        data_vencimento: toISODateString(dataVencimentoFinal), tipo: 'a_pagar',
-                        status: 'pendente', compra_parcelada_id: compraSalva.id, categoria: dadosCompra.categoria
-                    });
-                }
-                if (lancamentos.length > 0) await API.salvarMultiplosLancamentos(lancamentos);
+                await criarLancamentosParcelados(dadosCompra);
                 toastMessage = 'Compra parcelada lançada!';
 
             } else if (tipoCompra === 'recorrente') {
@@ -248,23 +256,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (idCompraAntiga) {
                 await deletarCompraParceladaCompleta(idCompraAntiga);
             }
-            
             const data = Object.fromEntries(new FormData(form));
-            // Simula um evento de formulário para reutilizar a lógica principal
-            const fakeForm = document.createElement('form');
-            const formData = new FormData(fakeForm);
-            formData.set('tipo_compra', 'parcelada');
-            formData.set('descricao', data.descricao);
-            formData.set('valor', data.valor_total);
-            formData.set('numero_parcelas', data.numero_parcelas);
-            formData.set('data', data.data_compra);
-            formData.set('conta_id', data.conta_id);
-            formData.set('categoria', data.categoria);
-            
-            const fakeEvent = { target: new URLSearchParams(formData), preventDefault: () => {} };
-            await salvarTransacaoUnificada(fakeEvent);
+            const dadosCompra = {
+                descricao: data.descricao, valor_total: parseFloat(data.valor_total),
+                numero_parcelas: parseInt(data.numero_parcelas), data_compra: data.data_compra,
+                conta_id: parseInt(data.conta_id), categoria: data.categoria,
+            };
+            await criarLancamentosParcelados(dadosCompra);
             
             UI.closeModal();
+            UI.showToast(`Compra parcelada ${idCompraAntiga ? 'recriada' : 'salva'}!`);
+            await reloadStateAndRender();
+
         } catch (err) {
             UI.showToast(err.message, 'error');
         } finally {
