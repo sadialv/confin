@@ -9,10 +9,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let historyCurrentPage = 1;
     let historyFilters = { 
         mes: new Date().toISOString().slice(0, 7), // Padrão para o mês atual
-        pesquisa: '' 
+        pesquisa: '',
+        contaId: 'todas' // NOVO: Filtro de conta
     };
     let billsCurrentPage = 1;
-    let billsFilters = { mes: 'todos', pesquisa: '' };
+    let billsFilters = { 
+        mes: 'todos', 
+        pesquisa: '',
+        contaId: 'todas' // NOVO: Filtro de conta
+    };
 
     async function reloadStateAndRender() {
         try {
@@ -97,8 +102,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (tipoCompra === 'vista') {
                 const transacao = {
-                    descricao: data.descricao, valor: Math.abs(parseFloat(data.valor)), data: data.data,
-                    conta_id: parseInt(data.conta_id), categoria: data.categoria,
+                    descricao: data.descricao,
+                    valor: Math.abs(parseFloat(data.valor)),
+                    data: data.data,
+                    conta_id: parseInt(data.conta_id),
+                    categoria: data.categoria,
                     tipo: data.tipo
                 };
                 await API.salvarDados('transacoes', transacao);
@@ -163,8 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
             UI.setLoadingState(btn, false, 'Salvar Transação');
         }
     }
-
-    // ===== FUNÇÕES ADICIONADAS/CORRIGIDAS =====
+    
     async function salvarEdicaoTransacao(e) {
         const form = e.target;
         const btn = form.querySelector('button[type="submit"]');
@@ -213,9 +220,32 @@ document.addEventListener('DOMContentLoaded', () => {
             if (idCompraAntiga) {
                 await deletarCompraParceladaCompleta(idCompraAntiga);
             }
-            // A lógica de criação é a mesma do formulário principal, então reusamos
-            await salvarTransacaoUnificada(e);
+            // A lógica de criação é a mesma do formulário principal
+            const data = Object.fromEntries(new FormData(form));
+            const dadosCompra = {
+                descricao: data.descricao, valor_total: parseFloat(data.valor_total),
+                numero_parcelas: parseInt(data.numero_parcelas), data_compra: data.data_compra,
+                conta_id: parseInt(data.conta_id), categoria: data.categoria,
+            };
+            const compraSalva = await API.salvarDados('compras_parceladas', dadosCompra);
+            const valorParcela = parseFloat((dadosCompra.valor_total / dadosCompra.numero_parcelas).toFixed(2));
+            const dataCompraObj = new Date(dadosCompra.data_compra + 'T12:00:00');
+            const lancamentos = [];
+            for (let i = 1; i <= dadosCompra.numero_parcelas; i++) {
+                const dataVencimento = new Date(dataCompraObj);
+                dataVencimento.setMonth(dataVencimento.getMonth() + i);
+                lancamentos.push({
+                    descricao: `${dadosCompra.descricao} (${i}/${dadosCompra.numero_parcelas})`, valor: valorParcela,
+                    data_vencimento: toISODateString(dataVencimento), tipo: 'a_pagar',
+                    status: 'pendente', compra_parcelada_id: compraSalva.id
+                });
+            }
+            await API.salvarMultiplosLancamentos(lancamentos);
+
             UI.closeModal();
+            UI.showToast(`Compra parcelada ${idCompraAntiga ? 'recriada' : 'salva'}!`);
+            await reloadStateAndRender();
+
         } catch (err) {
             UI.showToast(err.message, 'error');
         } finally {
@@ -356,6 +386,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 billsCurrentPage = 1;
                 UI.renderLancamentosFuturos(billsCurrentPage, billsFilters);
             }
+            if (e.target.id === 'history-account-filter') {
+                historyFilters.contaId = e.target.value;
+                historyCurrentPage = 1;
+                UI.renderHistoricoTransacoes(historyCurrentPage, historyFilters);
+            }
+            if (e.target.id === 'bills-account-filter') {
+                billsFilters.contaId = e.target.value;
+                billsCurrentPage = 1;
+                UI.renderLancamentosFuturos(billsCurrentPage, billsFilters);
+            }
         });
         
         document.body.addEventListener('input', e => {
@@ -377,7 +417,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'form-conta': salvarConta(e); break;
                 case 'form-transacao-unificada': salvarTransacaoUnificada(e); break;
                 case 'form-pagamento': confirmarPagamento(e); break;
-                // ===== LÓGICA DE SUBMIT CORRIGIDA =====
                 case 'form-edicao-transacao': salvarEdicaoTransacao(e); break;
                 case 'form-lancamento': salvarLancamentoFuturo(e); break;
                 case 'form-compra-parcelada': salvarCompraParcelada(e); break;
