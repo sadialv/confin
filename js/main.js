@@ -42,8 +42,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.dia_fechamento_cartao) {
                 data.dia_fechamento_cartao = parseInt(data.dia_fechamento_cartao);
             }
-            if (data.dia_vencimento_fatura) {
-                data.dia_vencimento_fatura = parseInt(data.dia_vencimento_fatura);
+            if (data.dia_vencimento_cartao) {
+                data.dia_vencimento_cartao = parseInt(data.dia_vencimento_cartao);
             }
             const saved = await API.salvarDados('contas', data, id);
             const state = State.getState();
@@ -114,23 +114,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
                 await API.salvarDados('transacoes', transacao);
                 toastMessage = 'Transação salva!';
-
             } else if (tipoCompra === 'parcelada') {
                 const dadosCompra = {
                     descricao: data.descricao, valor_total: parseFloat(data.valor),
                     numero_parcelas: parseInt(data.numero_parcelas), data_compra: data.data,
                     conta_id: parseInt(data.conta_id), categoria: data.categoria,
                 };
+
                 const conta = State.getContaPorId(dadosCompra.conta_id);
-                if (!conta || !conta.dia_fechamento_cartao || !conta.dia_vencimento_fatura) {
+                if (!conta || !conta.dia_fechamento_cartao || !conta.dia_vencimento_cartao) {
                     throw new Error("Para compras parceladas, o cartão de crédito precisa ter 'Dia de Fechamento' e 'Dia de Vencimento' cadastrados.");
                 }
+
                 const compraSalva = await API.salvarDados('compras_parceladas', dadosCompra);
                 const valorParcela = parseFloat((dadosCompra.valor_total / dadosCompra.numero_parcelas).toFixed(2));
                 const lancamentos = [];
                 const dataCompra = new Date(dadosCompra.data_compra + 'T12:00:00');
                 const diaFechamento = conta.dia_fechamento_cartao;
-                const diaVencimento = conta.dia_vencimento_fatura;
+                const diaVencimento = conta.dia_vencimento_cartao;
                 
                 let anoFechamento = dataCompra.getFullYear();
                 let mesFechamento = dataCompra.getMonth();
@@ -260,11 +261,10 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.set('conta_id', data.conta_id);
             formData.set('categoria', data.categoria);
             
-            const fakeEvent = { target: fakeForm, preventDefault: () => {} };
+            const fakeEvent = { target: new URLSearchParams(formData), preventDefault: () => {} };
             await salvarTransacaoUnificada(fakeEvent);
             
             UI.closeModal();
-            // A mensagem de toast já é mostrada pela salvarTransacaoUnificada
         } catch (err) {
             UI.showToast(err.message, 'error');
         } finally {
