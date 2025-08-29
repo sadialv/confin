@@ -69,9 +69,7 @@
 .toast.error { background-color: #dc3545; }
 
 
-/* ===== CORREÇÃO DEFINITIVA DO MODAL ===== */
-
-/* O container principal que serve como fundo escuro (backdrop) */
+/* Estilo do Modal/Popup */
 #modal-container {
     position: fixed;
     top: 0;
@@ -80,17 +78,17 @@
     height: 100%;
     background-color: rgba(0, 0, 0, 0.6);
     z-index: 1050;
-    display: none; /* CORREÇÃO: Apenas 'display: none' para começar oculto */
-}
-
-/* Regra que torna o modal visível quando a classe 'active' é adicionada via JS */
-#modal-container.active {
+    display: none;
+    
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-/* O nosso novo "popup" menor */
+#modal-container.active {
+    display: flex;
+}
+
 .popup-dialog {
     background-color: var(--bs-body-bg);
     border-radius: 0.5rem;
@@ -129,7 +127,6 @@
    UTILITÁRIOS E AJUSTES
    ================================= */
 
-/* Cores customizadas para Receita/Despesa */
 .income-text {
     color: var(--bs-success) !important;
 }
@@ -137,7 +134,6 @@
     color: var(--bs-danger) !important;
 }
 
-/* Ícone do acordeão */
 .accordion-button::after {
     transition: transform 0.2s ease-in-out;
 }
@@ -145,8 +141,6 @@
     transform: rotate(-180deg);
 }
 
-
-/* Ícone circular das transações */
 .transaction-icon-wrapper {
     width: 38px;
     height: 38px;
@@ -159,7 +153,32 @@
     flex-shrink: 0;
 }
 
-/* Garante que os campos extras do formulário comecem ocultos */
 .extra-fields {
     display: none;
+}
+
+
+/* =================================
+   SCROLL NA LISTA DE TRANSAÇÕES DA FATURA
+   ================================= */
+#statement-details-container .accordion {
+    max-height: 40vh; /* Define uma altura máxima (40% da altura da tela) */
+    overflow-y: auto; /* Adiciona uma barra de rolagem vertical apenas se necessário */
+    padding-right: 8px; /* Um pequeno espaço para a barra de rolagem não sobrepor o conteúdo */
+}
+
+/* Estilização da barra de rolagem para um visual mais moderno (opcional) */
+#statement-details-container .accordion::-webkit-scrollbar {
+  width: 8px;
+}
+
+#statement-details-container .accordion::-webkit-scrollbar-track {
+  background: var(--bs-light-rgb);
+  border-radius: 4px;
+}
+
+#statement-details-container .accordion::-webkit-scrollbar-thumb {
+  background-color: var(--bs-secondary-bg);
+  border-radius: 4px;
+  border: 2px solid var(--bs-light-rgb);
 }
