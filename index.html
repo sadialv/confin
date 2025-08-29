@@ -9,10 +9,14 @@
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    
     <link rel="stylesheet" href="style.css">
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
 </head>
 <body class="bg-body-tertiary">
 
@@ -32,7 +36,7 @@
         <div class="row">
 
             <div class="col-lg-4">
-                <div class="card shadow-sm mb-4">
+                <div class="card shadow-sm mb-4" data-aos="fade-right">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">Minhas Contas</h5>
                         <button id="btn-add-account" class="btn btn-primary btn-sm" title="Adicionar Conta">
@@ -44,7 +48,7 @@
                     </div>
                 </div>
 
-                <div class="card shadow-sm mb-4">
+                <div class="card shadow-sm mb-4" data-aos="fade-right" data-aos-delay="100">
                     <div class="card-header">
                         <h5 class="mb-0">Nova Transação</h5>
                     </div>
@@ -55,7 +59,7 @@
             </div>
 
             <div class="col-lg-8">
-                <div class="card shadow-sm mb-4">
+                <div class="card shadow-sm mb-4" data-aos="fade-left">
                     <div class="card-header">
                          <ul class="nav nav-tabs card-header-tabs" role="tablist">
                             <li class="nav-item" role="presentation">
@@ -76,7 +80,7 @@
                     </div>
                 </div>
 
-                <div class="card shadow-sm mb-4">
+                <div class="card shadow-sm mb-4" data-aos="fade-left" data-aos-delay="100">
                     <div class="card-header">
                         <ul class="nav nav-tabs card-header-tabs" role="tablist">
                             <li class="nav-item" role="presentation">
@@ -109,10 +113,12 @@
     </main>
     
     <div id="modal-container"></div>
-    
     <div id="toast-container"></div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    
     <script src="js/utils.js" type="module"></script>
     <script src="js/api.js" type="module"></script>
     <script src="js/state.js" type="module"></script>
