@@ -97,12 +97,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (tipoCompra === 'vista') {
                 const transacao = {
-                    descricao: data.descricao,
-                    valor: Math.abs(parseFloat(data.valor)),
-                    data: data.data,
-                    conta_id: parseInt(data.conta_id),
-                    categoria: data.categoria,
-                    tipo: data.tipo // Usa o valor do novo campo (despesa ou receita)
+                    descricao: data.descricao, valor: Math.abs(parseFloat(data.valor)), data: data.data,
+                    conta_id: parseInt(data.conta_id), categoria: data.categoria,
+                    tipo: data.tipo
                 };
                 await API.salvarDados('transacoes', transacao);
                 toastMessage = 'Transação salva!';
@@ -157,13 +154,72 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             form.reset();
-            form.querySelector('#tipo_compra')?.dispatchEvent(new Event('change'));
+            form.querySelector('#tipo-compra')?.dispatchEvent(new Event('change'));
             UI.showToast(toastMessage);
             await reloadStateAndRender();
         } catch (err) {
             UI.showToast(err.message, 'error');
         } finally {
             UI.setLoadingState(btn, false, 'Salvar Transação');
+        }
+    }
+
+    // ===== FUNÇÕES ADICIONADAS/CORRIGIDAS =====
+    async function salvarEdicaoTransacao(e) {
+        const form = e.target;
+        const btn = form.querySelector('button[type="submit"]');
+        const id = form.dataset.id;
+        UI.setLoadingState(btn, true);
+        try {
+            const data = Object.fromEntries(new FormData(form));
+            data.valor = parseFloat(data.valor);
+            data.conta_id = parseInt(data.conta_id);
+            await API.salvarDados('transacoes', data, id);
+            UI.closeModal();
+            UI.showToast('Transação atualizada!');
+            await reloadStateAndRender();
+        } catch (err) {
+            UI.showToast(err.message, 'error');
+        } finally {
+            UI.setLoadingState(btn, false, 'Salvar Alterações');
+        }
+    }
+
+    async function salvarLancamentoFuturo(e) {
+        const form = e.target;
+        const btn = form.querySelector('button[type="submit"]');
+        const id = form.dataset.id;
+        UI.setLoadingState(btn, true);
+        try {
+            const data = Object.fromEntries(new FormData(form));
+            data.valor = parseFloat(data.valor);
+            await API.salvarDados('lancamentos_futuros', data, id);
+            UI.closeModal();
+            UI.showToast(`Lançamento ${id ? 'atualizado' : 'salvo'}!`);
+            await reloadStateAndRender();
+        } catch (err) {
+            UI.showToast(err.message, 'error');
+        } finally {
+            UI.setLoadingState(btn, false, 'Salvar');
+        }
+    }
+
+    async function salvarCompraParcelada(e) {
+        const form = e.target;
+        const btn = form.querySelector('button[type="submit"]');
+        const idCompraAntiga = form.dataset.compraAntigaId ? parseInt(form.dataset.compraAntigaId) : null;
+        UI.setLoadingState(btn, true);
+        try {
+            if (idCompraAntiga) {
+                await deletarCompraParceladaCompleta(idCompraAntiga);
+            }
+            // A lógica de criação é a mesma do formulário principal, então reusamos
+            await salvarTransacaoUnificada(e);
+            UI.closeModal();
+        } catch (err) {
+            UI.showToast(err.message, 'error');
+        } finally {
+            UI.setLoadingState(btn, false, idCompraAntiga ? 'Salvar e Substituir' : 'Salvar Compra');
         }
     }
     
@@ -265,7 +321,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     cartaoFields.style.display = isCreditCard ? 'block' : 'none';
                 }
             }
-
             if (e.target.id === 'tipo-compra') {
                 const tipo = e.target.value;
                 const form = e.target.closest('form');
@@ -273,14 +328,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const recorrenteFields = form.querySelector('#recorrente-fields');
                 const labelValor = form.querySelector('#label-valor');
                 const selectConta = form.querySelector('select[name="conta_id"]');
-                
                 parceladaFields.style.display = 'none';
                 recorrenteFields.style.display = 'none';
-                
                 if (selectConta.dataset.allOptions) {
                     selectConta.innerHTML = selectConta.dataset.allOptions;
                 }
-
                 if (tipo === 'parcelada') {
                     parceladaFields.style.display = 'block';
                     labelValor.textContent = 'Valor Total';
@@ -325,7 +377,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'form-conta': salvarConta(e); break;
                 case 'form-transacao-unificada': salvarTransacaoUnificada(e); break;
                 case 'form-pagamento': confirmarPagamento(e); break;
-                // Adicione outros formulários de modal aqui
+                // ===== LÓGICA DE SUBMIT CORRIGIDA =====
+                case 'form-edicao-transacao': salvarEdicaoTransacao(e); break;
+                case 'form-lancamento': salvarLancamentoFuturo(e); break;
+                case 'form-compra-parcelada': salvarCompraParcelada(e); break;
             }
         });
     }
