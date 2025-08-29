@@ -1,7 +1,6 @@
 // js/utils.js
 export const CATEGORIAS_PADRAO = ['Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Lazer', 'Educação', 'Salário', 'Investimentos', 'Contas', 'Ajustes', 'Pagamento de Fatura', 'Compras', 'Outros'];
 
-// PALETA DE ÍCONES ATUALIZADA
 export const CATEGORY_ICONS = {
     'Alimentação': { icon: 'fas fa-utensils', color: '#EF4444' }, // Red
     'Transporte': { icon: 'fas fa-car', color: '#3B82F6' },     // Blue
@@ -18,7 +17,6 @@ export const CATEGORY_ICONS = {
     'Outros': { icon: 'fas fa-question-circle', color: '#6B7280' } 
 };
 
-// NOVA PALETA DE CORES PARA OS GRÁFICOS
 export const CHART_COLORS = [
     '#EF4444', '#F97316', '#10B981', '#3B82F6', '#8B5CF6', 
     '#EC4899', '#14B8A6', '#D946EF', '#64748B'
