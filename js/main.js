@@ -438,3 +438,29 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.addEventListener('submit', e => {
             e.preventDefault();
             switch (e.target.id) {
+                case 'form-conta': salvarConta(e); break;
+                case 'form-transacao-unificada': salvarTransacaoUnificada(e); break;
+                case 'form-pagamento': confirmarPagamento(e); break;
+                case 'form-edicao-transacao': salvarEdicaoTransacao(e); break;
+                case 'form-lancamento': salvarLancamentoFuturo(e); break;
+                case 'form-compra-parcelada': salvarCompraParcelada(e); break;
+            }
+        });
+    }
+
+    async function initializeApp() {
+        UI.showToast('Carregando dados...');
+        try {
+            const data = await API.fetchData();
+            State.setState(data);
+            UI.renderAllComponents({ statement: statementFilters, bills: billsFilters });
+        } catch (error) {
+            UI.showToast(error.message, 'error');
+            console.error("Falha na inicialização:", error);
+        }
+    }
+
+    applyTheme(localStorage.getItem('confin-theme') || 'light');
+    setupEventListeners();
+    initializeApp();
+});
