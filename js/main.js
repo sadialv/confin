@@ -73,11 +73,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = Object.fromEntries(new FormData(form));
             data.saldo_inicial = parseFloat(data.saldo_inicial) || 0;
     
-            // --- INÍCIO DA CORREÇÃO ---
-            // Verifica os campos específicos do cartão de crédito.
-            // Se eles existirem e tiverem um valor, converte para inteiro.
-            // Se estiverem vazios ou não existirem, remove-os do objeto
-            // para que o banco de dados os trate como nulos.
             if (data.dia_fechamento_cartao) {
                 data.dia_fechamento_cartao = parseInt(data.dia_fechamento_cartao);
             } else {
@@ -89,7 +84,6 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 delete data.dia_vencimento_cartao;
             }
-            // --- FIM DA CORREÇÃO ---
     
             const saved = await API.salvarDados('contas', data, id);
             const state = State.getState();
@@ -202,6 +196,11 @@ document.addEventListener('DOMContentLoaded', () => {
             form.reset();
             form.querySelector('#tipo-compra')?.dispatchEvent(new Event('change'));
             UI.showToast(toastMessage);
+            
+            // --- LINHA DA CORREÇÃO ADICIONADA AQUI ---
+            UI.closeModal(); 
+            // -----------------------------------------
+
             await reloadStateAndRender();
         } catch (err) {
             UI.showToast(err.message, 'error');
