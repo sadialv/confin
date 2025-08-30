@@ -748,25 +748,45 @@ export const getInstallmentPurchaseModalContent = (compra) => {
     return { title, body };
 };
 
+// --- FUNÇÃO CORRIGIDA ---
 export const getStatementModalContent = (contaId) => {
     const conta = getContaPorId(contaId);
     if (!conta) return { title: 'Erro', body: 'Conta não encontrada.' };
 
     const title = `Fatura - ${conta.nome}`;
-    const { transacoes, lancamentosFuturos, comprasParceladas } = getState();
+    const { transacoes, lancamentosFuturos } = getState();
+    const diaFechamento = conta.dia_fechamento_cartao || 28;
 
+    // Calcula o mês da fatura para cada transação
     const mesesDeTransacoes = transacoes
         .filter(t => t.conta_id === contaId)
-        .map(t => t.data.substring(0, 7));
+        .map(t => {
+            const dataTransacao = new Date(t.data + 'T12:00:00');
+            const ano = dataTransacao.getFullYear();
+            const mes = dataTransacao.getMonth(); // 0-11
 
+            // Cria a data de fechamento para o mesmo mês da transação
+            const dataFechamentoMesTransacao = new Date(ano, mes, diaFechamento);
+
+            if (dataTransacao > dataFechamentoMesTransacao) {
+                // Se a transação ocorreu APÓS o fechamento, pertence à fatura do próximo mês
+                const proximoMes = new Date(ano, mes + 1, 1);
+                return proximoMes.toISOString().substring(0, 7);
+            } else {
+                // Se não, pertence à fatura do mês corrente
+                return t.data.substring(0, 7);
+            }
+        });
+
+    // Mantém a lógica original para lançamentos futuros (parcelas)
     const mesesDeLancamentos = lancamentosFuturos
         .filter(l => {
-            if (!l.compra_parcelada_id) return false;
-            const compra = comprasParceladas.find(c => c.id === l.compra_parcelada_id);
+            const compra = getState().comprasParceladas.find(c => c.id === l.compra_parcelada_id);
             return compra && compra.conta_id === contaId;
         })
         .map(l => l.data_vencimento.substring(0, 7));
-
+    
+    // Une todos os meses, sem duplicatas, e ordena
     const mesesDisponiveis = [...new Set([...mesesDeTransacoes, ...mesesDeLancamentos])].sort().reverse();
 
     const options = mesesDisponiveis.map(mes => {
@@ -791,7 +811,6 @@ export const getStatementModalContent = (contaId) => {
     return { title, body };
 };
 
-// --- FUNÇÃO CORRIGIDA ---
 export const renderStatementDetails = (contaId, mesSelecionado) => {
     const container = document.getElementById('statement-details-container');
     if (!container) return;
@@ -807,7 +826,6 @@ export const renderStatementDetails = (contaId, mesSelecionado) => {
 
     const [ano, mes] = mesSelecionado.split('-').map(Number);
 
-    // Lógica de data corrigida
     const fimCiclo = new Date(ano, mes - 1, diaFechamento, 23, 59, 59);
     const inicioCiclo = new Date(fimCiclo);
     inicioCiclo.setMonth(inicioCiclo.getMonth() - 1);
