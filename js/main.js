@@ -5,14 +5,11 @@ import { applyTheme, toISODateString } from './utils.js';
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    // Estado dos filtros e paginação
-    let historyCurrentPage = 1;
     let historyFilters = { 
-        mes: new Date().toISOString().slice(0, 7), // Padrão para o mês atual
+        mes: new Date().toISOString().slice(0, 7),
         pesquisa: '',
         contaId: 'todas'
     };
-    let billsCurrentPage = 1;
     let billsFilters = { 
         mes: 'todos', 
         pesquisa: '',
@@ -88,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
             UI.renderContas();
             UI.closeModal();
             UI.showToast('Conta salva!');
+            await reloadStateAndRender();
         } catch (err) {
             UI.showToast(err.message, 'error');
         } finally {
@@ -99,9 +97,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!confirm('Apagar conta? As transações associadas não serão apagadas.')) return;
         try {
             await API.deletarDados('contas', id);
-            State.setState({ contas: State.getState().contas.filter(c => c.id !== id) });
-            UI.renderContas();
             UI.showToast('Conta deletada.');
+            await reloadStateAndRender();
         } catch (err) {
             UI.showToast(err.message, 'error');
         }
@@ -349,7 +346,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         UI.renderStatementDetails(contaId, mesSelecionado);
                     });
                     break;
-                // NOVO: Listener para o extrato de conta corrente/carteira
                 case 'ver-extrato':
                     UI.openModal(UI.getAccountStatementModalContent(id));
                     document.getElementById('account-statement-month-select')?.addEventListener('change', (e) => {
@@ -381,6 +377,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         document.body.addEventListener('change', e => {
+            if (e.target.id === 'tab-statement-month-select') {
+                UI.renderMonthlyStatementDetails(e.target.value);
+            }
             if (e.target.id === 'conta-tipo') {
                 const isCreditCard = e.target.value === 'Cartão de Crédito';
                 const cartaoFields = document.getElementById('cartao-credito-fields');
@@ -415,36 +414,30 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (e.target.id === 'history-month-filter') {
                 historyFilters.mes = e.target.value;
-                historyCurrentPage = 1;
-                UI.renderHistoricoTransacoes(historyCurrentPage, historyFilters);
+                UI.renderHistoricoTransacoes(1, historyFilters);
             }
             if (e.target.id === 'bills-month-filter') {
                 billsFilters.mes = e.target.value;
-                billsCurrentPage = 1;
-                UI.renderLancamentosFuturos(billsCurrentPage, billsFilters);
+                UI.renderLancamentosFuturos(1, billsFilters);
             }
             if (e.target.id === 'history-account-filter') {
                 historyFilters.contaId = e.target.value;
-                historyCurrentPage = 1;
-                UI.renderHistoricoTransacoes(historyCurrentPage, historyFilters);
+                UI.renderHistoricoTransacoes(1, historyFilters);
             }
             if (e.target.id === 'bills-account-filter') {
                 billsFilters.contaId = e.target.value;
-                billsCurrentPage = 1;
-                UI.renderLancamentosFuturos(billsCurrentPage, billsFilters);
+                UI.renderLancamentosFuturos(1, billsFilters);
             }
         });
         
         document.body.addEventListener('input', e => {
             if (e.target.id === 'history-search-input') {
                 historyFilters.pesquisa = e.target.value;
-                historyCurrentPage = 1;
-                UI.renderHistoricoTransacoes(historyCurrentPage, historyFilters);
+                UI.renderHistoricoTransacoes(1, historyFilters);
             }
             if (e.target.id === 'bills-search-input') {
                 billsFilters.pesquisa = e.target.value;
-                billsCurrentPage = 1;
-                UI.renderLancamentosFuturos(billsCurrentPage, billsFilters);
+                UI.renderLancamentosFuturos(1, billsFilters);
             }
         });
 
