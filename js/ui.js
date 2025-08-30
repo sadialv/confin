@@ -41,7 +41,7 @@ export const openModal = (content) => {
                 ${content.body}
             </div>
         </div>`;
-    
+
     container.innerHTML = modalHTML;
     container.classList.add('active');
 };
@@ -73,14 +73,15 @@ export const renderAllComponents = (initialFilters) => {
     renderFormTransacaoRapida();
     renderVisaoMensal();
     renderVisaoAnual();
-    renderFinancialHealth(); 
+    renderFinancialHealth();
     renderFilters('bills', initialFilters.bills);
     renderLancamentosFuturos(1, initialFilters.bills);
     renderFilters('history', initialFilters.history);
     renderHistoricoTransacoes(1, initialFilters.history);
+    renderMonthlyStatementTab();
 };
 
-// --- NOVA CENTRAL DE CÁLCULOS FINANCEIROS ---
+// --- CÁLCULOS E RENDERIZAÇÃO DA SAÚDE FINANCEIRA ---
 const calculateFinancialHealthMetrics = () => {
     const { contas, transacoes, lancamentosFuturos } = getState();
     const hoje = new Date();
@@ -89,12 +90,12 @@ const calculateFinancialHealthMetrics = () => {
     // 1. CÁLCULO DE PATRIMÔNIO LÍQUIDO
     let totalAtivos = 0;
     let totalPassivos = 0;
-    
+
     contas.forEach(conta => {
         const saldoConta = transacoes
             .filter(t => t.conta_id === conta.id)
             .reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, conta.saldo_inicial);
-            
+
         if (conta.tipo !== 'Cartão de Crédito') {
             totalAtivos += saldoConta > 0 ? saldoConta : 0;
         } else {
@@ -104,16 +105,16 @@ const calculateFinancialHealthMetrics = () => {
     totalPassivos += lancamentosFuturos
         .filter(l => l.status === 'pendente' && l.tipo === 'a_pagar')
         .reduce((acc, l) => acc + l.valor, 0);
-    
+
     const patrimonioLiquido = totalAtivos - totalPassivos;
 
     // 2. DIAGNÓSTICO DO MÊS ATUAL
     const transacoesMes = transacoes.filter(t => t.data?.startsWith(mesAtual));
     const rendaMensal = transacoesMes.filter(t => t.tipo === 'receita').reduce((acc, t) => acc + t.valor, 0);
-    
+
     const catsFixas = ['Moradia', 'Contas', 'Educação', 'Saúde', 'Transporte'];
     const catsVariaveis = ['Alimentação', 'Lazer', 'Compras', 'Outros'];
-    
+
     const despesasFixas = transacoesMes.filter(t => t.tipo === 'despesa' && catsFixas.includes(t.categoria)).reduce((acc, t) => acc + t.valor, 0);
     const despesasVariaveis = transacoesMes.filter(t => t.tipo === 'despesa' && catsVariaveis.includes(t.categoria)).reduce((acc, t) => acc + t.valor, 0);
     const pagamentoFaturas = transacoesMes.filter(t => t.tipo === 'despesa' && t.categoria === 'Pagamento de Fatura').reduce((acc, t) => acc + t.valor, 0);
@@ -131,7 +132,7 @@ const calculateFinancialHealthMetrics = () => {
     const catsDesejos = ['Lazer', 'Compras', 'Outros'];
     const gastosNecessidades = transacoesMes.filter(t => t.tipo === 'despesa' && catsNecessidades.includes(t.categoria)).reduce((acc, t) => acc + t.valor, 0);
     const gastosDesejos = transacoesMes.filter(t => t.tipo === 'despesa' && catsDesejos.includes(t.categoria)).reduce((acc, t) => acc + t.valor, 0);
-    
+
     const percNecessidades = rendaMensal > 0 ? (gastosNecessidades / rendaMensal) * 100 : 0;
     const percDesejos = rendaMensal > 0 ? (gastosDesejos / rendaMensal) * 100 : 0;
     const percPoupanca = taxaPoupanca;
@@ -145,7 +146,7 @@ const calculateFinancialHealthMetrics = () => {
     // 6. DADOS HISTÓRICOS PARA GRÁFICOS
     let gastosPorCategoria = {};
     let meses = new Set();
-    
+
     transacoes.forEach(t => {
         const mes = t.data.substring(0, 7);
         meses.add(mes);
@@ -157,7 +158,7 @@ const calculateFinancialHealthMetrics = () => {
     const mediaGastosCategoria = Object.entries(gastosPorCategoria)
         .map(([categoria, total]) => ({ categoria, media: total / numMeses }))
         .sort((a,b) => b.media - a.media);
-    
+
     const historicoPatrimonio = Array.from(meses).sort().slice(-12).map(mes => {
         const transacoesAteMes = transacoes.filter(t => t.data.substring(0,7) <= mes);
         let ativos = 0, passivos = 0;
@@ -245,7 +246,7 @@ export const renderFinancialHealth = () => {
                 </div>
             </div>
         </div>
-        
+
         <div class="card mb-3">
             <div class="card-header"><h6 class="mb-0">Equilíbrio de Gastos (Regra 50-30-20)</h6></div>
             <div class="card-body">
@@ -325,6 +326,7 @@ export const renderVisaoMensal = () => {
     const transacoesMes = [...getState().transacoes, ...gerarTransacoesVirtuais()].filter(t => t.data?.startsWith(mes));
     const receitas = transacoesMes.filter(t => t.tipo === 'receita').reduce((s, t) => s + t.valor, 0);
     const despesas = transacoesMes.filter(t => t.tipo === 'despesa').reduce((s, t) => s + t.valor, 0);
+
     container.innerHTML = `
         <h5 class="mb-3">Resumo do Mês</h5>
         <div class="row text-center mb-3">
@@ -332,7 +334,9 @@ export const renderVisaoMensal = () => {
             <div class="col-4"><h6>Despesas</h6><p class="h4 expense-text mb-0">${formatarMoeda(despesas)}</p></div>
             <div class="col-4"><h6>Saldo</h6><p class="h4 ${(receitas-despesas) >= 0 ? 'income-text':'expense-text'} mb-0">${formatarMoeda(receitas-despesas)}</p></div>
         </div>
-        <div style="height: 250px;"><canvas id="summary-chart-monthly"></canvas></div>`;
+        <div style="height: 250px;"><canvas id="summary-chart-monthly"></canvas></div>
+    `;
+
     if (summaryChart) summaryChart.destroy();
     const ctx = document.getElementById('summary-chart-monthly')?.getContext('2d');
     const despesasPorCat = transacoesMes.filter(t=>t.tipo==='despesa').reduce((acc,t)=>{acc[t.categoria]=(acc[t.categoria]||0)+t.valor;return acc;},{});
@@ -356,19 +360,15 @@ export const renderVisaoAnual = () => {
     }
 };
 
-// =======================================================
-// A FUNÇÃO RENDERCONTAS FOI ATUALIZADA A SEGUIR
-// =======================================================
 export const renderContas = () => {
     const container = document.getElementById('accounts-container');
     const { contas, transacoes } = getState();
 
-    if (!contas || !contas.length) { 
-        container.innerHTML = '<p class="text-center text-body-secondary p-3">Nenhuma conta cadastrada.</p>'; 
-        return; 
+    if (!contas || !contas.length) {
+        container.innerHTML = '<p class="text-center text-body-secondary p-3">Nenhuma conta cadastrada.</p>';
+        return;
     }
 
-    // Mapeamento de tipos de conta para ícones
     const ACCOUNT_TYPE_ICONS = {
         'Conta Corrente': 'fas fa-university',
         'Cartão de Crédito': 'far fa-credit-card',
@@ -381,7 +381,7 @@ export const renderContas = () => {
         const saldo = transacoes
             .filter(t => t.conta_id === conta.id)
             .reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, conta.saldo_inicial);
-        
+
         const iconClass = ACCOUNT_TYPE_ICONS[conta.tipo] || ACCOUNT_TYPE_ICONS['default'];
 
         let acoesEspecificas = '';
@@ -419,8 +419,7 @@ export const renderContas = () => {
             </div>
         `;
     }).join('');
-    
-    // Ajusta o preenchimento do container para os cards
+
     container.classList.remove('p-0');
     container.innerHTML = `<div class="p-2">${cardsHtml}</div>`;
 };
@@ -430,7 +429,7 @@ export const renderFormTransacaoRapida = () => {
     if (!container) return;
     const contas = getContas();
     const contasCartao = contas.filter(c => c.tipo === 'Cartão de Crédito');
-    
+
     const contasOptions = contas.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
     const contasCartaoOptions = contasCartao.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
     const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}">${c}</option>`).join('');
@@ -445,7 +444,7 @@ export const renderFormTransacaoRapida = () => {
             </select>
         </div>
         <div class="mb-3"><label class="form-label">Descrição</label><input type="text" name="descricao" class="form-control form-control-sm" required></div>
-        
+
         <div class="mb-3">
             <label for="tipo-transacao" class="form-label">Tipo</label>
             <select id="tipo-transacao" name="tipo" class="form-select form-select-sm">
@@ -455,14 +454,14 @@ export const renderFormTransacaoRapida = () => {
         </div>
 
         <div class="mb-3"><label id="label-valor" class="form-label">Valor</label><input type="number" name="valor" min="0" step="0.01" class="form-control form-control-sm" required></div>
-        
+
         <div class="mb-3" id="group-data"><label id="label-data" class="form-label">Data</label><input type="date" name="data" value="${toISODateString(new Date())}" class="form-control form-control-sm" required></div>
         <div class="mb-3" id="group-conta"><label id="label-conta" class="form-label">Conta</label><select name="conta_id" class="form-select form-select-sm" required>${contasOptions}</select></div>
-        
+
         <div id="parcelada-fields" class="extra-fields">
             <div class="mb-3"><label class="form-label">Nº de Parcelas</label><input name="numero_parcelas" type="number" min="2" class="form-control form-control-sm"></div>
         </div>
-        
+
         <div id="recorrente-fields" class="extra-fields">
             <div class="mb-3"><label class="form-label">Frequência</label>
                 <select name="frequencia" class="form-select form-select-sm">
@@ -475,7 +474,7 @@ export const renderFormTransacaoRapida = () => {
             <div class="mb-3" id="group-dia-vencimento"><label class="form-label">Dia do Vencimento</label><input name="dia_vencimento" type="number" min="1" max="31" value="10" class="form-control form-control-sm"></div>
             <div class="mb-3"><label class="form-label">Quantidade</label><input name="quantidade" type="number" min="1" value="12" class="form-control form-control-sm"></div>
         </div>
-        
+
         <div class="mb-3"><label class="form-label">Categoria</label><select name="categoria" class="form-select form-select-sm" required>${categoriasOptions}</select></div>
         <button type="submit" class="btn btn-primary w-100">Salvar Transação</button>
     `;
@@ -490,9 +489,9 @@ export const renderFormTransacaoRapida = () => {
 export const renderFilters = (type, currentFilters = {}) => {
     const container = document.getElementById(`${type}-filters-container`);
     if (!container) return;
-    
+
     const contas = getContas();
-    const accountOptions = contas.map(conta => 
+    const accountOptions = contas.map(conta =>
         `<option value="${conta.id}" ${currentFilters.contaId == conta.id ? 'selected' : ''}>${conta.nome}</option>`
     ).join('');
 
@@ -534,7 +533,7 @@ const renderSummaryPanel = (containerId, items, type) => {
     const saldo = totalReceitas - totalDespesas;
     const receitasLabel = isHistory ? 'Receitas' : 'A Receber';
     const despesasLabel = isHistory ? 'Despesas' : 'A Pagar';
-    
+
     container.innerHTML = `
         <div class="alert alert-light py-2">
             <div class="d-flex justify-content-around flex-wrap small text-center">
@@ -588,7 +587,7 @@ const renderTransactionCard = (t) => {
     const conta = getContaPorId(t.conta_id);
     const icon = CATEGORY_ICONS[t.categoria] || CATEGORY_ICONS['Outros'];
     const collapseId = `collapse-trans-${t.id || t.descricao.replace(/\W/g, '')}`;
-    
+
     const actions = t.isVirtual ? '<small class="text-info">Parcela Futura (Virtual)</small>' : `
         <div class="btn-group">
             <button class="btn btn-outline-secondary btn-sm" data-action="editar-transacao" data-id="${t.id}" title="Editar"><i class="fas fa-edit"></i></button>
@@ -625,24 +624,24 @@ export const renderLancamentosFuturos = (page = 1, filters) => {
     const container = document.getElementById('bills-list-container');
     if (!container) return;
     const { lancamentosFuturos, comprasParceladas } = getState();
-    
+
     const filtrados = lancamentosFuturos
         .filter(l => l.status === 'pendente')
         .filter(l => (filters.mes === 'todos' || !filters.mes) || l.data_vencimento.startsWith(filters.mes))
         .filter(l => {
-            if (filters.contaId === 'todas' || !filters.contaId) return true; 
+            if (filters.contaId === 'todas' || !filters.contaId) return true;
             const compra = comprasParceladas.find(c => c.id === l.compra_parcelada_id);
             return compra && compra.conta_id == filters.contaId;
         })
         .filter(l => l.descricao.toLowerCase().includes((filters.pesquisa || '').toLowerCase()))
         .sort((a,b) => new Date(a.data_vencimento) - new Date(b.data_vencimento));
-    
+
     renderSummaryPanel('bills-summary-panel', filtrados, 'bills');
 
     const paginados = filtrados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
-    if (!paginados.length) { 
-        container.innerHTML = '<p class="text-center text-body-secondary p-3">Nenhum lançamento futuro encontrado.</p>'; 
-        return; 
+    if (!paginados.length) {
+        container.innerHTML = '<p class="text-center text-body-secondary p-3">Nenhum lançamento futuro encontrado.</p>';
+        return;
     }
     container.innerHTML = paginados.map(l => renderBillItem(l, comprasParceladas)).join('');
 };
@@ -659,11 +658,11 @@ export const renderHistoricoTransacoes = (page = 1, filters) => {
         .sort((a,b) => new Date(b.data) - new Date(a.data));
 
     renderSummaryPanel('history-summary-panel', filtrados, 'history');
-    
+
     const paginados = filtrados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
-    if (!paginados.length) { 
-        container.innerHTML = '<p class="text-center text-body-secondary p-3">Nenhuma transação encontrada para os filtros selecionados.</p>'; 
-        return; 
+    if (!paginados.length) {
+        container.innerHTML = '<p class="text-center text-body-secondary p-3">Nenhuma transação encontrada para os filtros selecionados.</p>';
+        return;
     }
     container.innerHTML = paginados.map(renderTransactionCard).join('');
 };
@@ -737,7 +736,7 @@ export const getTransactionModalContent = (id) => {
     const title = 'Editar Transação';
     const contasOptions = getContas().map(c => `<option value="${c.id}" ${transacao.conta_id === c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
     const categoriasOptions = CATEGORIAS_PADRAO.map(c => `<option value="${c}" ${transacao.categoria === c ? 'selected' : ''}>${c}</option>`).join('');
-    
+
     const body = `
         <form id="form-edicao-transacao" data-id="${id}">
             <div class="mb-3"><label class="form-label">Descrição</label><input name="descricao" value="${transacao.descricao}" class="form-control" required></div>
@@ -811,7 +810,7 @@ export const getStatementModalContent = (contaId) => {
         <div id="statement-details-container" class="mt-4">
             <p class="text-center text-body-secondary">Selecione um mês para ver os detalhes da fatura.</p>
         </div>`;
-    
+
     return { title, body };
 };
 
@@ -829,7 +828,7 @@ export const renderStatementDetails = (contaId, mesSelecionado) => {
     const diaFechamento = conta.dia_fechamento_cartao || 28;
 
     const [ano, mes] = mesSelecionado.split('-').map(Number);
-    
+
     const fimCiclo = new Date(ano, mes - 1, diaFechamento, 12);
     const inicioCiclo = new Date(fimCiclo);
     inicioCiclo.setMonth(inicioCiclo.getMonth() - 1);
@@ -844,8 +843,8 @@ export const renderStatementDetails = (contaId, mesSelecionado) => {
 
     const totalFatura = transacoesFatura.reduce((acc, t) => acc + t.valor, 0);
 
-    const itemsHtml = transacoesFatura.length ? 
-        transacoesFatura.map(renderTransactionCard).join('') : 
+    const itemsHtml = transacoesFatura.length ?
+        transacoesFatura.map(renderTransactionCard).join('') :
         '<p class="text-center text-body-secondary p-3">Nenhuma despesa nesta fatura.</p>';
 
     container.innerHTML = `
@@ -894,7 +893,7 @@ export const getAccountStatementModalContent = (contaId) => {
         <div id="account-statement-details-container" class="mt-4">
             <p class="text-center text-body-secondary">Selecione um mês para ver os detalhes do extrato.</p>
         </div>`;
-    
+
     return { title, body };
 };
 
