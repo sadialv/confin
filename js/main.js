@@ -5,7 +5,7 @@ import { applyTheme, toISODateString } from './utils.js';
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    let historyFilters = { 
+    let statementFilters = {
         mes: new Date().toISOString().slice(0, 7),
         pesquisa: '',
         contaId: 'todas'
@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = await API.fetchData();
             State.setState(data);
-            UI.renderAllComponents({ history: historyFilters, bills: billsFilters });
+            UI.renderAllComponents({ statement: statementFilters, bills: billsFilters });
         } catch (error) {
             UI.showToast(error.message, 'error');
         }
@@ -377,11 +377,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         document.body.addEventListener('change', e => {
-            // ===== LINHA ADICIONADA AQUI =====
-            if (e.target.id === 'tab-statement-month-select') {
-                UI.renderMonthlyStatementDetails(e.target.value);
+            if (['tab-statement-month-select', 'tab-statement-account-filter'].includes(e.target.id)) {
+                statementFilters.mes = document.getElementById('tab-statement-month-select').value;
+                statementFilters.contaId = document.getElementById('tab-statement-account-filter').value;
+                UI.renderMonthlyStatementDetails(statementFilters);
             }
-            // ===================================
             if (e.target.id === 'conta-tipo') {
                 const isCreditCard = e.target.value === 'Cartão de Crédito';
                 const cartaoFields = document.getElementById('cartao-credito-fields');
@@ -414,17 +414,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     labelValor.textContent = 'Valor';
                 }
             }
-            if (e.target.id === 'history-month-filter') {
-                historyFilters.mes = e.target.value;
-                UI.renderHistoricoTransacoes(1, historyFilters);
-            }
             if (e.target.id === 'bills-month-filter') {
                 billsFilters.mes = e.target.value;
                 UI.renderLancamentosFuturos(1, billsFilters);
-            }
-            if (e.target.id === 'history-account-filter') {
-                historyFilters.contaId = e.target.value;
-                UI.renderHistoricoTransacoes(1, historyFilters);
             }
             if (e.target.id === 'bills-account-filter') {
                 billsFilters.contaId = e.target.value;
@@ -433,9 +425,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         document.body.addEventListener('input', e => {
-            if (e.target.id === 'history-search-input') {
-                historyFilters.pesquisa = e.target.value;
-                UI.renderHistoricoTransacoes(1, historyFilters);
+            if (e.target.id === 'tab-statement-search-input') {
+                statementFilters.pesquisa = e.target.value;
+                UI.renderMonthlyStatementDetails(statementFilters);
             }
             if (e.target.id === 'bills-search-input') {
                 billsFilters.pesquisa = e.target.value;
@@ -446,29 +438,3 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.addEventListener('submit', e => {
             e.preventDefault();
             switch (e.target.id) {
-                case 'form-conta': salvarConta(e); break;
-                case 'form-transacao-unificada': salvarTransacaoUnificada(e); break;
-                case 'form-pagamento': confirmarPagamento(e); break;
-                case 'form-edicao-transacao': salvarEdicaoTransacao(e); break;
-                case 'form-lancamento': salvarLancamentoFuturo(e); break;
-                case 'form-compra-parcelada': salvarCompraParcelada(e); break;
-            }
-        });
-    }
-
-    async function initializeApp() {
-        UI.showToast('Carregando dados...');
-        try {
-            const data = await API.fetchData();
-            State.setState(data);
-            UI.renderAllComponents({ history: historyFilters, bills: billsFilters });
-        } catch (error) {
-            UI.showToast(error.message, 'error');
-            console.error("Falha na inicialização:", error);
-        }
-    }
-
-    applyTheme(localStorage.getItem('confin-theme') || 'light');
-    setupEventListeners();
-    initializeApp();
-});
