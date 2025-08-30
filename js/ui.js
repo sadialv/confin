@@ -791,6 +791,7 @@ export const getStatementModalContent = (contaId) => {
     return { title, body };
 };
 
+// --- FUNÇÃO CORRIGIDA ---
 export const renderStatementDetails = (contaId, mesSelecionado) => {
     const container = document.getElementById('statement-details-container');
     if (!container) return;
@@ -806,14 +807,17 @@ export const renderStatementDetails = (contaId, mesSelecionado) => {
 
     const [ano, mes] = mesSelecionado.split('-').map(Number);
 
-    const fimCiclo = new Date(ano, mes - 1, diaFechamento, 12);
+    // Lógica de data corrigida
+    const fimCiclo = new Date(ano, mes - 1, diaFechamento, 23, 59, 59);
     const inicioCiclo = new Date(fimCiclo);
     inicioCiclo.setMonth(inicioCiclo.getMonth() - 1);
+    inicioCiclo.setDate(inicioCiclo.getDate() + 1);
+    inicioCiclo.setHours(0, 0, 0, 0);
 
     const transacoesFatura = transacoesCompletas.filter(t => {
         const dataTransacao = new Date(t.data + 'T12:00:00');
         return t.conta_id === contaId &&
-               dataTransacao > inicioCiclo &&
+               dataTransacao >= inicioCiclo &&
                dataTransacao <= fimCiclo &&
                t.tipo === 'despesa';
     }).sort((a, b) => new Date(a.data) - new Date(b.data));
