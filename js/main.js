@@ -377,9 +377,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         document.body.addEventListener('change', e => {
+            // ===== LINHA ADICIONADA AQUI =====
             if (e.target.id === 'tab-statement-month-select') {
                 UI.renderMonthlyStatementDetails(e.target.value);
             }
+            // ===================================
             if (e.target.id === 'conta-tipo') {
                 const isCreditCard = e.target.value === 'Cartão de Crédito';
                 const cartaoFields = document.getElementById('cartao-credito-fields');
