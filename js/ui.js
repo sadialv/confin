@@ -942,3 +942,91 @@ export const renderAccountStatementDetails = (contaId, mesSelecionado) => {
             ${itemsHtml}
         </div>`;
 };
+
+// ======================================================
+// ========= INÍCIO DAS FUNÇÕES ADICIONADAS =============
+// ======================================================
+
+export const renderMonthlyStatementTab = () => {
+    const container = document.getElementById('statement-tab-pane');
+    if (!container) return;
+
+    const { transacoes } = getState();
+
+    // Pega todos os meses disponíveis baseados nas transações
+    const availableMonths = [...new Set(
+        transacoes.map(t => t.data.substring(0, 7))
+    )].sort().reverse();
+
+    const monthOptions = availableMonths.map(mes => {
+        const [ano, mesNum] = mes.split('-');
+        const nomeMes = new Date(ano, mesNum - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        // Seleciona o mês atual por padrão
+        const isSelected = mes === new Date().toISOString().slice(0, 7) ? 'selected' : '';
+        return `<option value="${mes}" ${isSelected}>${nomeMes}</option>`;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="mb-3">
+            <label for="tab-statement-month-select" class="form-label">Selecione o Mês:</label>
+            <select id="tab-statement-month-select" class="form-select">
+                ${monthOptions}
+            </select>
+        </div>
+        <div id="tab-statement-details-container" class="mt-4">
+            </div>
+    `;
+
+    // Renderiza os detalhes para o mês selecionado inicialmente
+    const monthSelect = document.getElementById('tab-statement-month-select');
+    if (monthSelect && monthSelect.value) {
+        renderMonthlyStatementDetails(monthSelect.value);
+    } else {
+        renderMonthlyStatementDetails(null);
+    }
+};
+
+export const renderMonthlyStatementDetails = (mesSelecionado) => {
+    const container = document.getElementById('tab-statement-details-container');
+    if (!container) return;
+    
+    if (!mesSelecionado) {
+        container.innerHTML = '<p class="text-center text-body-secondary p-3">Nenhuma transação encontrada para gerar extratos.</p>';
+        return;
+    }
+
+    const { transacoes } = getState();
+    const transacoesDoMes = transacoes.filter(t => t.data.startsWith(mesSelecionado));
+
+    const receitas = transacoesDoMes.filter(t => t.tipo === 'receita').reduce((s, t) => s + t.valor, 0);
+    const despesas = transacoesDoMes.filter(t => t.tipo === 'despesa').reduce((s, t) => s + t.valor, 0);
+    const saldo = receitas - despesas;
+
+    const itemsHtml = transacoesDoMes.length ?
+        transacoesDoMes.sort((a,b) => new Date(b.data) - new Date(a.data)).map(renderTransactionCard).join('') :
+        '<p class="text-center text-body-secondary p-3">Nenhuma transação encontrada para este mês.</p>';
+
+    container.innerHTML = `
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <h6 class="small text-uppercase">Receitas</h6>
+                        <p class="h4 income-text mb-0">${formatarMoeda(receitas)}</p>
+                    </div>
+                    <div class="col-4">
+                        <h6 class="small text-uppercase">Despesas</h6>
+                        <p class="h4 expense-text mb-0">${formatarMoeda(despesas)}</p>
+                    </div>
+                    <div class="col-4">
+                        <h6 class="small text-uppercase">Saldo do Mês</h6>
+                        <p class="h4 ${saldo >= 0 ? 'income-text' : 'expense-text'} mb-0">${formatarMoeda(saldo)}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="accordion">
+            ${itemsHtml}
+        </div>
+    `;
+};
