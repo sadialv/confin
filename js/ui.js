@@ -76,9 +76,7 @@ export const renderAllComponents = (initialFilters) => {
     renderFinancialHealth();
     renderFilters('bills', initialFilters.bills);
     renderLancamentosFuturos(1, initialFilters.bills);
-    renderFilters('history', initialFilters.history);
-    renderHistoricoTransacoes(1, initialFilters.history);
-    renderMonthlyStatementTab();
+    renderMonthlyStatementTab(initialFilters.statement);
 };
 
 // --- CÁLCULOS E RENDERIZAÇÃO DA SAÚDE FINANCEIRA ---
@@ -646,27 +644,6 @@ export const renderLancamentosFuturos = (page = 1, filters) => {
     container.innerHTML = paginados.map(l => renderBillItem(l, comprasParceladas)).join('');
 };
 
-export const renderHistoricoTransacoes = (page = 1, filters) => {
-    const container = document.getElementById('history-list-container');
-    if (!container) return;
-    const transacoesCompletas = [...getState().transacoes, ...gerarTransacoesVirtuais()];
-
-    const filtrados = transacoesCompletas
-        .filter(t => (filters.mes === 'todos' || !filters.mes) || t.data.startsWith(filters.mes))
-        .filter(t => (filters.contaId === 'todas' || !filters.contaId) || t.conta_id == filters.contaId)
-        .filter(t => t.descricao.toLowerCase().includes((filters.pesquisa || '').toLowerCase()))
-        .sort((a,b) => new Date(b.data) - new Date(a.data));
-
-    renderSummaryPanel('history-summary-panel', filtrados, 'history');
-
-    const paginados = filtrados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
-    if (!paginados.length) {
-        container.innerHTML = '<p class="text-center text-body-secondary p-3">Nenhuma transação encontrada para os filtros selecionados.</p>';
-        return;
-    }
-    container.innerHTML = paginados.map(renderTransactionCard).join('');
-};
-
 export const getAccountModalContent = (id = null) => {
     const conta = id ? getContaPorId(id) : {};
     const title = id ? 'Editar Conta' : 'Nova Conta';
@@ -944,84 +921,84 @@ export const renderAccountStatementDetails = (contaId, mesSelecionado) => {
 };
 
 // ======================================================
-// ========= INÍCIO DAS FUNÇÕES ADICIONADAS =============
+// ========= ATUALIZAÇÃO ABA EXTRATO MENSAL =============
 // ======================================================
 
-export const renderMonthlyStatementTab = () => {
+export const renderMonthlyStatementTab = (initialFilters = {}) => {
     const container = document.getElementById('statement-tab-pane');
     if (!container) return;
 
     const { transacoes } = getState();
+    const contas = getContas();
 
-    // Pega todos os meses disponíveis baseados nas transações
-    const availableMonths = [...new Set(
-        transacoes.map(t => t.data.substring(0, 7))
-    )].sort().reverse();
+    const accountOptions = contas.map(conta =>
+        `<option value="${conta.id}" ${initialFilters.contaId == conta.id ? 'selected' : ''}>${conta.nome}</option>`
+    ).join('');
 
+    const availableMonths = [...new Set(transacoes.map(t => t.data.substring(0, 7)))].sort().reverse();
     const monthOptions = availableMonths.map(mes => {
         const [ano, mesNum] = mes.split('-');
         const nomeMes = new Date(ano, mesNum - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
-        // Seleciona o mês atual por padrão
-        const isSelected = mes === new Date().toISOString().slice(0, 7) ? 'selected' : '';
-        return `<option value="${mes}" ${isSelected}>${nomeMes}</option>`;
+        return `<option value="${mes}" ${initialFilters.mes === mes ? 'selected' : ''}>${nomeMes}</option>`;
     }).join('');
 
     container.innerHTML = `
-        <div class="mb-3">
-            <label for="tab-statement-month-select" class="form-label">Selecione o Mês:</label>
-            <select id="tab-statement-month-select" class="form-select">
-                ${monthOptions}
-            </select>
+        <div class="row g-2 mb-3">
+            <div class="col-md-4">
+                <select class="form-select form-select-sm" id="tab-statement-month-select">
+                    ${monthOptions}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <select class="form-select form-select-sm" id="tab-statement-account-filter">
+                    <option value="todas" ${!initialFilters.contaId || initialFilters.contaId === 'todas' ? 'selected' : ''}>Todas as Contas</option>
+                    ${accountOptions}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <input type="search" class="form-control form-control-sm" id="tab-statement-search-input" placeholder="Pesquisar..." value="${initialFilters.pesquisa || ''}">
+            </div>
         </div>
-        <div id="tab-statement-details-container" class="mt-4">
+        <div id="tab-statement-details-container" class="mt-2">
             </div>
     `;
 
-    // Renderiza os detalhes para o mês selecionado inicialmente
-    const monthSelect = document.getElementById('tab-statement-month-select');
-    if (monthSelect && monthSelect.value) {
-        renderMonthlyStatementDetails(monthSelect.value);
-    } else {
-        renderMonthlyStatementDetails(null);
-    }
+    renderMonthlyStatementDetails(initialFilters);
 };
 
-export const renderMonthlyStatementDetails = (mesSelecionado) => {
+export const renderMonthlyStatementDetails = (filters = {}) => {
     const container = document.getElementById('tab-statement-details-container');
     if (!container) return;
-    
+
+    const mesSelecionado = filters.mes;
     if (!mesSelecionado) {
         container.innerHTML = '<p class="text-center text-body-secondary p-3">Nenhuma transação encontrada para gerar extratos.</p>';
         return;
     }
 
-    const { transacoes } = getState();
-    const transacoesDoMes = transacoes.filter(t => t.data.startsWith(mesSelecionado));
+    const transacoesCompletas = [...getState().transacoes, ...gerarTransacoesVirtuais()];
+    
+    const transacoesFiltradas = transacoesCompletas
+        .filter(t => t.data.startsWith(mesSelecionado))
+        .filter(t => (filters.contaId === 'todas' || !filters.contaId) || t.conta_id == filters.contaId)
+        .filter(t => t.descricao.toLowerCase().includes((filters.pesquisa || '').toLowerCase()));
 
-    const receitas = transacoesDoMes.filter(t => t.tipo === 'receita').reduce((s, t) => s + t.valor, 0);
-    const despesas = transacoesDoMes.filter(t => t.tipo === 'despesa').reduce((s, t) => s + t.valor, 0);
+    const receitas = transacoesFiltradas.filter(t => t.tipo === 'receita').reduce((s, t) => s + t.valor, 0);
+    const despesas = transacoesFiltradas.filter(t => t.tipo === 'despesa').reduce((s, t) => s + t.valor, 0);
     const saldo = receitas - despesas;
 
-    const itemsHtml = transacoesDoMes.length ?
-        transacoesDoMes.sort((a,b) => new Date(b.data) - new Date(a.data)).map(renderTransactionCard).join('') :
-        '<p class="text-center text-body-secondary p-3">Nenhuma transação encontrada para este mês.</p>';
+    const itemsHtml = transacoesFiltradas.length ?
+        transacoesFiltradas.sort((a,b) => new Date(b.data) - new Date(a.data)).map(renderTransactionCard).join('') :
+        '<p class="text-center text-body-secondary p-3">Nenhuma transação encontrada para os filtros selecionados.</p>';
 
     container.innerHTML = `
         <div class="card mb-3">
-            <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-4">
-                        <h6 class="small text-uppercase">Receitas</h6>
-                        <p class="h4 income-text mb-0">${formatarMoeda(receitas)}</p>
-                    </div>
-                    <div class="col-4">
-                        <h6 class="small text-uppercase">Despesas</h6>
-                        <p class="h4 expense-text mb-0">${formatarMoeda(despesas)}</p>
-                    </div>
-                    <div class="col-4">
-                        <h6 class="small text-uppercase">Saldo do Mês</h6>
-                        <p class="h4 ${saldo >= 0 ? 'income-text' : 'expense-text'} mb-0">${formatarMoeda(saldo)}</p>
-                    </div>
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-around flex-wrap small text-center">
+                    <span>Resultados: <strong class="d-block">${transacoesFiltradas.length}</strong></span>
+                    <span class="income-text">Receitas: <strong class="d-block">${formatarMoeda(receitas)}</strong></span>
+                    <span class="expense-text">Despesas: <strong class="d-block">${formatarMoeda(despesas)}</strong></span>
+                    <span>Saldo: <strong class="d-block ${saldo >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldo)}</strong></span>
                 </div>
             </div>
         </div>
