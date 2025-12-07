@@ -21,25 +21,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- LÓGICA DE CARREGAMENTO INTELIGENTE (Performance) ---
     async function carregarDadosOtimizados() {
         try {
-            // 1. Define Data de Corte: 1º de Janeiro do ano atual
             const anoAtual = new Date().getFullYear();
             const dataCorte = `${anoAtual}-01-01`;
 
-            // 2. Carrega dados auxiliares e o resumo antigo em paralelo
             const [auxiliares, transacoesAntigas, transacoesRecentes] = await Promise.all([
                 API.fetchDadosAuxiliares(),
                 API.fetchResumoTransacoesAntigas(dataCorte),
                 API.fetchTransacoesRecentes(dataCorte)
             ]);
 
-            // 3. Calcula o "Saldo Acumulado" dos anos anteriores
             const saldosAcumulados = {}; 
             transacoesAntigas.forEach(t => {
                 const valor = t.tipo === 'receita' ? t.valor : -t.valor;
                 saldosAcumulados[t.conta_id] = (saldosAcumulados[t.conta_id] || 0) + valor;
             });
 
-            // 4. Atualiza o saldo inicial das contas na memória
             const contasAjustadas = auxiliares.contas.map(conta => {
                 const acumuladoAntigo = saldosAcumulados[conta.id] || 0;
                 return {
@@ -48,15 +44,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
             });
 
-            // 5. Salva no Estado Global
             State.setState({
                 contas: contasAjustadas.sort((a, b) => a.nome.localeCompare(b.nome)),
                 lancamentosFuturos: auxiliares.lancamentosFuturos,
                 comprasParceladas: auxiliares.comprasParceladas,
-                transacoes: transacoesRecentes // Apenas transações deste ano
+                transacoes: transacoesRecentes
             });
 
-            // 6. Renderiza a tela
             UI.renderAllComponents({ history: historyFilters, bills: billsFilters });
             
         } catch (error) {
@@ -65,7 +59,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Wrapper para recarregar a tela após ações
     async function reloadStateAndRender() {
         await carregarDadosOtimizados();
     }
@@ -147,8 +140,6 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.setLoadingState(btn, true);
         try {
             const data = Object.fromEntries(new FormData(form));
-            
-            // Vincula pagamento ao boleto original
             const transacao = {
                 descricao: form.dataset.desc, 
                 valor: parseFloat(form.dataset.valor),
@@ -179,8 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = Object.fromEntries(new FormData(form));
             
-            // CORREÇÃO PARA RECEITAS RECORRENTES:
-            // Define o tipo do lançamento futuro baseado na escolha do usuário (Receita ou Despesa)
+            // Define se é a receber ou a pagar baseado no formulário
             const tipoLancamentoFuturo = data.tipo === 'receita' ? 'a_receber' : 'a_pagar';
 
             if (data.tipo_compra === 'vista') {
@@ -227,13 +217,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         descricao: data.descricao, 
                         valor: Math.abs(valor),
                         data_vencimento: toISODateString(proximaData), 
-                        tipo: tipoLancamentoFuturo, // <--- Usa a variável corrigida aqui
+                        tipo: tipoLancamentoFuturo, 
                         status: 'pendente', 
                         categoria: data.categoria
                     });
                 }
                 if (lancamentos.length > 0) await API.salvarMultiplosLancamentos(lancamentos);
-                toastMessage = `${lancamentos.length} lançamentos recorrentes criados!`;
+                
+                // CORREÇÃO: Mostra o toast diretamente aqui
+                UI.showToast(`${lancamentos.length} lançamentos recorrentes criados!`);
             }
             
             form.reset();
@@ -295,10 +287,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 await deletarCompraParceladaCompleta(idCompraAntiga);
             }
             const data = Object.fromEntries(new FormData(form));
-            // Recria parcelamento
             await criarLancamentosParcelados({
                 descricao: data.descricao, valor_total: parseFloat(data.valor_total),
-                numero_parcelas: parseInt(data.numero_parcelas), data_compra: data.data_compra,
+                numero_parcelas: parseInt(data.numero_parcelas), data_compra: data.data,
                 conta_id: parseInt(data.conta_id), categoria: data.categoria,
             });
             
@@ -357,7 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- SETUP LISTENERS (Eventos globais) ---
+    // --- SETUP LISTENERS ---
     function setupEventListeners() {
         document.getElementById('theme-switcher').addEventListener('click', () => {
             const current = document.documentElement.getAttribute('data-theme');
@@ -379,32 +370,31 @@ document.addEventListener('DOMContentLoaded', () => {
             const id = parseInt(target.dataset.id);
             const compraId = parseInt(target.dataset.compraId);
 
-            // Roteamento de ações dos botões
-            if(action === 'editar-conta') UI.openModal(UI.getAccountModalContent(id));
-            if(action === 'deletar-conta') deletarConta(id);
-            if(action === 'ver-fatura') {
-                UI.openModal(UI.getStatementModalContent(id));
-                document.getElementById('statement-month-select')?.addEventListener('change', (e) => UI.renderStatementDetails(parseInt(e.target.dataset.contaId), e.target.value));
+            switch (action) {
+                case 'editar-conta': UI.openModal(UI.getAccountModalContent(id)); break;
+                case 'deletar-conta': deletarConta(id); break;
+                case 'ver-fatura':
+                    UI.openModal(UI.getStatementModalContent(id));
+                    document.getElementById('statement-month-select')?.addEventListener('change', (e) => UI.renderStatementDetails(parseInt(e.target.dataset.contaId), e.target.value));
+                    break;
+                case 'ver-extrato':
+                    UI.openModal(UI.getAccountStatementModalContent(id));
+                    document.getElementById('account-statement-month-select')?.addEventListener('change', (e) => UI.renderAccountStatementDetails(parseInt(e.target.dataset.contaId), e.target.value));
+                    break;
+                case 'pagar-conta': UI.openModal(UI.getPayBillModalContent(id)); break;
+                case 'editar-lancamento': UI.openModal(UI.getBillModalContent(id)); break;
+                case 'recriar-compra-parcelada':
+                     const compra = State.getState().comprasParceladas.find(c => c.id === id);
+                     if (compra) UI.openModal(UI.getInstallmentPurchaseModalContent(compra));
+                     break;
+                case 'deletar-lancamento': deletarLancamento(id, compraId); break;
+                case 'editar-transacao': UI.openModal(UI.getTransactionModalContent(id)); break;
+                case 'deletar-transacao': deletarTransacao(id); break;
             }
-            if(action === 'ver-extrato') {
-                UI.openModal(UI.getAccountStatementModalContent(id));
-                document.getElementById('account-statement-month-select')?.addEventListener('change', (e) => UI.renderAccountStatementDetails(parseInt(e.target.dataset.contaId), e.target.value));
-            }
-            if(action === 'pagar-conta') UI.openModal(UI.getPayBillModalContent(id));
-            if(action === 'editar-lancamento') UI.openModal(UI.getBillModalContent(id));
-            if(action === 'recriar-compra-parcelada') {
-                 const compra = State.getState().comprasParceladas.find(c => c.id === id);
-                 if (compra) UI.openModal(UI.getInstallmentPurchaseModalContent(compra));
-            }
-            if(action === 'deletar-lancamento') deletarLancamento(id, compraId);
-            if(action === 'editar-transacao') UI.openModal(UI.getTransactionModalContent(id));
-            if(action === 'deletar-transacao') deletarTransacao(id);
         });
 
         document.body.addEventListener('change', e => {
-            if (e.target.id === 'tab-statement-month-select') {
-                UI.renderMonthlyStatementDetails(e.target.value);
-            }
+            if (e.target.id === 'tab-statement-month-select') UI.renderMonthlyStatementDetails(e.target.value);
             if (e.target.id === 'conta-tipo') {
                 const isCreditCard = e.target.value === 'Cartão de Crédito';
                 const cartaoFields = document.getElementById('cartao-credito-fields');
@@ -415,7 +405,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const form = e.target.closest('form');
                 const parceladaFields = form.querySelector('#parcelada-fields');
                 const recorrenteFields = form.querySelector('#recorrente-fields');
-                const labelValor = form.querySelector('#label-valor');
                 const selectConta = form.querySelector('select[name="conta_id"]');
                 
                 if(parceladaFields) parceladaFields.style.display = 'none';
@@ -424,13 +413,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (tipo === 'parcelada') {
                     if(parceladaFields) parceladaFields.style.display = 'block';
-                    labelValor.textContent = 'Valor Total';
+                    form.querySelector('#label-valor').textContent = 'Valor Total';
                     if (selectConta.dataset.creditCardOptions) selectConta.innerHTML = selectConta.dataset.creditCardOptions;
                 } else if (tipo === 'recorrente') {
                     if(recorrenteFields) recorrenteFields.style.display = 'block';
-                    labelValor.textContent = 'Valor da Recorrência';
+                    form.querySelector('#label-valor').textContent = 'Valor da Recorrência';
                 } else {
-                    labelValor.textContent = 'Valor';
+                    form.querySelector('#label-valor').textContent = 'Valor';
                 }
             }
             
