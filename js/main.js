@@ -21,21 +21,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- LÓGICA DE CARREGAMENTO INTELIGENTE (Performance) ---
     async function carregarDadosOtimizados() {
         try {
+            // 1. Define Data de Corte: 1º de Janeiro do ano atual
             const anoAtual = new Date().getFullYear();
             const dataCorte = `${anoAtual}-01-01`;
 
+            // 2. Carrega dados auxiliares e o resumo antigo em paralelo
             const [auxiliares, transacoesAntigas, transacoesRecentes] = await Promise.all([
                 API.fetchDadosAuxiliares(),
                 API.fetchResumoTransacoesAntigas(dataCorte),
                 API.fetchTransacoesRecentes(dataCorte)
             ]);
 
+            // 3. Calcula o "Saldo Acumulado" dos anos anteriores
             const saldosAcumulados = {}; 
             transacoesAntigas.forEach(t => {
                 const valor = t.tipo === 'receita' ? t.valor : -t.valor;
                 saldosAcumulados[t.conta_id] = (saldosAcumulados[t.conta_id] || 0) + valor;
             });
 
+            // 4. Atualiza o saldo inicial das contas na memória
             const contasAjustadas = auxiliares.contas.map(conta => {
                 const acumuladoAntigo = saldosAcumulados[conta.id] || 0;
                 return {
@@ -44,13 +48,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
             });
 
+            // 5. Salva no Estado Global
             State.setState({
                 contas: contasAjustadas.sort((a, b) => a.nome.localeCompare(b.nome)),
                 lancamentosFuturos: auxiliares.lancamentosFuturos,
                 comprasParceladas: auxiliares.comprasParceladas,
-                transacoes: transacoesRecentes
+                transacoes: transacoesRecentes // Apenas transações deste ano
             });
 
+            // 6. Renderiza a tela
             UI.renderAllComponents({ history: historyFilters, bills: billsFilters });
             
         } catch (error) {
@@ -59,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Wrapper para recarregar a tela após ações
     async function reloadStateAndRender() {
         await carregarDadosOtimizados();
     }
@@ -140,6 +147,8 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.setLoadingState(btn, true);
         try {
             const data = Object.fromEntries(new FormData(form));
+            
+            // Vincula pagamento ao boleto original
             const transacao = {
                 descricao: form.dataset.desc, 
                 valor: parseFloat(form.dataset.valor),
@@ -154,7 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await API.salvarDados('lancamentos_futuros', { status: 'pago' }, form.dataset.billId);
             
             UI.closeModal();
-            UI.showToast('Conta paga!');
+            UI.showToast('Lançamento efetivado!');
             await reloadStateAndRender();
         } catch (err) {
             UI.showToast(err.message, 'error');
@@ -170,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = Object.fromEntries(new FormData(form));
             
-            // Define se é a receber ou a pagar baseado no formulário
+            // Define o tipo corretamente (a_receber para receitas, a_pagar para despesas)
             const tipoLancamentoFuturo = data.tipo === 'receita' ? 'a_receber' : 'a_pagar';
 
             if (data.tipo_compra === 'vista') {
@@ -194,11 +203,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
             } else if (data.tipo_compra === 'recorrente') {
                 const valor = parseFloat(data.valor);
-                const dataInicio = new Date(data.data + 'T12:00:00');
-                const lancamentos = [];
                 const quantidade = parseInt(data.quantidade);
+                const dataInicio = new Date(data.data + 'T12:00:00');
                 const diaVencimento = parseInt(data.dia_vencimento);
                 const frequencia = data.frequencia;
+
+                // 1. Cria o REGISTRO PAI (Agregador da série)
+                const dadosSerie = {
+                    descricao: `${data.descricao} (Série)`,
+                    valor_total: valor * quantidade,
+                    numero_parcelas: quantidade,
+                    data_compra: data.data,
+                    conta_id: parseInt(data.conta_id),
+                    categoria: data.categoria
+                };
+                
+                const serieSalva = await API.salvarDados('compras_parceladas', dadosSerie);
+
+                // 2. Gera os lançamentos mensais vinculados
+                const lancamentos = [];
                 
                 for (let i = 0; i < quantidade; i++) {
                     let proximaData;
@@ -214,18 +237,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     lancamentos.push({
-                        descricao: data.descricao, 
+                        descricao: `${data.descricao} (${i + 1}/${quantidade})`,
                         valor: Math.abs(valor),
                         data_vencimento: toISODateString(proximaData), 
-                        tipo: tipoLancamentoFuturo, 
+                        tipo: tipoLancamentoFuturo, // Usa tipo correto (receita/despesa)
                         status: 'pendente', 
-                        categoria: data.categoria
+                        categoria: data.categoria,
+                        compra_parcelada_id: serieSalva.id // Vincula ao pai
                     });
                 }
-                if (lancamentos.length > 0) await API.salvarMultiplosLancamentos(lancamentos);
                 
-                // CORREÇÃO: Mostra o toast diretamente aqui
-                UI.showToast(`${lancamentos.length} lançamentos recorrentes criados!`);
+                if (lancamentos.length > 0) await API.salvarMultiplosLancamentos(lancamentos);
+                UI.showToast(`Série recorrente criada com ${lancamentos.length} lançamentos!`);
             }
             
             form.reset();
@@ -277,30 +300,100 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- FUNÇÃO INTELIGENTE DE ATUALIZAÇÃO DE SÉRIE ---
     async function salvarCompraParcelada(e) {
         const form = e.target;
         const btn = form.querySelector('button[type="submit"]');
-        const idCompraAntiga = form.dataset.compraAntigaId ? parseInt(form.dataset.compraAntigaId) : null;
-        UI.setLoadingState(btn, true);
+        const idSerie = form.dataset.compraAntigaId ? parseInt(form.dataset.compraAntigaId) : null;
+        
+        UI.setLoadingState(btn, true, 'Atualizando...');
+        
         try {
-            if (idCompraAntiga) {
-                await deletarCompraParceladaCompleta(idCompraAntiga);
-            }
             const data = Object.fromEntries(new FormData(form));
-            await criarLancamentosParcelados({
-                descricao: data.descricao, valor_total: parseFloat(data.valor_total),
-                numero_parcelas: parseInt(data.numero_parcelas), data_compra: data.data,
-                conta_id: parseInt(data.conta_id), categoria: data.categoria,
-            });
+            const tipoSerie = data.tipo_serie; // 'parcelada' ou 'recorrente'
+            const valorUnitario = parseFloat(data.valor_total);
+            
+            // 1. Atualiza os dados do "Pai"
+            const dadosAtualizados = {
+                descricao: data.descricao,
+                conta_id: parseInt(data.conta_id),
+                categoria: data.categoria,
+                data_compra: data.data_inicio // Nova data de referência
+            };
+            
+            await API.salvarDados('compras_parceladas', dadosAtualizados, idSerie);
+
+            // 2. Apaga APENAS os lançamentos futuros PENDENTES desta série
+            await API.deletarLancamentosPendentesPorCompraId(idSerie);
+
+            // 3. Recria os lançamentos futuros com a nova regra
+            const lancamentos = [];
+            const dataInicio = new Date(data.data_inicio + 'T12:00:00');
+            
+            // Tenta manter o tipo original (receita/despesa) olhando o histórico
+            const lancamentosAntigos = State.getState().lancamentosFuturos.filter(l => l.compra_parcelada_id === idSerie);
+            const tipoOriginal = lancamentosAntigos.length > 0 ? lancamentosAntigos[0].tipo : 'a_pagar'; 
+
+            if (tipoSerie === 'parcelada') {
+                // Se for cartão, recria como parcela normal (simplificado)
+                // Nota: Idealmente aqui teria lógica específica de cartão, mas para "reconfigurar" funciona bem
+                // criarLancamentosParcelados criaria um novo pai, então fazemos manual aqui para manter o ID
+                const diaVencimento = 10; // Default fallback
+                for (let i = 0; i < parseInt(data.numero_parcelas); i++) {
+                     let dataVenc = new Date(dataInicio);
+                     dataVenc.setMonth(dataInicio.getMonth() + i);
+                     lancamentos.push({
+                        descricao: `${data.descricao} (${i + 1}/${data.numero_parcelas})`,
+                        valor: valorUnitario / parseInt(data.numero_parcelas),
+                        data_vencimento: toISODateString(dataVenc),
+                        tipo: 'a_pagar',
+                        status: 'pendente',
+                        compra_parcelada_id: idSerie,
+                        categoria: data.categoria
+                    });
+                }
+
+            } else {
+                // LÓGICA RECORRENTE (SALÁRIO)
+                const quantidade = parseInt(data.quantidade);
+                const frequencia = data.frequencia;
+                
+                for (let i = 0; i < quantidade; i++) {
+                    let proximaData = new Date(dataInicio);
+                    
+                    if (frequencia === 'mensal') {
+                        proximaData.setMonth(dataInicio.getMonth() + i);
+                    } else if (frequencia === 'semestral') {
+                        proximaData.setMonth(dataInicio.getMonth() + (i * 6));
+                    } else if (frequencia === 'anual') {
+                        proximaData.setFullYear(dataInicio.getFullYear() + i);
+                    } else if (frequencia === 'quinzenal') {
+                        proximaData.setDate(dataInicio.getDate() + (i * 15));
+                    }
+
+                    lancamentos.push({
+                        descricao: `${data.descricao} (Renovado ${i + 1}/${quantidade})`,
+                        valor: valorUnitario,
+                        data_vencimento: toISODateString(proximaData),
+                        tipo: tipoOriginal, // Mantém se é a_receber ou a_pagar
+                        status: 'pendente',
+                        compra_parcelada_id: idSerie,
+                        categoria: data.categoria
+                    });
+                }
+            }
+
+            if (lancamentos.length > 0) await API.salvarMultiplosLancamentos(lancamentos);
             
             UI.closeModal();
-            UI.showToast(`Compra parcelada ${idCompraAntiga ? 'recriada' : 'salva'}!`);
+            UI.showToast(`Série atualizada! ${lancamentos.length} novos lançamentos gerados.`);
             await reloadStateAndRender();
 
         } catch (err) {
             UI.showToast(err.message, 'error');
+            console.error(err);
         } finally {
-            UI.setLoadingState(btn, false, idCompraAntiga ? 'Salvar e Substituir' : 'Salvar Compra');
+            UI.setLoadingState(btn, false, 'Salvar Alterações');
         }
     }
     
@@ -317,10 +410,19 @@ document.addEventListener('DOMContentLoaded', () => {
     
     async function deletarLancamento(id, compraId) { 
         if (compraId) {
-            if (!confirm('Este é um lançamento parcelado. Deseja apagar a compra inteira e todas as suas parcelas?')) return;
+            if (!confirm('Este item faz parte de uma série/parcelamento. Deseja apagar a SÉRIE INTEIRA (todos os itens)?\n\nClique OK para apagar TUDO.\nClique Cancelar para apagar SÓ ESTE.')) {
+                 // Apaga só este (Lógica de exceção)
+                 try {
+                    await API.deletarDados('lancamentos_futuros', id);
+                    UI.showToast('Item único deletado.');
+                    await reloadStateAndRender();
+                 } catch(err) { UI.showToast(err.message, 'error'); }
+                 return;
+            }
+            // Apaga a série toda
             try {
                 await deletarCompraParceladaCompleta(compraId);
-                UI.showToast('Compra e parcelas deletadas!');
+                UI.showToast('Série completa deletada!');
                 await reloadStateAndRender();
             } catch (err) {
                 UI.showToast(err.message, 'error');
@@ -394,7 +496,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         document.body.addEventListener('change', e => {
-            if (e.target.id === 'tab-statement-month-select') UI.renderMonthlyStatementDetails(e.target.value);
+            if (e.target.id === 'tab-statement-month-select') {
+                UI.renderMonthlyStatementDetails(e.target.value);
+            }
             if (e.target.id === 'conta-tipo') {
                 const isCreditCard = e.target.value === 'Cartão de Crédito';
                 const cartaoFields = document.getElementById('cartao-credito-fields');
