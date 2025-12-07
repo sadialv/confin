@@ -1,7 +1,6 @@
-// ARQUIVO: js/ui.js
 import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, CHART_COLORS } from './utils.js';
 import { getState, getContaPorId, getContas } from './state.js';
-import { calculateFinancialHealthMetrics } from './finance.js'; // Importação essencial para os cálculos
+import { calculateFinancialHealthMetrics } from './finance.js';
 
 let summaryChart = null;
 let annualChart = null;
@@ -88,7 +87,6 @@ export const renderFinancialHealth = () => {
     const container = document.getElementById('health-tab-pane');
     if (!container) return;
 
-    // Usa a lógica separada no finance.js
     const metrics = calculateFinancialHealthMetrics(getState());
 
     const scoreColor = metrics.financialScore >= 75 ? 'success' : metrics.financialScore >= 40 ? 'warning' : 'danger';
@@ -830,3 +828,132 @@ export const renderAccountStatementDetails = (contaId, mesSelecionado) => {
     const totalEntradas = transacoesDoMes.filter(t => t.tipo === 'receita').reduce((acc, t) => acc + t.valor, 0);
     const totalSaidas = transacoesDoMes.filter(t => t.tipo === 'despesa').reduce((acc, t) => acc + t.valor, 0);
     const saldoFinal = saldoAnterior + totalEntradas - totalSaidas;
+
+    const itemsHtml = transacoesDoMes.length ?
+        transacoesDoMes.map(renderTransactionCard).join('') :
+        '<p class="text-center text-body-secondary p-3">Nenhuma transação neste mês.</p>';
+
+    container.innerHTML = `
+        <ul class="list-group list-group-flush mb-3">
+            <li class="list-group-item d-flex justify-content-between"><span>Saldo Anterior:</span> <span>${formatarMoeda(saldoAnterior)}</span></li>
+            <li class="list-group-item d-flex justify-content-between"><span>Total de Entradas:</span> <span class="income-text">${formatarMoeda(totalEntradas)}</span></li>
+            <li class="list-group-item d-flex justify-content-between"><span>Total de Saídas:</span> <span class="expense-text">${formatarMoeda(totalSaidas)}</span></li>
+            <li class="list-group-item d-flex justify-content-between fw-bold"><span>Saldo Final:</span> <span>${formatarMoeda(saldoFinal)}</span></li>
+        </ul>
+        <div class="accordion">
+            ${itemsHtml}
+        </div>`;
+};
+
+// --- FUNÇÃO PARA A TAB DE EXTRATO MENSAL NO DASHBOARD ---
+
+export const renderMonthlyStatementTab = () => {
+    const container = document.getElementById('statement-tab-pane');
+    if (!container) return;
+
+    const { transacoes } = getState();
+    
+    // Pega os meses disponíveis nas transações
+    const months = [...new Set(transacoes.map(t => t.data.substring(0, 7)))].sort().reverse();
+    
+    // Define o mês atual como padrão, ou o primeiro disponível
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const selectedMonth = months.includes(currentMonth) ? currentMonth : (months[0] || currentMonth);
+
+    const options = months.map(m => {
+        const [ano, mes] = m.split('-');
+        const date = new Date(ano, mes - 1);
+        const label = date.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        // Letra maiúscula na primeira letra do mês
+        const labelCapitalized = label.charAt(0).toUpperCase() + label.slice(1);
+        return `<option value="${m}" ${m === selectedMonth ? 'selected' : ''}>${labelCapitalized}</option>`;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="card mb-3 shadow-sm border-0">
+            <div class="card-body py-3">
+                <div class="row align-items-center justify-content-center justify-content-md-start">
+                    <div class="col-auto"><label class="col-form-label fw-bold text-body-secondary">Mês de Referência:</label></div>
+                    <div class="col-auto flex-grow-1 flex-md-grow-0" style="min-width: 200px;">
+                        <select id="tab-statement-month-select" class="form-select">
+                            ${options || '<option>Sem transações registradas</option>'}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="tab-statement-content"></div>
+    `;
+
+    // Renderiza o conteúdo do mês selecionado inicialmente
+    if (months.length > 0) {
+        renderMonthlyStatementDetails(selectedMonth);
+    } else {
+        document.getElementById('tab-statement-content').innerHTML = `
+            <div class="text-center p-5 text-body-secondary">
+                <i class="fas fa-receipt fa-3x mb-3 opacity-50"></i>
+                <p>Nenhuma transação encontrada para gerar extrato.</p>
+            </div>`;
+    }
+};
+
+export const renderMonthlyStatementDetails = (mes) => {
+    const container = document.getElementById('tab-statement-content');
+    if (!container || !mes) return;
+
+    const { transacoes } = getState();
+    
+    // Filtra transações do mês selecionado
+    const transacoesMes = transacoes
+        .filter(t => t.data.startsWith(mes))
+        .sort((a, b) => new Date(b.data) - new Date(a.data));
+
+    if (transacoesMes.length === 0) {
+        container.innerHTML = '<div class="alert alert-info text-center">Nenhuma movimentação neste mês.</div>';
+        return;
+    }
+
+    // Cálculos de totais
+    const entradas = transacoesMes.filter(t => t.tipo === 'receita').reduce((acc, t) => acc + t.valor, 0);
+    const saidas = transacoesMes.filter(t => t.tipo === 'despesa').reduce((acc, t) => acc + t.valor, 0);
+    const resultado = entradas - saidas;
+
+    // Gera lista de transações usando a função já existente renderTransactionCard
+    const listHtml = transacoesMes.map(t => {
+        return renderTransactionCard(t); 
+    }).join('');
+
+    container.innerHTML = `
+        <div class="row mb-4 g-3 text-center">
+            <div class="col-md-4">
+                <div class="card h-100 border-success shadow-sm">
+                    <div class="card-header bg-success text-white py-2 fw-bold">Entradas</div>
+                    <div class="card-body">
+                        <h4 class="card-title text-success mb-0">${formatarMoeda(entradas)}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 border-danger shadow-sm">
+                    <div class="card-header bg-danger text-white py-2 fw-bold">Saídas</div>
+                    <div class="card-body">
+                        <h4 class="card-title text-danger mb-0">${formatarMoeda(saidas)}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 border-${resultado >= 0 ? 'success' : 'danger'} shadow-sm">
+                    <div class="card-header bg-${resultado >= 0 ? 'success' : 'danger'} text-white py-2 fw-bold">Balanço</div>
+                    <div class="card-body">
+                        <h4 class="card-title text-${resultado >= 0 ? 'success' : 'danger'} mb-0">${formatarMoeda(resultado)}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <h6 class="border-bottom pb-2 mb-3 text-body-secondary">Detalhamento das Movimentações</h6>
+        <div class="accordion" id="statement-accordion">
+            ${listHtml}
+        </div>
+    `;
+};
