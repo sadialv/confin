@@ -1,7 +1,7 @@
 // ARQUIVO: js/ui.js
 import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, CHART_COLORS } from './utils.js';
 import { getState, getContaPorId, getContas } from './state.js';
-import { calculateFinancialHealthMetrics } from './finance.js'; // Nova importação
+import { calculateFinancialHealthMetrics } from './finance.js'; // Importação essencial para os cálculos
 
 let summaryChart = null;
 let annualChart = null;
@@ -83,12 +83,12 @@ export const renderAllComponents = (initialFilters) => {
     renderMonthlyStatementTab();
 };
 
-// --- RENDERIZAÇÃO DA SAÚDE FINANCEIRA ---
+// --- CÁLCULOS E RENDERIZAÇÃO DA SAÚDE FINANCEIRA ---
 export const renderFinancialHealth = () => {
     const container = document.getElementById('health-tab-pane');
     if (!container) return;
 
-    // AQUI ESTÁ A MUDANÇA: Usamos a função importada do finance.js
+    // Usa a lógica separada no finance.js
     const metrics = calculateFinancialHealthMetrics(getState());
 
     const scoreColor = metrics.financialScore >= 75 ? 'success' : metrics.financialScore >= 40 ? 'warning' : 'danger';
@@ -830,25 +830,3 @@ export const renderAccountStatementDetails = (contaId, mesSelecionado) => {
     const totalEntradas = transacoesDoMes.filter(t => t.tipo === 'receita').reduce((acc, t) => acc + t.valor, 0);
     const totalSaidas = transacoesDoMes.filter(t => t.tipo === 'despesa').reduce((acc, t) => acc + t.valor, 0);
     const saldoFinal = saldoAnterior + totalEntradas - totalSaidas;
-
-    const itemsHtml = transacoesDoMes.length ?
-        transacoesDoMes.map(renderTransactionCard).join('') :
-        '<p class="text-center text-body-secondary p-3">Nenhuma transação neste mês.</p>';
-
-    container.innerHTML = `
-        <ul class="list-group list-group-flush mb-3">
-            <li class="list-group-item d-flex justify-content-between"><span>Saldo Anterior:</span> <span>${formatarMoeda(saldoAnterior)}</span></li>
-            <li class="list-group-item d-flex justify-content-between"><span>Total de Entradas:</span> <span class="income-text">${formatarMoeda(totalEntradas)}</span></li>
-            <li class="list-group-item d-flex justify-content-between"><span>Total de Saídas:</span> <span class="expense-text">${formatarMoeda(totalSaidas)}</span></li>
-            <li class="list-group-item d-flex justify-content-between fw-bold"><span>Saldo Final:</span> <span>${formatarMoeda(saldoFinal)}</span></li>
-        </ul>
-        <div class="accordion">
-            ${itemsHtml}
-        </div>`;
-};
-
-// --- FUNÇÃO NOVA PARA A LISTA DE CONTAS NO PAINEL LATERAL ---
-// Esta função faltava no arquivo original e pode ser chamada para renderizar "Minhas Contas" na aba Cadastro
-export const renderMonthlyStatementTab = () => {
-    // Implementação básica se necessária para a aba de extrato mensal
-};
