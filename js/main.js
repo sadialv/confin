@@ -1,3 +1,4 @@
+// ARQUIVO: js/main.js
 import * as UI from './ui.js';
 import * as API from './api.js';
 import * as State from './state.js';
@@ -5,7 +6,7 @@ import { applyTheme, toISODateString } from './utils.js';
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    let statementFilters = {
+    let historyFilters = { 
         mes: new Date().toISOString().slice(0, 7),
         pesquisa: '',
         contaId: 'todas'
@@ -20,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = await API.fetchData();
             State.setState(data);
-            UI.renderAllComponents({ statement: statementFilters, bills: billsFilters });
+            UI.renderAllComponents({ history: historyFilters, bills: billsFilters });
         } catch (error) {
             UI.showToast(error.message, 'error');
         }
@@ -72,19 +73,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const id = form.dataset.id;
             const data = Object.fromEntries(new FormData(form));
             data.saldo_inicial = parseFloat(data.saldo_inicial) || 0;
-    
             if (data.dia_fechamento_cartao) {
                 data.dia_fechamento_cartao = parseInt(data.dia_fechamento_cartao);
-            } else {
-                delete data.dia_fechamento_cartao;
             }
-    
             if (data.dia_vencimento_cartao) {
                 data.dia_vencimento_cartao = parseInt(data.dia_vencimento_cartao);
-            } else {
-                delete data.dia_vencimento_cartao;
             }
-    
             const saved = await API.salvarDados('contas', data, id);
             const state = State.getState();
             const newContas = id ? state.contas.map(c => c.id == saved.id ? saved : c) : [...state.contas, saved];
@@ -117,15 +111,26 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.setLoadingState(btn, true);
         try {
             const data = Object.fromEntries(new FormData(form));
+            
+            // AQUI ESTÁ A CORREÇÃO IMPORTANTE:
+            // Vinculamos o pagamento ao ID do lançamento futuro original.
             const transacao = {
-                descricao: form.dataset.desc, valor: parseFloat(form.dataset.valor),
-                data: data.data, conta_id: parseInt(data.conta_id),
-                categoria: form.dataset.cat, tipo: 'despesa'
+                descricao: form.dataset.desc, 
+                valor: parseFloat(form.dataset.valor),
+                data: data.data, 
+                conta_id: parseInt(data.conta_id),
+                categoria: form.dataset.cat, 
+                tipo: 'despesa',
+                lancamento_futuro_id: parseInt(form.dataset.billId) // <--- LINHA NOVA
             };
+
             await API.salvarDados('transacoes', transacao);
+            
+            // Atualiza o boleto para "pago"
             await API.salvarDados('lancamentos_futuros', { status: 'pago' }, form.dataset.billId);
+            
             UI.closeModal();
-            UI.showToast('Conta paga!');
+            UI.showToast('Conta paga com sucesso!');
             await reloadStateAndRender();
         } catch (err) {
             UI.showToast(err.message, 'error');
@@ -196,11 +201,6 @@ document.addEventListener('DOMContentLoaded', () => {
             form.reset();
             form.querySelector('#tipo-compra')?.dispatchEvent(new Event('change'));
             UI.showToast(toastMessage);
-            
-            // --- LINHA DA CORREÇÃO ADICIONADA AQUI ---
-            UI.closeModal(); 
-            // -----------------------------------------
-
             await reloadStateAndRender();
         } catch (err) {
             UI.showToast(err.message, 'error');
@@ -389,10 +389,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         document.body.addEventListener('change', e => {
-            if (['tab-statement-month-select', 'tab-statement-account-filter'].includes(e.target.id)) {
-                statementFilters.mes = document.getElementById('tab-statement-month-select').value;
-                statementFilters.contaId = document.getElementById('tab-statement-account-filter').value;
-                UI.renderMonthlyStatementDetails(statementFilters);
+            if (e.target.id === 'tab-statement-month-select') {
+                UI.renderMonthlyStatementDetails(e.target.value);
             }
             if (e.target.id === 'conta-tipo') {
                 const isCreditCard = e.target.value === 'Cartão de Crédito';
@@ -426,9 +424,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     labelValor.textContent = 'Valor';
                 }
             }
+            if (e.target.id === 'history-month-filter') {
+                historyFilters.mes = e.target.value;
+                UI.renderHistoricoTransacoes(1, historyFilters);
+            }
             if (e.target.id === 'bills-month-filter') {
                 billsFilters.mes = e.target.value;
                 UI.renderLancamentosFuturos(1, billsFilters);
+            }
+            if (e.target.id === 'history-account-filter') {
+                historyFilters.contaId = e.target.value;
+                UI.renderHistoricoTransacoes(1, historyFilters);
             }
             if (e.target.id === 'bills-account-filter') {
                 billsFilters.contaId = e.target.value;
@@ -437,9 +443,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         document.body.addEventListener('input', e => {
-            if (e.target.id === 'tab-statement-search-input') {
-                statementFilters.pesquisa = e.target.value;
-                UI.renderMonthlyStatementDetails(statementFilters);
+            if (e.target.id === 'history-search-input') {
+                historyFilters.pesquisa = e.target.value;
+                UI.renderHistoricoTransacoes(1, historyFilters);
             }
             if (e.target.id === 'bills-search-input') {
                 billsFilters.pesquisa = e.target.value;
@@ -465,7 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = await API.fetchData();
             State.setState(data);
-            UI.renderAllComponents({ statement: statementFilters, bills: billsFilters });
+            UI.renderAllComponents({ history: historyFilters, bills: billsFilters });
         } catch (error) {
             UI.showToast(error.message, 'error');
             console.error("Falha na inicialização:", error);
