@@ -1,14 +1,14 @@
 // ARQUIVO: js/ui.js
 import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, CHART_COLORS } from './utils.js';
 import { getState, getContaPorId, getContas } from './state.js';
-import { calculateFinancialHealthMetrics, calculateAnnualTimeline } from './finance.js';
+import { calculateFinancialHealthMetrics, calculateAnnualTimeline, calculateCategoryGrid } from './finance.js';
 
-// Variáveis globais dos gráficos para controle de instância (destruir antes de recriar)
+// Variáveis globais dos gráficos
 let summaryChart = null;
 let annualChart = null;
 let netWorthChart = null;
 let avgSpendingChart = null;
-let annualMixedChart = null; // Novo gráfico de planejamento
+let annualMixedChart = null; // Gráfico de planejamento
 
 const ITEMS_PER_PAGE = 10;
 
@@ -84,38 +84,73 @@ export const renderAllComponents = (initialFilters) => {
     renderFilters('history', initialFilters.history);
     renderHistoricoTransacoes(1, initialFilters.history);
     renderMonthlyStatementTab();
-    renderAnnualPlanningTab(); // Nova aba de planejamento
+    renderAnnualPlanningTab();
 };
 
-// --- NOVA ABA: PLANEJAMENTO ANUAL (GRÁFICO MISTO) ---
+// --- NOVA ABA: PLANEJAMENTO ANUAL (GRÁFICO + TABELA) ---
 export const renderAnnualPlanningTab = () => {
-    const container = document.getElementById('annual-mixed-chart');
+    const container = document.getElementById('planning-tab-pane');
     if (!container) return;
 
-    const timelineData = calculateAnnualTimeline(getState());
+    // Estrutura com toggle
+    container.innerHTML = `
+        <div class="p-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Planejamento ${new Date().getFullYear()}</h5>
+                <div class="btn-group" role="group">
+                    <input type="radio" class="btn-check" name="btnradio" id="btn-view-chart" autocomplete="off" checked>
+                    <label class="btn btn-outline-primary btn-sm" for="btn-view-chart"><i class="fas fa-chart-bar"></i> Gráfico</label>
 
+                    <input type="radio" class="btn-check" name="btnradio" id="btn-view-table" autocomplete="off">
+                    <label class="btn btn-outline-primary btn-sm" for="btn-view-table"><i class="fas fa-table"></i> Detalhado</label>
+                </div>
+            </div>
+
+            <div id="panel-chart-view">
+                <div style="height: 400px; position: relative;">
+                    <canvas id="annual-mixed-chart"></canvas>
+                </div>
+                <div class="row text-center mt-4" id="chart-summary-footer"></div>
+            </div>
+
+            <div id="panel-table-view" class="table-responsive" style="display: none;"></div>
+        </div>
+    `;
+
+    renderMixedChart();
+
+    // Eventos de troca
+    document.getElementById('btn-view-chart').addEventListener('change', () => {
+        document.getElementById('panel-chart-view').style.display = 'block';
+        document.getElementById('panel-table-view').style.display = 'none';
+    });
+
+    document.getElementById('btn-view-table').addEventListener('change', () => {
+        document.getElementById('panel-chart-view').style.display = 'none';
+        document.getElementById('panel-table-view').style.display = 'block';
+        renderDetailedTable();
+    });
+};
+
+const renderMixedChart = () => {
+    const timelineData = calculateAnnualTimeline(getState());
     const labels = timelineData.map(d => d.mes.substring(0, 3).toUpperCase());
     const receitas = timelineData.map(d => d.receitas);
     const despesas = timelineData.map(d => d.despesas + d.cartoes);
     const acumulado = timelineData.map(d => d.acumulado);
 
-    // Totais do rodapé
     const totalRec = receitas.reduce((a, b) => a + b, 0);
     const totalDesp = despesas.reduce((a, b) => a + b, 0);
     const saldoAno = totalRec - totalDesp;
 
-    const elRec = document.getElementById('total-receitas-ano');
-    const elDesp = document.getElementById('total-despesas-ano');
-    const elSaldo = document.getElementById('total-saldo-ano');
+    const footerHTML = `
+        <div class="col-4"><small class="text-body-secondary">Receitas</small><h5 class="income-text">${formatarMoeda(totalRec)}</h5></div>
+        <div class="col-4"><small class="text-body-secondary">Despesas</small><h5 class="expense-text">${formatarMoeda(totalDesp)}</h5></div>
+        <div class="col-4"><small class="text-body-secondary">Resultado</small><h5 class="${saldoAno>=0?'income-text':'expense-text'}">${formatarMoeda(saldoAno)}</h5></div>
+    `;
+    document.getElementById('chart-summary-footer').innerHTML = footerHTML;
 
-    if(elRec) elRec.textContent = formatarMoeda(totalRec);
-    if(elDesp) elDesp.textContent = formatarMoeda(totalDesp);
-    if(elSaldo) {
-        elSaldo.textContent = formatarMoeda(saldoAno);
-        elSaldo.className = saldoAno >= 0 ? 'income-text' : 'expense-text';
-    }
-
-    const ctx = container.getContext('2d');
+    const ctx = document.getElementById('annual-mixed-chart').getContext('2d');
     if (annualMixedChart) annualMixedChart.destroy();
 
     annualMixedChart = new Chart(ctx, {
@@ -123,61 +158,59 @@ export const renderAnnualPlanningTab = () => {
         data: {
             labels: labels,
             datasets: [
-                {
-                    label: 'Saldo Acumulado',
-                    data: acumulado,
-                    type: 'line',
-                    borderColor: '#4A5568',
-                    borderWidth: 2,
-                    pointBackgroundColor: '#fff',
-                    pointBorderColor: '#4A5568',
-                    tension: 0.3,
-                    yAxisID: 'y1'
-                },
-                {
-                    label: 'Receitas',
-                    data: receitas,
-                    backgroundColor: 'rgba(56, 161, 105, 0.6)',
-                    borderColor: 'rgba(56, 161, 105, 1)',
-                    borderWidth: 1,
-                    order: 2
-                },
-                {
-                    label: 'Despesas Totais',
-                    data: despesas,
-                    backgroundColor: 'rgba(229, 62, 62, 0.6)',
-                    borderColor: 'rgba(229, 62, 62, 1)',
-                    borderWidth: 1,
-                    order: 3
-                }
+                { label: 'Saldo Acumulado', data: acumulado, type: 'line', borderColor: '#4A5568', borderWidth: 2, tension: 0.3, pointRadius: 0, yAxisID: 'y1' },
+                { label: 'Receitas', data: receitas, backgroundColor: 'rgba(56, 161, 105, 0.6)', borderRadius: 2, order: 2 },
+                { label: 'Despesas', data: despesas, backgroundColor: 'rgba(229, 62, 62, 0.6)', borderRadius: 2, order: 3 }
             ]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            plugins: {
-                legend: { position: 'bottom' },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) label += ': ';
-                            if (context.parsed.y !== null) {
-                                label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed.y);
-                            }
-                            return label;
-                        }
-                    }
-                }
-            },
+            responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { position: 'bottom' } },
             scales: {
                 x: { grid: { display: false } },
-                y: { type: 'linear', display: true, position: 'left', beginAtZero: true, grid: { borderDash: [2, 2] } },
-                y1: { type: 'linear', display: false, position: 'right', grid: { display: false } }
+                y: { display: false },
+                y1: { display: false }
             }
         }
     });
+};
+
+const renderDetailedTable = () => {
+    const container = document.getElementById('panel-table-view');
+    const data = calculateCategoryGrid(getState());
+    
+    const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const headerCols = meses.map(m => `<th class="text-center bg-light">${m}</th>`).join('');
+
+    const createRows = (objData, cssClass) => {
+        return Object.keys(objData).sort().map(cat => {
+            const vals = objData[cat].map(v => v === 0 ? '<span class="text-muted opacity-25">-</span>' : formatarMoeda(v).replace('R$', ''));
+            const cols = vals.map(v => `<td class="text-end small">${v}</td>`).join('');
+            return `<tr><td class="fw-bold small text-truncate" style="max-width: 150px;">${cat}</td>${cols}</tr>`;
+        }).join('');
+    };
+
+    const rowsReceitas = createRows(data.receitas, 'income-text');
+    const rowsDespesas = createRows(data.despesas, 'expense-text');
+    const rowSaldo = data.saldos.map(v => {
+        const color = v >= 0 ? 'text-success' : 'text-danger';
+        return `<td class="text-end fw-bold ${color}" style="font-size: 0.8rem;">${formatarMoeda(v).replace('R$', '')}</td>`;
+    }).join('');
+
+    container.innerHTML = `
+        <table class="table table-bordered table-sm table-hover" style="font-size: 0.85rem;">
+            <thead style="position: sticky; top: 0; z-index: 2;">
+                <tr><th class="bg-light" style="min-width: 120px;">Categoria</th>${headerCols}</tr>
+            </thead>
+            <tbody>
+                <tr class="table-success"><td colspan="13"><strong>RECEITAS</strong></td></tr>
+                ${rowsReceitas || '<tr><td colspan="13" class="text-center text-muted">Sem dados</td></tr>'}
+                <tr class="table-danger border-top"><td colspan="13"><strong>DESPESAS</strong></td></tr>
+                ${rowsDespesas || '<tr><td colspan="13" class="text-center text-muted">Sem dados</td></tr>'}
+                <tr class="table-dark border-top" style="position: sticky; bottom: 0;"><td><strong>SALDO LÍQUIDO</strong></td>${rowSaldo}</tr>
+            </tbody>
+        </table>
+    `;
 };
 
 // --- SAÚDE FINANCEIRA ---
@@ -339,11 +372,9 @@ export const renderVisaoMensal = () => {
     const mesAtual = new Date().toISOString().slice(0, 7);
     const despesasMap = {};
     
-    // Realizadas
     transacoes.filter(t => t.data.startsWith(mesAtual) && t.tipo === 'despesa').forEach(t => {
         despesasMap[t.categoria] = (despesasMap[t.categoria] || 0) + t.valor;
     });
-    // Pendentes
     lancamentosFuturos.filter(l => l.data_vencimento.startsWith(mesAtual) && l.tipo === 'a_pagar' && l.status === 'pendente').forEach(l => {
         despesasMap[l.categoria] = (despesasMap[l.categoria] || 0) + l.valor;
     });
