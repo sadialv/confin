@@ -466,6 +466,7 @@ const renderBillItem = (bill, compras) => {
     const icon = CATEGORY_ICONS[cat] || CATEGORY_ICONS['Outros'];
     const collapseId = `collapse-bill-${bill.id}`;
 
+    // Botão de Engrenagem
     const extraButton = isParcela 
         ? `<button class="btn btn-outline-secondary btn-sm" data-action="recriar-compra-parcelada" data-id="${bill.compra_parcelada_id}" title="${isSerie ? 'Editar Série Recorrente' : 'Configurar Parcelamento'}"><i class="fas fa-cog"></i></button>`
         : '';
@@ -477,6 +478,7 @@ const renderBillItem = (bill, compras) => {
             : '<br><small class="text-info"><i class="fas fa-credit-card"></i> Compra Parcelada</small>';
     }
 
+    // Botão inteligente (Pagar vs Receber)
     const isReceita = bill.tipo === 'a_receber';
     const payButtonClass = isReceita ? 'btn-primary' : 'btn-success';
     const payButtonIcon = isReceita ? 'fas fa-hand-holding-usd' : 'fas fa-check';
@@ -526,7 +528,14 @@ const renderTransactionCard = (t) => {
     
     const opacityClass = isPendente ? 'opacity-75' : '';
 
+    // Botões de Ação
     let actions = '';
+    
+    // Se for realizado, verifica se tem vínculo para mostrar engrenagem
+    const extraBtn = (t.compra_parcelada_id) 
+        ? `<button class="btn btn-outline-secondary btn-sm" data-action="recriar-compra-parcelada" data-id="${t.compra_parcelada_id}" title="Configurar Série"><i class="fas fa-cog"></i></button>`
+        : '';
+
     if (isPendente) {
         const isReceita = t.tipo === 'a_receber';
         const btnClass = isReceita ? 'btn-primary' : 'btn-success';
@@ -537,11 +546,15 @@ const renderTransactionCard = (t) => {
             <div class="btn-group">
                 <button class="btn ${btnClass} btn-sm" data-action="pagar-conta" data-id="${t.id}" title="${btnTitle}"><i class="${btnIcon}"></i></button>
                 <button class="btn btn-outline-secondary btn-sm" data-action="editar-lancamento" data-id="${t.id}"><i class="fas fa-edit"></i></button>
+                ${extraBtn}
+                <button class="btn btn-outline-danger btn-sm" data-action="deletar-lancamento" data-id="${t.id}" title="Apagar"><i class="fas fa-trash"></i></button>
             </div>`;
     } else {
+        // Item Realizado
         actions = `
             <div class="btn-group">
                 <button class="btn btn-outline-secondary btn-sm" data-action="editar-transacao" data-id="${t.id}"><i class="fas fa-edit"></i></button>
+                ${extraBtn}
                 <button class="btn btn-outline-danger btn-sm" data-action="deletar-transacao" data-id="${t.id}"><i class="fas fa-trash"></i></button>
             </div>`;
     }
