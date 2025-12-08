@@ -1,12 +1,15 @@
 // ARQUIVO: js/ui.js
 import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, CHART_COLORS } from './utils.js';
 import { getState, getContaPorId, getContas } from './state.js';
-import { calculateFinancialHealthMetrics } from './finance.js';
+import { calculateFinancialHealthMetrics, calculateAnnualTimeline } from './finance.js';
 
+// Variáveis globais dos gráficos para controle de instância (destruir antes de recriar)
 let summaryChart = null;
 let annualChart = null;
 let netWorthChart = null;
 let avgSpendingChart = null;
+let annualMixedChart = null; // Novo gráfico de planejamento
+
 const ITEMS_PER_PAGE = 10;
 
 // --- FUNÇÕES GERAIS DE UI ---
@@ -81,6 +84,100 @@ export const renderAllComponents = (initialFilters) => {
     renderFilters('history', initialFilters.history);
     renderHistoricoTransacoes(1, initialFilters.history);
     renderMonthlyStatementTab();
+    renderAnnualPlanningTab(); // Nova aba de planejamento
+};
+
+// --- NOVA ABA: PLANEJAMENTO ANUAL (GRÁFICO MISTO) ---
+export const renderAnnualPlanningTab = () => {
+    const container = document.getElementById('annual-mixed-chart');
+    if (!container) return;
+
+    const timelineData = calculateAnnualTimeline(getState());
+
+    const labels = timelineData.map(d => d.mes.substring(0, 3).toUpperCase());
+    const receitas = timelineData.map(d => d.receitas);
+    const despesas = timelineData.map(d => d.despesas + d.cartoes);
+    const acumulado = timelineData.map(d => d.acumulado);
+
+    // Totais do rodapé
+    const totalRec = receitas.reduce((a, b) => a + b, 0);
+    const totalDesp = despesas.reduce((a, b) => a + b, 0);
+    const saldoAno = totalRec - totalDesp;
+
+    const elRec = document.getElementById('total-receitas-ano');
+    const elDesp = document.getElementById('total-despesas-ano');
+    const elSaldo = document.getElementById('total-saldo-ano');
+
+    if(elRec) elRec.textContent = formatarMoeda(totalRec);
+    if(elDesp) elDesp.textContent = formatarMoeda(totalDesp);
+    if(elSaldo) {
+        elSaldo.textContent = formatarMoeda(saldoAno);
+        elSaldo.className = saldoAno >= 0 ? 'income-text' : 'expense-text';
+    }
+
+    const ctx = container.getContext('2d');
+    if (annualMixedChart) annualMixedChart.destroy();
+
+    annualMixedChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Saldo Acumulado',
+                    data: acumulado,
+                    type: 'line',
+                    borderColor: '#4A5568',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: '#4A5568',
+                    tension: 0.3,
+                    yAxisID: 'y1'
+                },
+                {
+                    label: 'Receitas',
+                    data: receitas,
+                    backgroundColor: 'rgba(56, 161, 105, 0.6)',
+                    borderColor: 'rgba(56, 161, 105, 1)',
+                    borderWidth: 1,
+                    order: 2
+                },
+                {
+                    label: 'Despesas Totais',
+                    data: despesas,
+                    backgroundColor: 'rgba(229, 62, 62, 0.6)',
+                    borderColor: 'rgba(229, 62, 62, 1)',
+                    borderWidth: 1,
+                    order: 3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) label += ': ';
+                            if (context.parsed.y !== null) {
+                                label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed.y);
+                            }
+                            return label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { grid: { display: false } },
+                y: { type: 'linear', display: true, position: 'left', beginAtZero: true, grid: { borderDash: [2, 2] } },
+                y1: { type: 'linear', display: false, position: 'right', grid: { display: false } }
+            }
+        }
+    });
 };
 
 // --- SAÚDE FINANCEIRA ---
