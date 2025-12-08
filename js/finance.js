@@ -178,4 +178,62 @@ export const calculateAnnualTimeline = (state) => {
             acumulado: saldoAcumulado
         };
     });
+    export const calculateCategoryGrid = (state) => {
+    const { transacoes, lancamentosFuturos, contas } = state;
+    const anoAtual = new Date().getFullYear();
+    const meses = Array.from({ length: 12 }, (_, i) => i); // 0 a 11
+    
+    // Identifica contas que são Cartão de Crédito para separar se necessário
+    // (Neste grid unificado, vamos tratar gasto de cartão como despesa na categoria original para análise correta)
+    
+    // Estruturas para guardar os totais
+    const gridReceitas = {};
+    const gridDespesas = {};
+    const totaisMensais = Array(12).fill(0); // Para o saldo final
+
+    // Função auxiliar para somar no grid
+    const adicionarAoGrid = (tipo, categoria, mesIndex, valor) => {
+        const target = tipo === 'receita' || tipo === 'a_receber' ? gridReceitas : gridDespesas;
+        
+        // Inicializa a categoria se não existir
+        if (!target[categoria]) {
+            target[categoria] = Array(12).fill(0);
+        }
+        
+        target[categoria][mesIndex] += valor;
+        
+        // Atualiza saldo líquido total
+        if (tipo === 'receita' || tipo === 'a_receber') {
+            totaisMensais[mesIndex] += valor;
+        } else {
+            totaisMensais[mesIndex] -= valor;
+        }
+    };
+
+    // 1. Processar Realizado (Transações)
+    transacoes.forEach(t => {
+        const d = new Date(t.data + 'T12:00:00');
+        if (d.getFullYear() === anoAtual) {
+            adicionarAoGrid(t.tipo, t.categoria, d.getMonth(), t.valor);
+        }
+    });
+
+    // 2. Processar Previsto (Lançamentos Futuros Pendentes)
+    lancamentosFuturos.forEach(l => {
+        if (l.status === 'pendente') {
+            const d = new Date(l.data_vencimento + 'T12:00:00');
+            if (d.getFullYear() === anoAtual) {
+                // Mapeia tipos
+                const tipo = l.tipo === 'a_receber' ? 'receita' : 'despesa';
+                adicionarAoGrid(tipo, l.categoria, d.getMonth(), l.valor);
+            }
+        }
+    });
+
+    return {
+        receitas: gridReceitas,
+        despesas: gridDespesas,
+        saldos: totaisMensais
+    };
+};
 };
