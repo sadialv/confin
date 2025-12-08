@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ConFin - Controle Financeiro</title>
+    <title>ConFin - Gestor Financeiro</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-    
     <link rel="stylesheet" href="style.css">
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -70,13 +68,19 @@
                     <div class="card-header">
                          <ul class="nav nav-tabs card-header-tabs" role="tablist">
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#dashboard-monthly-pane" type="button" role="tab">Visão Geral</button>
+                                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#dashboard-monthly-pane" type="button" role="tab">Visão Geral</button>
                             </li>
                              <li class="nav-item" role="presentation">
-                                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#health-tab-pane" type="button" role="tab">Saúde Financeira</button>
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#health-tab-pane" type="button" role="tab">Saúde Financeira</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#planning-tab-pane" type="button" role="tab">Planejamento Anual</button>
                             </li>
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link" data-bs-toggle="tab" data-bs-target="#bills-tab-pane" type="button" role="tab">Contas a Pagar/Receber</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#history-tab-pane" type="button" role="tab">Histórico</button>
                             </li>
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link" data-bs-toggle="tab" data-bs-target="#statement-tab-pane" type="button" role="tab">Extrato Mensal</button>
@@ -84,15 +88,39 @@
                         </ul>
                     </div>
                     <div class="card-body tab-content">
-                        <div id="dashboard-monthly-pane" class="tab-pane fade" role="tabpanel">
+                        
+                        <div id="dashboard-monthly-pane" class="tab-pane fade show active" role="tabpanel">
                              <div class="row">
                                  <div class="col-md-6" id="dashboard-monthly-container"></div>
                                  <div class="col-md-6" id="dashboard-yearly-container"></div>
                              </div>
                         </div>
                         
-                        <div id="health-tab-pane" class="tab-pane fade show active" role="tabpanel">
+                        <div id="health-tab-pane" class="tab-pane fade" role="tabpanel">
                             <p class="text-center text-body-secondary">Calculando indicadores...</p>
+                        </div>
+
+                        <div id="planning-tab-pane" class="tab-pane fade" role="tabpanel">
+                            <div class="p-3">
+                                <h5 class="mb-4">Fluxo Anual (Realizado + Previsto)</h5>
+                                <div style="height: 400px; position: relative;">
+                                    <canvas id="annual-mixed-chart"></canvas>
+                                </div>
+                                <div class="row text-center mt-4">
+                                    <div class="col-4">
+                                        <small class="text-body-secondary">Receitas</small>
+                                        <h5 class="income-text" id="total-receitas-ano">R$ 0,00</h5>
+                                    </div>
+                                    <div class="col-4">
+                                        <small class="text-body-secondary">Despesas</small>
+                                        <h5 class="expense-text" id="total-despesas-ano">R$ 0,00</h5>
+                                    </div>
+                                    <div class="col-4">
+                                        <small class="text-body-secondary">Resultado Anual</small>
+                                        <h5 id="total-saldo-ano">R$ 0,00</h5>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div id="bills-tab-pane" class="tab-pane fade" role="tabpanel">
@@ -102,6 +130,15 @@
                                 <p class="text-center text-body-secondary">Carregando...</p>
                             </div>
                         </div>
+
+                        <div id="history-tab-pane" class="tab-pane fade" role="tabpanel">
+                            <div id="history-filters-container"></div>
+                            <div id="history-summary-panel" class="mb-3"></div>
+                            <div class="accordion" id="history-list-container">
+                                 <p class="text-center text-body-secondary">Carregando...</p>
+                            </div>
+                        </div>
+
                         <div id="statement-tab-pane" class="tab-pane fade" role="tabpanel">
                             <p class="text-center text-body-secondary">Carregando extrato...</p>
                         </div>
@@ -116,11 +153,11 @@
     <div id="toast-container"></div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    
     <script src="js/utils.js" type="module"></script>
     <script src="js/api.js" type="module"></script>
     <script src="js/state.js" type="module"></script>
-    <script src="js/ui.js" type="module"></script>
+    <script src="js/finance.js" type="module"></script> <script src="js/ui.js" type="module"></script>
     <script src="js/main.js" type="module"></script>
 </body>
 </html>
-
