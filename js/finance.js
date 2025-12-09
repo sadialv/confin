@@ -1,23 +1,21 @@
 // ARQUIVO: js/finance.js
 import { isTipoCartao } from './state.js';
 
-// 1. Métricas Principais (Dashboard, Saúde Financeira e Visão Mensal)
+// 1. Métricas Principais (Dashboard, Saúde Financeira)
 export const calculateFinancialHealthMetrics = (state) => {
     const { contas, transacoes, lancamentosFuturos } = state;
     const hoje = new Date();
     const mesAtual = hoje.toISOString().slice(0, 7); // Ex: "2025-12"
 
-    // --- CÁLCULO DE PATRIMÔNIO (Ativos vs Passivos) ---
     let totalAtivos = 0;
     let totalPassivos = 0;
 
+    // Calcula Patrimônio Atual (Saldo das Contas + Histórico)
     contas.forEach(conta => {
-        // Calcula o saldo atual da conta somando/subtraindo transações do saldo inicial
         const saldoConta = transacoes
             .filter(t => t.conta_id === conta.id)
             .reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, conta.saldo_inicial);
 
-        // Se NÃO for cartão, é Ativo (dinheiro). Se for cartão, é Passivo (dívida) se negativo.
         if (!isTipoCartao(conta.tipo)) {
             totalAtivos += saldoConta > 0 ? saldoConta : 0;
         } else {
@@ -25,97 +23,55 @@ export const calculateFinancialHealthMetrics = (state) => {
         }
     });
 
-    // Soma dívidas futuras pendentes (Lançamentos 'a_pagar')
     totalPassivos += lancamentosFuturos
         .filter(l => l.status === 'pendente' && l.tipo === 'a_pagar')
         .reduce((acc, l) => acc + l.valor, 0);
 
     const patrimonioLiquido = totalAtivos - totalPassivos;
 
-    // --- DIAGNÓSTICO DO MÊS ATUAL (Previsão vs Realizado) ---
+    // Métricas do Mês Atual
     const transacoesMes = transacoes.filter(t => t.data?.startsWith(mesAtual));
-    
-    // A. Realizado (O que já aconteceu de fato)
-    const rendaRealizada = transacoesMes
-        .filter(t => t.tipo === 'receita')
-        .reduce((acc, t) => acc + t.valor, 0);
+    const rendaRealizada = transacoesMes.filter(t => t.tipo === 'receita').reduce((acc, t) => acc + t.valor, 0);
+    const despesaRealizada = transacoesMes.filter(t => t.tipo === 'despesa').reduce((acc, t) => acc + t.valor, 0);
 
-    const despesaRealizada = transacoesMes
-        .filter(t => t.tipo === 'despesa')
-        .reduce((acc, t) => acc + t.valor, 0);
+    const receitasPendentes = lancamentosFuturos.filter(l => l.status === 'pendente' && l.tipo === 'a_receber' && l.data_vencimento.startsWith(mesAtual)).reduce((acc, l) => acc + l.valor, 0);
+    const despesasPendentes = lancamentosFuturos.filter(l => l.status === 'pendente' && l.tipo === 'a_pagar' && l.data_vencimento.startsWith(mesAtual)).reduce((acc, l) => acc + l.valor, 0);
 
-    // B. Pendente (O que está agendado para acontecer)
-    const receitasPendentes = lancamentosFuturos
-        .filter(l => l.status === 'pendente' && l.tipo === 'a_receber' && l.data_vencimento.startsWith(mesAtual))
-        .reduce((acc, l) => acc + l.valor, 0);
-
-    const despesasPendentes = lancamentosFuturos
-        .filter(l => l.status === 'pendente' && l.tipo === 'a_pagar' && l.data_vencimento.startsWith(mesAtual))
-        .reduce((acc, l) => acc + l.valor, 0);
-
-    // C. Totais Previstos (Realizado + Pendente)
     const rendaPrevistaTotal = rendaRealizada + receitasPendentes;
     const despesaPrevistaTotal = despesaRealizada + despesasPendentes;
     const saldoPrevisto = rendaPrevistaTotal - despesaPrevistaTotal;
 
-    // --- CATEGORIZAÇÃO E INDICADORES ---
+    // Indicadores
     const catsFixas = ['Moradia', 'Contas', 'Educação', 'Saúde', 'Transporte'];
-    const catsNecessidades = ['Moradia', 'Contas', 'Educação', 'Saúde', 'Transporte', 'Alimentação'];
-    const catsDesejos = ['Lazer', 'Compras', 'Outros'];
-
-    // Despesas Fixas (apenas realizadas no mês para cálculo de reserva)
-    const despesasFixas = transacoesMes
-        .filter(t => t.tipo === 'despesa' && catsFixas.includes(t.categoria))
-        .reduce((acc, t) => acc + t.valor, 0);
-    
-    // Indicadores de Saúde Financeira
+    const despesasFixas = transacoesMes.filter(t => t.tipo === 'despesa' && catsFixas.includes(t.categoria)).reduce((acc, t) => acc + t.valor, 0);
     const indiceEndividamento = totalAtivos > 0 ? (totalPassivos / totalAtivos) * 100 : 0;
     const reservaEmergenciaMeses = despesasFixas > 0 ? (totalAtivos / despesasFixas) : (totalAtivos > 0 ? 99 : 0);
-    
     const saldoRealizado = rendaRealizada - despesaRealizada;
     const taxaPoupanca = rendaRealizada > 0 ? (saldoRealizado / rendaRealizada) * 100 : 0;
 
-    // Métricas 50-30-20
-    const gastosNecessidades = transacoesMes.filter(t => t.tipo === 'despesa' && catsNecessidades.includes(t.categoria)).reduce((acc, t) => acc + t.valor, 0);
-    const gastosDesejos = transacoesMes.filter(t => t.tipo === 'despesa' && catsDesejos.includes(t.categoria)).reduce((acc, t) => acc + t.valor, 0);
-
-    const percNecessidades = rendaRealizada > 0 ? (gastosNecessidades / rendaRealizada) * 100 : 0;
-    const percDesejos = rendaRealizada > 0 ? (gastosDesejos / rendaRealizada) * 100 : 0;
-    const percPoupanca = taxaPoupanca;
-
-    // Cálculo do Score (0 a 100)
+    // Score
     const scorePoupanca = Math.min(100, Math.max(0, (taxaPoupanca / 20) * 100));
     const scoreEndividamento = Math.min(100, Math.max(0, (1 - (indiceEndividamento / 50)) * 100));
     const financialScore = (scorePoupanca * 0.5) + (scoreEndividamento * 0.5);
 
-    // --- DADOS PARA GRÁFICOS (Histórico) ---
-    
-    // 1. Média de Gastos por Categoria
+    // Dados Históricos
     let gastosPorCategoria = {};
     let meses = new Set();
     transacoes.forEach(t => {
         const mes = t.data.substring(0, 7);
         meses.add(mes);
-        if (t.tipo === 'despesa') {
-            gastosPorCategoria[t.categoria] = (gastosPorCategoria[t.categoria] || 0) + t.valor;
-        }
+        if (t.tipo === 'despesa') gastosPorCategoria[t.categoria] = (gastosPorCategoria[t.categoria] || 0) + t.valor;
     });
 
-    const numMeses = meses.size || 1;
     const mediaGastosCategoria = Object.entries(gastosPorCategoria)
-        .map(([categoria, total]) => ({ categoria, media: total / numMeses }))
+        .map(([categoria, total]) => ({ categoria, media: total / (meses.size || 1) }))
         .sort((a,b) => b.media - a.media);
 
-    // 2. Evolução do Patrimônio (Últimos 12 meses)
     const historicoPatrimonio = Array.from(meses).sort().slice(-12).map(mes => {
         const transacoesAteMes = transacoes.filter(t => t.data.substring(0,7) <= mes);
         let ativos = 0, passivos = 0;
-        
         contas.forEach(c => {
-            const saldo = transacoesAteMes
-                .filter(t => t.conta_id === c.id)
-                .reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, c.saldo_inicial);
-            
+            const saldo = transacoesAteMes.filter(t => t.conta_id === c.id).reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, c.saldo_inicial);
             if (!isTipoCartao(c.tipo)) ativos += saldo > 0 ? saldo : 0;
             else if (saldo < 0) passivos += Math.abs(saldo);
         });
@@ -126,145 +82,139 @@ export const calculateFinancialHealthMetrics = (state) => {
         rendaRealizada, despesaRealizada, saldoRealizado,
         receitasPendentes, despesasPendentes, rendaPrevistaTotal, despesaPrevistaTotal, saldoPrevisto,
         totalAtivos, totalPassivos, patrimonioLiquido,
-        indiceEndividamento, reservaEmergenciaMeses, taxaPoupanca,
-        percNecessidades, percDesejos, percPoupanca,
-        financialScore, mediaGastosCategoria, historicoPatrimonio
+        indiceEndividamento, reservaEmergenciaMeses, taxaPoupanca, financialScore,
+        mediaGastosCategoria, historicoPatrimonio
     };
 };
 
-// 2. Planejamento Anual: Gráfico Misto (Timeline)
-// Essa função calcula o fluxo de caixa para um ano específico, considerando o passado.
+// 2. Planejamento Anual (CORRIGIDO PARA INCLUIR SALDO ACUMULADO REAL + PREVISÃO FUTURA)
 export const calculateAnnualTimeline = (state, anoSelecionado) => {
-    const { contas, transacoes, lancamentosFuturos } = state;
+    const { contas, transacoes, lancamentosFuturos, comprasParceladas } = state;
     const ano = anoSelecionado || new Date().getFullYear();
     const meses = Array.from({ length: 12 }, (_, i) => i); 
 
-    // Identifica contas de Cartão para separar visualmente se necessário
-    const idsCartao = contas.filter(c => isTipoCartao(c.tipo)).map(c => c.id);
-
-    // --- CÁLCULO DO SALDO INICIAL DO ANO (ACUMULADO HISTÓRICO) ---
-    // Precisamos saber quanto dinheiro existia no dia 31/12 do ano anterior.
+    // --- PASSO 1: CALCULAR O "CAIXA INICIAL" (Tudo que você tem até o dia 01/Jan do ano selecionado) ---
     
-    // 1. Soma dos Saldos Iniciais Cadastrados nas contas (Dinheiro/Investimentos)
+    // A. Saldo Inicial Cadastrado nas Contas (Dinheiro + Investimentos)
     let saldoInicialAbsoluto = contas
         .filter(c => !isTipoCartao(c.tipo))
         .reduce((acc, c) => acc + c.saldo_inicial, 0);
 
-    // 2. Soma todas as movimentações realizadas ANTES do ano selecionado
     const dataCorteInicioAno = `${ano}-01-01`;
 
-    const historicoRealizado = transacoes
+    // B. Histórico REALIZADO (Transações feitas antes desse ano)
+    const deltaRealizado = transacoes
         .filter(t => t.data < dataCorteInicioAno)
         .reduce((acc, t) => {
             if (t.tipo === 'receita') return acc + t.valor;
+            // Despesa: Se for cartão, tecnicamente não saiu da conta, mas impacta o patrimônio líquido.
+            // Para visão de Fluxo de Caixa (Sobrou/Faltou), subtraímos.
             if (t.tipo === 'despesa') return acc - t.valor;
             return acc;
         }, 0);
 
-    // Saldo Acumulado começa com: Saldo Inicial das Contas + Histórico de Transações Passadas
-    let saldoAcumulado = saldoInicialAbsoluto + historicoRealizado;
+    // C. Histórico PENDENTE (Contas não pagas/recebidas antes desse ano que afetam o saldo)
+    // Ex: Se estou olhando 2026, preciso somar o que planejei ganhar em Dez/2025.
+    const deltaPendente = lancamentosFuturos
+        .filter(l => l.status === 'pendente' && l.data_vencimento < dataCorteInicioAno)
+        .reduce((acc, l) => {
+            if (l.tipo === 'a_receber') return acc + l.valor;
+            if (l.tipo === 'a_pagar') return acc - l.valor;
+            return acc;
+        }, 0);
 
-    // --- LOOP PELOS MESES DO ANO SELECIONADO ---
+    // Saldo Acumulado no início do Ano Selecionado
+    let saldoAcumulado = saldoInicialAbsoluto + deltaRealizado + deltaPendente;
+
+    // --- PASSO 2: CALCULAR MÊS A MÊS ---
+    
+    // Identificar IDs de contas Cartão para separar visualmente
+    const idsCartao = contas.filter(c => isTipoCartao(c.tipo)).map(c => c.id);
+
     return meses.map(mesIndex => {
         const mesStr = `${ano}-${String(mesIndex + 1).padStart(2, '0')}`;
         
-        // 1. Receitas: Soma o que já entrou (Real) + o que vai entrar (Previsto)
-        const recReal = transacoes
-            .filter(t => t.data.startsWith(mesStr) && t.tipo === 'receita')
-            .reduce((s, t) => s + t.valor, 0);
-            
-        const recPrev = lancamentosFuturos
-            .filter(l => l.data_vencimento.startsWith(mesStr) && l.tipo === 'a_receber' && l.status === 'pendente')
-            .reduce((s, l) => s + l.valor, 0);
-            
+        // 1. Receitas (Realizado + Previsto)
+        const recReal = transacoes.filter(t => t.data.startsWith(mesStr) && t.tipo === 'receita').reduce((s, t) => s + t.valor, 0);
+        const recPrev = lancamentosFuturos.filter(l => l.data_vencimento.startsWith(mesStr) && l.tipo === 'a_receber' && l.status === 'pendente').reduce((s, l) => s + l.valor, 0);
         const totalReceitas = recReal + recPrev;
 
-        // 2. Despesas: Soma o que já saiu (Real) + o que vai sair (Previsto)
-        // Nota: Filtramos fora as despesas "internas" de cartão se a lógica for separar, 
-        // mas para fluxo de caixa simples, somamos tudo que saiu da conta.
-        const despReal = transacoes
-            .filter(t => t.data.startsWith(mesStr) && t.tipo === 'despesa' && !idsCartao.includes(t.conta_id))
-            .reduce((s, t) => s + t.valor, 0);
-            
-        const despPrev = lancamentosFuturos
-            .filter(l => l.data_vencimento.startsWith(mesStr) && l.tipo === 'a_pagar' && l.status === 'pendente' && (!l.compra_parcelada_id || !idsCartao.includes(l.conta_id))) 
-            .reduce((s, l) => s + l.valor, 0);
-
-        // 3. Gastos de Cartão (Visualização separada ou somada)
-        // Aqui somamos os gastos feitos com cartão para dar a visão de consumo
+        // 2. Despesas (Realizado + Previsto)
+        // NOTA: Para bater com seu "Saldo em Conta", subtraímos tudo.
+        // Se quiser separar cartão, precisaria checar o vínculo da conta.
+        
+        const despReal = transacoes.filter(t => t.data.startsWith(mesStr) && t.tipo === 'despesa').reduce((s, t) => s + t.valor, 0);
+        const despPrev = lancamentosFuturos.filter(l => l.data_vencimento.startsWith(mesStr) && l.tipo === 'a_pagar' && l.status === 'pendente').reduce((s, l) => s + l.valor, 0);
+        
+        // Separação visual de gastos EXCLUSIVOS de cartão (apenas estimativa visual)
+        // Tentamos achar gastos ligados a contas do tipo cartão
         const gastosCartaoReal = transacoes
             .filter(t => t.data.startsWith(mesStr) && t.tipo === 'despesa' && idsCartao.includes(t.conta_id))
             .reduce((s, t) => s + t.valor, 0);
             
-        // Nota: Para o saldo financeiro estrito, o gasto no cartão não sai da conta bancária no ato (sai no vencimento).
-        // Porém, para planejamento pessoal, é melhor considerar o gasto no mês de competência para não se iludir.
-        // Aqui estamos somando tudo (Despesa Conta + Despesa Cartão) como saída.
+        // Para futuro, precisamos ver a 'compra_parcelada' pai
+        const gastosCartaoPrev = lancamentosFuturos
+            .filter(l => l.data_vencimento.startsWith(mesStr) && l.tipo === 'a_pagar' && l.status === 'pendente')
+            .reduce((sum, l) => {
+                // Tenta achar a compra pai para ver se é cartão
+                const compraPai = comprasParceladas.find(c => c.id === l.compra_parcelada_id);
+                if (compraPai && idsCartao.includes(compraPai.conta_id)) {
+                    return sum + l.valor;
+                }
+                return sum;
+            }, 0);
+
+        const totalCartaoDisplay = gastosCartaoReal + gastosCartaoPrev;
         
-        const totalDespesas = despReal + despPrev + gastosCartaoReal; 
-        
+        // Total Despesas Geral (inclui cartão para cálculo de saldo líquido)
+        const totalDespesas = despReal + despPrev;
+
         const saldoMensal = totalReceitas - totalDespesas;
         
-        // Atualiza o acumulado para o próximo mês
+        // Acumula o saldo
         saldoAcumulado += saldoMensal;
 
         return {
             mes: new Date(ano, mesIndex).toLocaleString('pt-BR', { month: 'long' }),
             receitas: totalReceitas,
             despesas: totalDespesas,
-            cartoes: gastosCartaoReal, // Apenas informativo, já somado em despesas
+            cartoes: totalCartaoDisplay, // Apenas para exibição na tabela
             saldo: saldoMensal,
-            acumulado: saldoAcumulado
+            acumulado: saldoAcumulado // Agora inclui Saldo Inicial + Histórico + Mês Atual
         };
     });
 };
 
-// 3. Tabela Detalhada (Grid Categoria x Mês)
+// 3. Tabela Detalhada (Grid)
 export const calculateCategoryGrid = (state, anoSelecionado) => {
     const { transacoes, lancamentosFuturos } = state;
     const ano = anoSelecionado || new Date().getFullYear();
-    
-    const gridReceitas = {};
-    const gridDespesas = {};
-    const totaisMensais = Array(12).fill(0);
+    const gridReceitas = {}, gridDespesas = {}, totaisMensais = Array(12).fill(0);
 
-    const adicionarAoGrid = (tipo, categoria, mesIndex, valor) => {
+    const add = (tipo, cat, mes, val) => {
         const target = (tipo === 'receita' || tipo === 'a_receber') ? gridReceitas : gridDespesas;
-        const catNome = categoria || 'Outros';
+        const catNome = cat || 'Outros';
+        if (!target[catNome]) target[catNome] = Array(12).fill(0);
+        target[catNome][mes] += val;
         
-        if (!target[catNome]) {
-            target[catNome] = Array(12).fill(0);
-        }
-        
-        target[catNome][mesIndex] += valor;
-        
-        if (tipo === 'receita' || tipo === 'a_receber') {
-            totaisMensais[mesIndex] += valor;
-        } else {
-            totaisMensais[mesIndex] -= valor;
-        }
+        if (tipo === 'receita' || tipo === 'a_receber') totaisMensais[mes] += val;
+        else totaisMensais[mes] -= val;
     };
 
-    // 1. Processar Realizado
     transacoes.forEach(t => {
         if (t.data.startsWith(`${ano}-`)) {
             const mes = parseInt(t.data.split('-')[1]) - 1;
-            adicionarAoGrid(t.tipo, t.categoria, mes, t.valor);
+            add(t.tipo, t.categoria, mes, t.valor);
         }
     });
 
-    // 2. Processar Previsto (Futuro Pendente)
     lancamentosFuturos.forEach(l => {
         if (l.status === 'pendente' && l.data_vencimento.startsWith(`${ano}-`)) {
             const mes = parseInt(l.data_vencimento.split('-')[1]) - 1;
-            // Normaliza o tipo
             const tipo = l.tipo === 'a_receber' ? 'receita' : 'despesa';
-            adicionarAoGrid(tipo, l.categoria, mes, l.valor);
+            add(tipo, l.categoria, mes, l.valor);
         }
     });
 
-    return {
-        receitas: gridReceitas,
-        despesas: gridDespesas,
-        saldos: totaisMensais
-    };
+    return { receitas: gridReceitas, despesas: gridDespesas, saldos: totaisMensais };
 };
