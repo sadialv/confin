@@ -263,6 +263,7 @@ export const renderAnnualPlanningTab = () => {
     const container = document.getElementById('planning-tab-pane');
     if (!container) return;
 
+    // Estrutura com Navegação de Ano
     container.innerHTML = `
         <div class="p-3">
             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -308,7 +309,7 @@ export const renderAnnualPlanningTab = () => {
     document.getElementById('btn-view-chart').addEventListener('change', () => {
         document.getElementById('panel-chart-view').style.display = 'block';
         document.getElementById('panel-table-view').style.display = 'none';
-        renderMixedChart(); // Garante render atualizado ao trocar
+        renderMixedChart(); // Renderiza o gráfico novamente ao exibir
     });
 
     document.getElementById('btn-view-table').addEventListener('change', () => {
@@ -328,7 +329,9 @@ const updatePlanningView = () => {
 };
 
 const renderMixedChart = () => {
+    // Passa o ano selecionado
     const timelineData = calculateAnnualTimeline(getState(), currentPlanningYear);
+
     const labels = timelineData.map(d => d.mes.substring(0, 3).toUpperCase());
     const receitas = timelineData.map(d => d.receitas);
     const despesas = timelineData.map(d => d.despesas);
@@ -338,12 +341,13 @@ const renderMixedChart = () => {
     const totalDesp = despesas.reduce((a, b) => a + b, 0);
     const saldoAno = totalRec - totalDesp;
 
-    const footer = document.getElementById('chart-summary-footer');
-    if(footer) footer.innerHTML = `
+    const footerHTML = `
         <div class="col-4"><small class="text-body-secondary">Receitas</small><h5 class="income-text">${formatarMoeda(totalRec)}</h5></div>
         <div class="col-4"><small class="text-body-secondary">Despesas</small><h5 class="expense-text">${formatarMoeda(totalDesp)}</h5></div>
         <div class="col-4"><small class="text-body-secondary">Resultado</small><h5 class="${saldoAno>=0?'income-text':'expense-text'}">${formatarMoeda(saldoAno)}</h5></div>
     `;
+    const elFooter = document.getElementById('chart-summary-footer');
+    if(elFooter) elFooter.innerHTML = footerHTML;
 
     const elChart = document.getElementById('annual-mixed-chart');
     if(!elChart) return;
@@ -404,7 +408,9 @@ const renderDetailedTable = () => {
     const container = document.getElementById('panel-table-view');
     if(!container) return;
     
+    // Passa o ano selecionado
     const data = calculateCategoryGrid(getState(), currentPlanningYear);
+    
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     const headerCols = meses.map(m => `<th class="text-center bg-light">${m}</th>`).join('');
 
@@ -420,8 +426,14 @@ const renderDetailedTable = () => {
     const rowsDespesas = createRows(data.despesas, 'expense-text');
     
     const rowSaldo = data.saldos.map(v => {
-        const color = v >= 0 ? 'text-success' : 'text-danger';
+        const color = v >= 0 ? 'text-primary' : 'text-danger';
         return `<td class="text-end fw-bold ${color}" style="font-size: 0.8rem;">${formatarMoeda(v).replace('R$', '')}</td>`;
+    }).join('');
+
+    // Nova linha: Saldo Acumulado
+    const rowAcumulado = data.acumulados.map(v => {
+        const color = v >= 0 ? 'text-success' : 'text-danger';
+        return `<td class="text-end fw-bold ${color}" style="font-size: 0.85rem; background-color: #f8f9fa;">${formatarMoeda(v).replace('R$', '')}</td>`;
     }).join('');
 
     container.innerHTML = `
@@ -436,9 +448,13 @@ const renderDetailedTable = () => {
                 <tr class="table-danger border-top"><td colspan="13"><strong>DESPESAS</strong></td></tr>
                 ${rowsDespesas || '<tr><td colspan="13" class="text-center text-muted">Sem dados</td></tr>'}
                 
-                <tr class="table-dark border-top" style="position: sticky; bottom: 0;">
-                    <td><strong>SALDO LÍQUIDO</strong></td>
+                <tr class="border-top" style="background-color: #e9ecef;">
+                    <td><strong>RESULTADO MENSAL</strong></td>
                     ${rowSaldo}
+                </tr>
+                <tr class="table-dark border-top" style="position: sticky; bottom: 0; z-index: 2;">
+                    <td><strong>SALDO EM CONTA (Acumulado)</strong></td>
+                    ${rowAcumulado}
                 </tr>
             </tbody>
         </table>
@@ -446,7 +462,7 @@ const renderDetailedTable = () => {
 };
 
 // =========================================================================
-// === DASHBOARDS E GRÁFICOS (MENSAL/ANUAL/SAÚDE) ===
+// === RENDERIZADORES DE TELA (DASHBOARD/CONTAS) ===
 // =========================================================================
 
 export const renderVisaoMensal = () => {
