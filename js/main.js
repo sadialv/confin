@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 contas: contasAjustadas.sort((a, b) => a.nome.localeCompare(b.nome)),
                 lancamentosFuturos: auxiliares.lancamentosFuturos,
                 comprasParceladas: auxiliares.comprasParceladas,
-                transacoes: transacoesRecentes, // Apenas transações deste ano
+                transacoes: transacoesRecentes, // Apenas transações deste ano em diante
                 categorias: auxiliares.categorias,
                 tiposContas: auxiliares.tiposContas
             });
@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const conta = State.getContaPorId(dadosCompra.conta_id);
         const isCartao = State.isTipoCartao(conta.tipo);
         
-        // Se for cartão, exige datas. Se não for (ex: emprestimo em conta), usa data da compra.
+        // Validação específica para cartão de crédito
         if (isCartao && (!conta.dia_fechamento_cartao || !conta.dia_vencimento_cartao)) {
             throw new Error("Para compras no Cartão de Crédito, configure o Dia de Fechamento e Vencimento no cadastro da conta.");
         }
@@ -92,16 +92,16 @@ document.addEventListener('DOMContentLoaded', () => {
         let diaVencimento = dataCompra.getDate();
         let dataBase = new Date(dataCompra);
 
-        // Lógica específica de cartão
+        // Lógica de datas para Cartão vs Outros
         if (isCartao) {
             const diaFechamento = conta.dia_fechamento_cartao;
             diaVencimento = conta.dia_vencimento_cartao;
             
-            // Se comprou depois do fechamento, joga pro próximo mês
+            // Se comprou no dia do fechamento ou depois, joga pro próximo mês
             if (dataCompra.getDate() >= diaFechamento) {
                 dataBase.setMonth(dataBase.getMonth() + 1);
             }
-            // Se o vencimento é menor que o fechamento, já é no mês seguinte ao da "competência"
+            // Se o dia do vencimento é menor que o fechamento (ex: fecha dia 20, vence dia 5), já é mês seguinte
             if (diaVencimento < diaFechamento) {
                 dataBase.setMonth(dataBase.getMonth() + 1);
             }
@@ -127,26 +127,42 @@ document.addEventListener('DOMContentLoaded', () => {
         const form = e.target;
         const btn = form.querySelector('button[type="submit"]');
         UI.setLoadingState(btn, true, 'Salvando...');
+        
         try {
             const id = form.dataset.id;
             const data = Object.fromEntries(new FormData(form));
+            
+            // Tratamento de tipos numéricos
             data.saldo_inicial = parseFloat(data.saldo_inicial) || 0;
-            if (data.dia_fechamento_cartao) data.dia_fechamento_cartao = parseInt(data.dia_fechamento_cartao);
-            if (data.dia_vencimento_cartao) data.dia_vencimento_cartao = parseInt(data.dia_vencimento_cartao);
+
+            // LÓGICA DE CORREÇÃO: Trata campos vazios de cartão como NULL
+            // Isso evita o erro "invalid input syntax for type integer" no Supabase
+            const isCartao = State.isTipoCartao(data.tipo);
+            
+            data.dia_fechamento_cartao = (isCartao && data.dia_fechamento_cartao) 
+                ? parseInt(data.dia_fechamento_cartao) 
+                : null;
+                
+            data.dia_vencimento_cartao = (isCartao && data.dia_vencimento_cartao) 
+                ? parseInt(data.dia_vencimento_cartao) 
+                : null;
             
             await API.salvarDados('contas', data, id);
+            
             UI.closeModal();
-            UI.showToast('Conta salva!');
+            UI.showToast('Conta salva com sucesso!');
             await reloadStateAndRender();
+            
         } catch (err) {
-            UI.showToast(err.message, 'error');
+            console.error(err);
+            UI.showToast(err.message || 'Erro ao salvar conta', 'error');
         } finally {
             UI.setLoadingState(btn, false, 'Salvar');
         }
     }
 
     async function deletarConta(id) {
-        if (!confirm('Apagar conta? As transações associadas não serão apagadas.')) return;
+        if (!confirm('Apagar conta? As transações associadas não serão apagadas, mas perderão o vínculo.')) return;
         try {
             await API.deletarDados('contas', id);
             UI.showToast('Conta deletada.');
@@ -163,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = Object.fromEntries(new FormData(form));
             
-            // Tenta recuperar o tipo original do lançamento para manter consistência (receita vs despesa)
+            // Recupera o tipo original (receita/despesa) do lançamento para manter consistência
             const lancamentoOriginal = State.getState().lancamentosFuturos.find(l => l.id == form.dataset.billId);
             const tipoFinal = lancamentoOriginal && lancamentoOriginal.tipo === 'a_receber' ? 'receita' : 'despesa';
 
@@ -181,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await API.salvarDados('lancamentos_futuros', { status: 'pago' }, form.dataset.billId);
             
             UI.closeModal();
-            UI.showToast('Registrado com sucesso!');
+            UI.showToast(tipoFinal === 'receita' ? 'Recebimento confirmado!' : 'Pagamento confirmado!');
             await reloadStateAndRender();
         } catch (err) {
             UI.showToast(err.message, 'error');
@@ -196,6 +212,8 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.setLoadingState(btn, true, "Salvando...");
         try {
             const data = Object.fromEntries(new FormData(form));
+            
+            // Define o tipo futuro corretamente (a_receber para receitas, a_pagar para despesas)
             const tipoLancamentoFuturo = data.tipo === 'receita' ? 'a_receber' : 'a_pagar';
 
             if (data.tipo_compra === 'vista') {
@@ -243,6 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Clone da data para não alterar a referência no loop
                     if (frequencia === 'mensal') {
                         proximaData.setMonth(dataInicio.getMonth() + i);
+                        // Ajusta para o dia de vencimento desejado
                         proximaData.setDate(Math.min(diaVencimento, new Date(proximaData.getFullYear(), proximaData.getMonth() + 1, 0).getDate()));
                     } else if (frequencia === 'anual') {
                         proximaData.setFullYear(dataInicio.getFullYear() + i);
@@ -329,7 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const tipoSerie = data.tipo_serie; 
             const valorUnitario = parseFloat(data.valor_total);
             
-            // 1. Atualiza dados do Pai
+            // 1. Atualiza dados do Pai (Série/Compra)
             await API.salvarDados('compras_parceladas', {
                 descricao: data.descricao, 
                 conta_id: parseInt(data.conta_id),
@@ -340,7 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // 2. Apaga FUTUROS PENDENTES
             await API.deletarLancamentosPendentesPorCompraId(idSerie);
 
-            // 3. Verifica HISTÓRICO PAGO para evitar duplicidade
+            // 3. Verifica HISTÓRICO PAGO para evitar duplicidade de mês
             const itensPagos = State.getState().lancamentosFuturos.filter(l => 
                 l.compra_parcelada_id === idSerie && l.status === 'pago'
             );
@@ -353,6 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const tipoOriginal = lancamentosAntigos.length > 0 ? lancamentosAntigos[0].tipo : 'a_pagar'; 
 
             if (tipoSerie === 'parcelada') {
+                // Se for cartão, recria como parcelamento padrão
                 for (let i = 0; i < parseInt(data.numero_parcelas); i++) {
                      let dataVenc = new Date(dataInicio);
                      dataVenc.setMonth(dataInicio.getMonth() + i);
@@ -364,7 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 }
             } else {
-                // RECORRENTE
+                // RECORRENTE (SALÁRIO / CONTAS FIXAS)
                 const quantidade = parseInt(data.quantidade);
                 const frequencia = data.frequencia;
                 
@@ -373,8 +393,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     if (frequencia === 'mensal') {
                         proximaData.setMonth(dataInicio.getMonth() + i);
-                        // Check anti-duplicidade mensal
-                        if (mesesPagos.has(toISODateString(proximaData).substring(0, 7))) continue;
+                        
+                        // CHECK ANTI-DUPLICIDADE:
+                        // Se já existe um pagamento REALIZADO para este mês nesta série, não cria o pendente.
+                        if (mesesPagos.has(toISODateString(proximaData).substring(0, 7))) {
+                            continue; 
+                        }
+
                     } else if (frequencia === 'semestral') {
                         proximaData.setMonth(dataInicio.getMonth() + (i * 6));
                     } else if (frequencia === 'anual') {
@@ -394,6 +419,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (lancamentos.length > 0) await API.salvarMultiplosLancamentos(lancamentos);
+            
             UI.closeModal();
             UI.showToast('Série atualizada!');
             await reloadStateAndRender();
@@ -432,10 +458,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function deletarTransacao(id) { 
         if (!confirm('Apagar transação?')) return;
-        try { await API.deletarDados('transacoes', id); UI.showToast('Deletada.'); await reloadStateAndRender(); } catch (err) { UI.showToast(err.message, 'error'); }
+        try {
+            await API.deletarDados('transacoes', id);
+            UI.showToast('Deletada.');
+            await reloadStateAndRender();
+        } catch (err) {
+            UI.showToast(err.message, 'error');
+        }
     }
 
-    // --- SETUP LISTENERS ---
+    // --- SETUP LISTENERS (Eventos Globais) ---
     function setupEventListeners() {
         document.getElementById('theme-switcher').addEventListener('click', () => {
             const current = document.documentElement.getAttribute('data-theme');
@@ -489,7 +521,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'editar-transacao': UI.openModal(UI.getTransactionModalContent(id)); break;
                 case 'deletar-transacao': deletarTransacao(id); break;
                 
-                // Gerenciamento
+                // Gerenciamento de Categorias/Tipos
                 case 'deletar-categoria':
                     if(confirm('Remover esta categoria da lista? (Histórico não muda)')) {
                         API.deletarDados('categorias', id).then(() => {
@@ -516,10 +548,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.target.id === 'tab-statement-month-select') {
                 UI.renderMonthlyStatementDetails(e.target.value);
             }
+            // Lógica para mostrar campos de cartão apenas se o tipo for cartão
             if (e.target.id === 'conta-tipo') {
                 const selectedOption = e.target.options[e.target.selectedIndex];
-                // Verifica se é cartão pela propriedade data-is-card (string)
-                const isCard = selectedOption.dataset.isCard === 'true';
+                const isCard = selectedOption.dataset.isCard === 'true'; // Leitura do atributo data
                 const div = document.getElementById('cartao-credito-fields');
                 if (div) div.style.display = isCard ? 'block' : 'none';
             }
@@ -581,6 +613,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'form-lancamento': salvarLancamentoFuturo(e); break;
                 case 'form-compra-parcelada': salvarCompraParcelada(e); break;
                 
+                // Categorias
                 case 'form-nova-categoria':
                     const inputCat = e.target.querySelector('input[name="nome"]');
                     if(inputCat.value.trim()) {
@@ -604,6 +637,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                     }
                     break;
+                // Tipos de Conta
                 case 'form-novo-tipo-conta':
                     const dataTipo = Object.fromEntries(new FormData(e.target));
                     API.salvarDados('tipos_contas', { nome: dataTipo.nome, e_cartao: !!dataTipo.e_cartao }).then(() => {
