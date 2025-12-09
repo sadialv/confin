@@ -3,12 +3,15 @@ import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, CHAR
 import { getState, getContaPorId, getContas, getCategorias, getTiposContas, isTipoCartao } from './state.js';
 import { calculateFinancialHealthMetrics, calculateAnnualTimeline, calculateCategoryGrid } from './finance.js';
 
-// --- VARIÁVEIS GLOBAIS (Controle de Gráficos) ---
+// --- VARIÁVEIS GLOBAIS (Controle de Gráficos e Estado de UI) ---
 let summaryChart = null;
 let annualChart = null;
 let netWorthChart = null;
 let avgSpendingChart = null;
 let annualMixedChart = null;
+
+// Estado local da UI para o ano de planejamento
+let currentPlanningYear = new Date().getFullYear();
 
 const ITEMS_PER_PAGE = 10;
 
@@ -263,7 +266,12 @@ export const renderAnnualPlanningTab = () => {
     container.innerHTML = `
         <div class="p-3">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0">Planejamento ${new Date().getFullYear()}</h5>
+                <div class="d-flex align-items-center bg-white border rounded px-2 py-1">
+                    <button class="btn btn-link text-decoration-none p-0 text-dark" id="btn-prev-year"><i class="fas fa-chevron-left"></i></button>
+                    <span class="mx-3 fw-bold fs-5" id="label-planning-year">${currentPlanningYear}</span>
+                    <button class="btn btn-link text-decoration-none p-0 text-dark" id="btn-next-year"><i class="fas fa-chevron-right"></i></button>
+                </div>
+
                 <div class="btn-group" role="group">
                     <input type="radio" class="btn-check" name="btnradio" id="btn-view-chart" autocomplete="off" checked>
                     <label class="btn btn-outline-primary btn-sm" for="btn-view-chart"><i class="fas fa-chart-bar"></i> Gráfico</label>
@@ -286,10 +294,21 @@ export const renderAnnualPlanningTab = () => {
 
     renderMixedChart();
 
-    // Toggle entre Gráfico e Tabela
+    // Listeners de Ano
+    document.getElementById('btn-prev-year').addEventListener('click', () => {
+        currentPlanningYear--;
+        updatePlanningView();
+    });
+    document.getElementById('btn-next-year').addEventListener('click', () => {
+        currentPlanningYear++;
+        updatePlanningView();
+    });
+
+    // Listeners de Toggle View
     document.getElementById('btn-view-chart').addEventListener('change', () => {
         document.getElementById('panel-chart-view').style.display = 'block';
         document.getElementById('panel-table-view').style.display = 'none';
+        renderMixedChart(); // Garante render atualizado ao trocar
     });
 
     document.getElementById('btn-view-table').addEventListener('change', () => {
@@ -299,33 +318,32 @@ export const renderAnnualPlanningTab = () => {
     });
 };
 
+const updatePlanningView = () => {
+    document.getElementById('label-planning-year').textContent = currentPlanningYear;
+    if (document.getElementById('btn-view-chart').checked) {
+        renderMixedChart();
+    } else {
+        renderDetailedTable();
+    }
+};
+
 const renderMixedChart = () => {
-    const timelineData = calculateAnnualTimeline(getState());
+    const timelineData = calculateAnnualTimeline(getState(), currentPlanningYear);
     const labels = timelineData.map(d => d.mes.substring(0, 3).toUpperCase());
     const receitas = timelineData.map(d => d.receitas);
-    const despesas = timelineData.map(d => d.despesas + d.cartoes);
+    const despesas = timelineData.map(d => d.despesas);
     const acumulado = timelineData.map(d => d.acumulado);
 
     const totalRec = receitas.reduce((a, b) => a + b, 0);
     const totalDesp = despesas.reduce((a, b) => a + b, 0);
     const saldoAno = totalRec - totalDesp;
 
-    const footerHTML = `
-        <div class="col-4">
-            <small class="text-body-secondary">Receitas</small>
-            <h5 class="income-text">${formatarMoeda(totalRec)}</h5>
-        </div>
-        <div class="col-4">
-            <small class="text-body-secondary">Despesas</small>
-            <h5 class="expense-text">${formatarMoeda(totalDesp)}</h5>
-        </div>
-        <div class="col-4">
-            <small class="text-body-secondary">Resultado</small>
-            <h5 class="${saldoAno >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldoAno)}</h5>
-        </div>
+    const footer = document.getElementById('chart-summary-footer');
+    if(footer) footer.innerHTML = `
+        <div class="col-4"><small class="text-body-secondary">Receitas</small><h5 class="income-text">${formatarMoeda(totalRec)}</h5></div>
+        <div class="col-4"><small class="text-body-secondary">Despesas</small><h5 class="expense-text">${formatarMoeda(totalDesp)}</h5></div>
+        <div class="col-4"><small class="text-body-secondary">Resultado</small><h5 class="${saldoAno>=0?'income-text':'expense-text'}">${formatarMoeda(saldoAno)}</h5></div>
     `;
-    const elFooter = document.getElementById('chart-summary-footer');
-    if(elFooter) elFooter.innerHTML = footerHTML;
 
     const elChart = document.getElementById('annual-mixed-chart');
     if(!elChart) return;
@@ -386,7 +404,7 @@ const renderDetailedTable = () => {
     const container = document.getElementById('panel-table-view');
     if(!container) return;
     
-    const data = calculateCategoryGrid(getState());
+    const data = calculateCategoryGrid(getState(), currentPlanningYear);
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     const headerCols = meses.map(m => `<th class="text-center bg-light">${m}</th>`).join('');
 
@@ -507,7 +525,7 @@ export const renderVisaoAnual = () => {
         else despesasPorMes[mes] += t.valor;
     });
 
-    container.innerHTML = `<h5 class="mb-3">Fluxo de Caixa Anual</h5><div style="height: 300px;"><canvas id="annual-chart"></canvas></div>`;
+    container.innerHTML = `<h5 class="mb-3">Fluxo de Caixa Anual (Realizado)</h5><div style="height: 300px;"><canvas id="annual-chart"></canvas></div>`;
     
     if(annualChart) annualChart.destroy();
     const ctx = document.getElementById('annual-chart')?.getContext('2d');
@@ -601,7 +619,7 @@ export const renderFinancialHealth = () => {
 };
 
 // =========================================================================
-// === RENDERIZADORES DE LISTAS (CONTAS / HISTÓRICO / FUTURO) ===
+// === RENDERIZADORES DE LISTAS (FILTROS, CARDS, EXTRATOS) ===
 // =========================================================================
 
 export const renderFilters = (type, currentFilters = {}) => {
@@ -742,7 +760,9 @@ const renderBillItem = (bill, compras) => {
         const c = compras.find(compra => compra.id === bill.compra_parcelada_id);
         if(c) {
             cat = c.categoria;
-            if (c.descricao && c.descricao.includes('(Série)')) isSerie = true;
+            if (c.descricao && c.descricao.includes('(Série)')) {
+                isSerie = true;
+            }
         }
     }
     const icon = CATEGORY_ICONS[cat] || CATEGORY_ICONS['Outros'];
@@ -753,13 +773,16 @@ const renderBillItem = (bill, compras) => {
         : '';
 
     let linkText = '';
-    if (isParcela) linkText = isSerie 
-        ? '<br><small class="text-success"><i class="fas fa-sync-alt"></i> Série Recorrente</small>' 
-        : '<br><small class="text-info"><i class="fas fa-credit-card"></i> Compra Parcelada</small>';
+    if (isParcela) {
+        linkText = isSerie 
+            ? '<br><small class="text-success"><i class="fas fa-sync-alt"></i> Série Recorrente</small>' 
+            : '<br><small class="text-info"><i class="fas fa-credit-card"></i> Compra Parcelada</small>';
+    }
 
     const isReceita = bill.tipo === 'a_receber';
     const payButtonClass = isReceita ? 'btn-primary' : 'btn-success';
     const payButtonIcon = isReceita ? 'fas fa-hand-holding-usd' : 'fas fa-check';
+    const payButtonTitle = isReceita ? 'Confirmar Recebimento' : 'Pagar';
 
     return `
         <div class="accordion-item">
@@ -779,7 +802,7 @@ const renderBillItem = (bill, compras) => {
                         ${linkText}
                     </div>
                     <div class="btn-group">
-                        <button class="btn ${payButtonClass} btn-sm" data-action="pagar-conta" data-id="${bill.id}"><i class="${payButtonIcon}"></i></button>
+                        <button class="btn ${payButtonClass} btn-sm" data-action="pagar-conta" data-id="${bill.id}" title="${payButtonTitle}"><i class="${payButtonIcon}"></i></button>
                         <button class="btn btn-outline-secondary btn-sm" data-action="editar-lancamento" data-id="${bill.id}"><i class="fas fa-edit"></i></button>
                         ${extraButton}
                         <button class="btn btn-outline-danger btn-sm" data-action="deletar-lancamento" data-id="${bill.id}" data-compra-id="${bill.compra_parcelada_id || ''}"><i class="fas fa-trash"></i></button>
@@ -836,7 +859,8 @@ export const renderHistoricoTransacoes = (page = 1, filters) => {
     container.innerHTML = paginados.map(renderTransactionCard).join('');
 };
 
-// --- GETTERS DE MODAIS ---
+// --- MODAIS ---
+
 export const getAccountModalContent = (id = null) => {
     const conta = id ? getContaPorId(id) : {};
     const title = id ? 'Editar Conta' : 'Nova Conta';
@@ -852,8 +876,13 @@ export const getAccountModalContent = (id = null) => {
         <form id="form-conta" data-id="${id || ''}">
             <div class="mb-3"><label class="form-label">Nome da Conta</label><input name="nome" class="form-control" value="${conta.nome || ''}" required></div>
             <div class="mb-3">
-                <label class="form-label d-flex justify-content-between">Tipo de Conta <a href="#" id="link-manage-types" class="small text-decoration-none">Gerenciar Tipos</a></label>
-                <select name="tipo" id="conta-tipo" class="form-select">${options}</select>
+                <label class="form-label d-flex justify-content-between">
+                    Tipo de Conta
+                    <a href="#" id="link-manage-types" class="small text-decoration-none">Gerenciar Tipos</a>
+                </label>
+                <select name="tipo" id="conta-tipo" class="form-select">
+                    ${options}
+                </select>
             </div>
             <div class="mb-3"><label class="form-label">Saldo Inicial</label><input name="saldo_inicial" type="number" step="0.01" class="form-control" value="${conta.saldo_inicial || 0}" ${id ? 'disabled' : ''}></div>
             <div id="cartao-credito-fields" style="display: ${currentIsCard ? 'block' : 'none'};">
@@ -882,14 +911,18 @@ export const getCategoriesModalContent = () => {
             <button type="submit" class="btn btn-success"><i class="fas fa-plus"></i></button>
         </form>
         <div style="max-height: 300px; overflow-y: auto;">
-            <ul class="list-group list-group-flush" id="lista-categorias-modal">${listaHtml}</ul>
+            <ul class="list-group list-group-flush" id="lista-categorias-modal">
+                ${listaHtml}
+            </ul>
         </div>`;
     return { title: 'Gerenciar Categorias', body };
 };
 
 export const getEditCategoryModalContent = (id, nomeAtual) => {
     const body = `
-        <div class="alert alert-warning small"><i class="fas fa-exclamation-triangle"></i> Alterar o nome atualizará todo o histórico.</div>
+        <div class="alert alert-warning small">
+            <i class="fas fa-exclamation-triangle"></i> Alterar o nome atualizará todo o histórico.
+        </div>
         <form id="form-editar-categoria" data-id="${id}" data-nome-antigo="${nomeAtual}">
             <div class="mb-3"><label class="form-label">Nome da Categoria</label><input type="text" name="nome" class="form-control" value="${nomeAtual}" required></div>
             <div class="text-end"><button type="submit" class="btn btn-primary">Salvar</button></div>
@@ -901,18 +934,33 @@ export const getAccountTypesModalContent = () => {
     const tipos = getTiposContas();
     const listaHtml = tipos.map(t => `
         <li class="list-group-item d-flex justify-content-between align-items-center">
-            <div><span>${t.nome}</span>${t.e_cartao ? '<span class="badge bg-info text-dark ms-2" style="font-size:0.6rem">Cartão</span>' : ''}</div>
+            <div>
+                <span>${t.nome}</span>
+                ${t.e_cartao ? '<span class="badge bg-info text-dark ms-2" style="font-size:0.6rem">Cartão</span>' : ''}
+            </div>
             <button class="btn btn-sm btn-outline-danger" data-action="deletar-tipo-conta" data-id="${t.id}"><i class="fas fa-trash"></i></button>
-        </li>`).join('');
+        </li>
+    `).join('');
+
     const body = `
         <form id="form-novo-tipo-conta" class="mb-4">
             <div class="input-group mb-2">
                 <input type="text" name="nome" class="form-control" placeholder="Novo Tipo..." required>
                 <button type="submit" class="btn btn-success"><i class="fas fa-plus"></i></button>
             </div>
-            <div class="form-check"><input class="form-check-input" type="checkbox" name="e_cartao" id="check-e-cartao"><label class="form-check-label small" for="check-e-cartao">Funciona como Cartão de Crédito?</label></div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="e_cartao" id="check-e-cartao">
+                <label class="form-check-label small" for="check-e-cartao">
+                    Funciona como Cartão de Crédito? (Pede fatura)
+                </label>
+            </div>
         </form>
-        <div style="max-height: 300px; overflow-y: auto;"><ul class="list-group list-group-flush">${listaHtml}</ul></div>`;
+        <div style="max-height: 300px; overflow-y: auto;">
+            <ul class="list-group list-group-flush">
+                ${listaHtml}
+            </ul>
+        </div>
+    `;
     return { title: 'Gerenciar Tipos de Conta', body };
 };
 
@@ -921,8 +969,11 @@ export const getBillModalContent = (id = null) => {
     const title = id ? 'Editar Parcela' : 'Novo Lançamento';
     const isParcela = !!bill.compra_parcelada_id;
     const categoriasOptions = getCategoriaOptionsHTML(bill.categoria);
-    const warning = isParcela ? `<div class="alert alert-info small"><i class="fas fa-info-circle"></i> Editando apenas esta parcela. Use a engrenagem para editar a série.</div>` : '';
     
+    const warning = isParcela 
+        ? `<div class="alert alert-info small"><i class="fas fa-info-circle"></i> Você está editando apenas esta parcela. Para mudar todas, use o botão de Engrenagem na lista.</div>` 
+        : '';
+
     const body = `
         <form id="form-lancamento" data-id="${id || ''}">
             ${warning}
@@ -939,8 +990,11 @@ export const getBillModalContent = (id = null) => {
 export const getTransactionModalContent = (id) => {
     const transacao = getState().transacoes.find(t => t.id === id);
     if (!transacao) return { title: 'Erro', body: '<p>Transação não encontrada.</p>' };
+
+    const title = 'Editar Transação';
     const contasOptions = getContas().map(c => `<option value="${c.id}" ${transacao.conta_id === c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
     const categoriasOptions = getCategoriaOptionsHTML(transacao.categoria);
+
     const body = `
         <form id="form-edicao-transacao" data-id="${id}">
             <div class="mb-3"><label class="form-label">Descrição</label><input name="descricao" value="${transacao.descricao}" class="form-control" required></div>
@@ -956,6 +1010,7 @@ export const getTransactionModalContent = (id) => {
 
 export const getInstallmentPurchaseModalContent = (compra) => {
     if (!compra) return { title: 'Erro', body: '<p>Série não encontrada.</p>' };
+    
     const conta = getContaPorId(compra.conta_id);
     const isCartao = conta && isTipoCartao(conta.tipo);
     const title = isCartao ? 'Reconfigurar Parcelamento' : 'Editar Série Recorrente';
@@ -963,21 +1018,57 @@ export const getInstallmentPurchaseModalContent = (compra) => {
     const categoriasOptions = getCategoriaOptionsHTML(compra.categoria);
 
     let camposEspecificos = '';
+    
     if (isCartao) {
-        camposEspecificos = `<div class="mb-3"><label class="form-label">Número de Parcelas</label><input name="numero_parcelas" type="number" min="1" value="${compra.numero_parcelas}" class="form-control" required></div><div class="mb-3"><label class="form-label">Data da Compra Original</label><input name="data_inicio" type="date" value="${compra.data_compra}" class="form-control" required></div><input type="hidden" name="tipo_serie" value="parcelada">`;
+        camposEspecificos = `
+            <div class="mb-3"><label class="form-label">Número de Parcelas</label><input name="numero_parcelas" type="number" min="1" value="${compra.numero_parcelas}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Data da Compra Original</label><input name="data_inicio" type="date" value="${compra.data_compra}" class="form-control" required></div>
+            <input type="hidden" name="tipo_serie" value="parcelada">
+        `;
     } else {
-        camposEspecificos = `<div class="row"><div class="col-6 mb-3"><label class="form-label">Frequência</label><select name="frequencia" class="form-select"><option value="mensal">Mensal</option><option value="quinzenal">Quinzenal</option><option value="semestral">Semestral</option><option value="anual">Anual</option></select></div><div class="col-6 mb-3"><label class="form-label">Qtde Restante</label><input name="quantidade" type="number" value="12" class="form-control"></div></div><div class="mb-3"><label class="form-label">Data do Próximo</label><input name="data_inicio" type="date" value="${toISODateString(new Date())}" class="form-control" required></div><input type="hidden" name="tipo_serie" value="recorrente">`;
+        camposEspecificos = `
+            <div class="row">
+                <div class="col-6 mb-3">
+                    <label class="form-label">Frequência</label>
+                    <select name="frequencia" class="form-select">
+                        <option value="mensal">Mensal</option>
+                        <option value="quinzenal">Quinzenal</option>
+                        <option value="semestral">Semestral</option>
+                        <option value="anual">Anual</option>
+                    </select>
+                </div>
+                <div class="col-6 mb-3">
+                    <label class="form-label">Qtde Restante</label>
+                    <input name="quantidade" type="number" value="12" class="form-control" title="Quantos lançamentos criar a partir de agora?">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Data do Próximo Recebimento</label>
+                <input name="data_inicio" type="date" value="${toISODateString(new Date())}" class="form-control" required>
+                <div class="form-text">A partir desta data, a nova regra será aplicada.</div>
+            </div>
+            <input type="hidden" name="tipo_serie" value="recorrente">
+        `;
     }
 
     const body = `
-        <div class="alert alert-info small"><i class="fas fa-info-circle"></i> Ao salvar, os lançamentos <strong>pendentes</strong> serão recriados. Histórico mantido.</div>
+        <div class="alert alert-info small">
+            <i class="fas fa-info-circle"></i> 
+            Ao salvar, os lançamentos <strong>pendentes (futuros)</strong> serão recriados com os novos dados. 
+            O histórico de itens já pagos/recebidos será <strong>mantido</strong>.
+        </div>
         <form id="form-compra-parcelada" data-compra-antiga-id="${compra.id}">
-            <div class="mb-3"><label class="form-label">Descrição</label><input name="descricao" value="${compra.descricao}" class="form-control" required></div>
-            <div class="mb-3"><label class="form-label">Valor (Novo)</label><input name="valor_total" type="number" step="0.01" value="${(compra.valor_total / (compra.numero_parcelas || 1)).toFixed(2)}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Descrição da Série</label><input name="descricao" value="${compra.descricao}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Valor (Novo Padrão)</label><input name="valor_total" type="number" step="0.01" value="${(compra.valor_total / (compra.numero_parcelas || 1)).toFixed(2)}" class="form-control" required></div>
+            
             ${camposEspecificos}
-            <div class="mb-3"><label class="form-label">Conta</label><select name="conta_id" class="form-select" required>${contasOptions}</select></div>
+
+            <div class="mb-3"><label class="form-label">Conta Vinculada</label><select name="conta_id" class="form-select" required>${contasOptions}</select></div>
             <div class="mb-3"><label class="form-label">Categoria</label><select name="categoria" class="form-select" required>${categoriasOptions}</select></div>
-            <div class="text-end"><button type="submit" class="btn btn-primary">Atualizar Série</button></div>
+            
+            <div class="text-end">
+                <button type="submit" class="btn btn-primary">Atualizar Série Futura</button>
+            </div>
         </form>`;
     return { title, body };
 };
@@ -985,94 +1076,314 @@ export const getInstallmentPurchaseModalContent = (compra) => {
 export const getPayBillModalContent = (billId) => {
     const bill = getState().lancamentosFuturos.find(b=>b.id===billId);
     if (!bill) return { title: 'Erro', body: 'Lançamento não encontrado.' };
+    
+    // Modal Inteligente (Pagar vs Receber)
     const isReceita = bill.tipo === 'a_receber';
     const title = isReceita ? 'Confirmar Recebimento' : 'Pagar Lançamento';
     const textoAcao = isReceita ? 'recebendo' : 'pagando';
     const btnClass = isReceita ? 'btn-primary' : 'btn-success';
     const btnText = isReceita ? 'Confirmar Recebimento' : 'Confirmar Pagamento';
-    const body = `<form id="form-pagamento" data-bill-id="${bill.id}" data-valor="${bill.valor}" data-desc="${bill.descricao}" data-cat="${bill.categoria || 'Contas'}"><p>Você está ${textoAcao} <strong>${bill.descricao}</strong> no valor de:</p><p class="h3 text-center my-3 ${isReceita ? 'income-text' : 'expense-text'}">${formatarMoeda(bill.valor)}</p><div class="mb-3"><label class="form-label">Data</label><input type="date" name="data" value="${toISODateString(new Date())}" class="form-control"></div><div class="mb-3"><label class="form-label">Conta</label><select name="conta_id" class="form-select">${getContas().filter(c=>c.tipo!=='Cartão de Crédito').map(c=>`<option value="${c.id}">${c.nome}</option>`).join('')}</select></div><div class="text-end"><button type="submit" class="btn ${btnClass}">${btnText}</button></div></form>`;
+
+    const body = `
+        <form id="form-pagamento" data-bill-id="${bill.id}" data-valor="${bill.valor}" data-desc="${bill.descricao}" data-cat="${bill.categoria || 'Contas'}">
+            <p>Você está ${textoAcao} <strong>${bill.descricao}</strong> no valor de:</p>
+            <p class="h3 text-center my-3 ${isReceita ? 'income-text' : 'expense-text'}">${formatarMoeda(bill.valor)}</p>
+            <div class="mb-3"><label class="form-label">Data da Transação</label><input type="date" name="data" value="${toISODateString(new Date())}" class="form-control"></div>
+            <div class="mb-3"><label class="form-label">Conta</label><select name="conta_id" class="form-select">${getContas().filter(c=>c.tipo!=='Cartão de Crédito').map(c=>`<option value="${c.id}">${c.nome}</option>`).join('')}</select></div>
+            <div class="text-end"><button type="submit" class="btn ${btnClass}">${btnText}</button></div>
+        </form>`;
     return { title, body };
 };
 
 export const getStatementModalContent = (contaId) => {
     const conta = getContaPorId(contaId);
     if (!conta) return { title: 'Erro', body: 'Conta não encontrada.' };
+
+    const title = `Fatura - ${conta.nome}`;
     const { transacoes, lancamentosFuturos, comprasParceladas } = getState();
-    const meses = [...new Set([...transacoes.filter(t => t.conta_id === contaId).map(t => t.data.substring(0, 7)), ...lancamentosFuturos.filter(l => {if (!l.compra_parcelada_id) return false; const compra = comprasParceladas.find(c => c.id === l.compra_parcelada_id); return compra && compra.conta_id === contaId;}).map(l => l.data_vencimento.substring(0, 7))])].sort().reverse();
-    const options = meses.map(m => `<option value="${m}">${new Date(m.split('-')[0], m.split('-')[1]-1).toLocaleString('pt-BR', {month:'long', year:'numeric'})}</option>`).join('');
-    const body = `<div class="mb-3"><label>Selecione a Fatura:</label><select id="statement-month-select" class="form-select" data-conta-id="${contaId}"><option value="">Selecione...</option>${options}</select></div><div id="statement-details-container" class="mt-4"><p class="text-center text-body-secondary">Selecione um mês.</p></div>`;
-    return { title: `Fatura - ${conta.nome}`, body };
+
+    const mesesDeTransacoes = transacoes
+        .filter(t => t.conta_id === contaId)
+        .map(t => t.data.substring(0, 7));
+
+    const mesesDeLancamentos = lancamentosFuturos
+        .filter(l => {
+            if (!l.compra_parcelada_id) return false;
+            const compra = comprasParceladas.find(c => c.id === l.compra_parcelada_id);
+            return compra && compra.conta_id === contaId;
+        })
+        .map(l => l.data_vencimento.substring(0, 7));
+
+    const mesesDisponiveis = [...new Set([...mesesDeTransacoes, ...mesesDeLancamentos])].sort().reverse();
+
+    const options = mesesDisponiveis.map(mes => {
+        const [ano, mesNum] = mes.split('-');
+        const data = new Date(ano, mesNum - 1);
+        const nomeMes = data.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        return `<option value="${mes}">${nomeMes}</option>`;
+    }).join('');
+
+    const body = `
+        <div class="mb-3">
+            <label for="statement-month-select" class="form-label">Selecione a Fatura:</label>
+            <select id="statement-month-select" class="form-select" data-conta-id="${contaId}">
+                <option value="">Selecione...</option>
+                ${options}
+            </select>
+        </div>
+        <div id="statement-details-container" class="mt-4">
+            <p class="text-center text-body-secondary">Selecione um mês para ver os detalhes da fatura.</p>
+        </div>`;
+
+    return { title, body };
 };
 
 export const renderStatementDetails = (contaId, mesSelecionado) => {
     const container = document.getElementById('statement-details-container');
-    if (!container || !mesSelecionado) return;
+    if (!container) return;
+
+    if (!mesSelecionado) {
+        container.innerHTML = '<p class="text-center text-body-secondary">Selecione um mês para ver os detalhes.</p>';
+        return;
+    }
+
     const conta = getContaPorId(contaId);
     const transacoesCompletas = [...getState().transacoes, ...gerarTransacoesVirtuais()];
     const diaFechamento = conta.dia_fechamento_cartao || 28;
+
     const [ano, mes] = mesSelecionado.split('-').map(Number);
+
     const fimCiclo = new Date(ano, mes - 1, diaFechamento, 12);
     const inicioCiclo = new Date(fimCiclo);
     inicioCiclo.setMonth(inicioCiclo.getMonth() - 1);
-    const transacoesFatura = transacoesCompletas.filter(t => {const d = new Date(t.data + 'T12:00:00'); return t.conta_id === contaId && d > inicioCiclo && d <= fimCiclo && t.tipo === 'despesa';}).sort((a, b) => new Date(a.data) - new Date(b.data));
+
+    const transacoesFatura = transacoesCompletas.filter(t => {
+        const dataTransacao = new Date(t.data + 'T12:00:00');
+        return t.conta_id === contaId &&
+               dataTransacao > inicioCiclo &&
+               dataTransacao <= fimCiclo &&
+               t.tipo === 'despesa';
+    }).sort((a, b) => new Date(a.data) - new Date(b.data));
+
     const totalFatura = transacoesFatura.reduce((acc, t) => acc + t.valor, 0);
-    const itemsHtml = transacoesFatura.length ? transacoesFatura.map(renderTransactionCard).join('') : '<p class="text-center">Nenhuma despesa.</p>';
-    container.innerHTML = `<div><h5 class="d-flex justify-content-between"><span>Total:</span><span class="expense-text">${formatarMoeda(totalFatura)}</span></h5></div><div class="accordion mt-3">${itemsHtml}</div>`;
+
+    const itemsHtml = transacoesFatura.length ?
+        transacoesFatura.map(renderTransactionCard).join('') :
+        '<p class="text-center text-body-secondary p-3">Nenhuma despesa nesta fatura.</p>';
+
+    container.innerHTML = `
+        <div>
+            <h5 class="d-flex justify-content-between">
+                <span>Total da Fatura:</span>
+                <span class="expense-text">${formatarMoeda(totalFatura)}</span>
+            </h5>
+            <p class="text-body-secondary small">
+                Período de ${inicioCiclo.toLocaleDateString('pt-BR')} a ${fimCiclo.toLocaleDateString('pt-BR')}
+            </p>
+        </div>
+        <div class="accordion mt-3">
+            ${itemsHtml}
+        </div>`;
 };
 
 export const getAccountStatementModalContent = (contaId) => {
     const conta = getContaPorId(contaId);
     if (!conta) return { title: 'Erro', body: 'Conta não encontrada.' };
+
+    const title = `Extrato - ${conta.nome}`;
     const { transacoes } = getState();
-    const meses = [...new Set(transacoes.filter(t => t.conta_id === contaId).map(t => t.data.substring(0, 7)))].sort().reverse();
-    const options = meses.map(m => `<option value="${m}">${new Date(m.split('-')[0], m.split('-')[1]-1).toLocaleString('pt-BR', {month:'long', year:'numeric'})}</option>`).join('');
-    const body = `<div class="mb-3"><label>Selecione o Mês:</label><select id="account-statement-month-select" class="form-select" data-conta-id="${contaId}"><option value="">Selecione...</option>${options}</select></div><div id="account-statement-details-container" class="mt-4"><p class="text-center text-body-secondary">Selecione um mês.</p></div>`;
-    return { title: `Extrato - ${conta.nome}`, body };
+
+    const mesesDisponiveis = [...new Set(
+        transacoes
+            .filter(t => t.conta_id === contaId)
+            .map(t => t.data.substring(0, 7))
+    )].sort().reverse();
+
+    const options = mesesDisponiveis.map(mes => {
+        const [ano, mesNum] = mes.split('-');
+        const data = new Date(ano, mesNum - 1);
+        const nomeMes = data.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        return `<option value="${mes}">${nomeMes}</option>`;
+    }).join('');
+
+    const body = `
+        <div class="mb-3">
+            <label for="account-statement-month-select" class="form-label">Selecione o Mês:</label>
+            <select id="account-statement-month-select" class="form-select" data-conta-id="${contaId}">
+                <option value="">Selecione...</option>
+                ${options}
+            </select>
+        </div>
+        <div id="account-statement-details-container" class="mt-4">
+            <p class="text-center text-body-secondary">Selecione um mês para ver os detalhes do extrato.</p>
+        </div>`;
+
+    return { title, body };
 };
 
 export const renderAccountStatementDetails = (contaId, mesSelecionado) => {
     const container = document.getElementById('account-statement-details-container');
-    if (!container || !mesSelecionado) return;
+    if (!container) return;
+
+    if (!mesSelecionado) {
+        container.innerHTML = '<p class="text-center text-body-secondary">Selecione um mês para ver os detalhes.</p>';
+        return;
+    }
+
     const conta = getContaPorId(contaId);
     const { transacoes } = getState();
     const [ano, mes] = mesSelecionado.split('-').map(Number);
     const inicioDoMes = new Date(ano, mes - 1, 1);
-    const transacoesAnteriores = transacoes.filter(t => {const d = new Date(t.data + 'T12:00:00'); return t.conta_id === contaId && d < inicioDoMes;});
-    const saldoAnterior = transacoesAnteriores.reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, conta.saldo_inicial);
-    const transacoesDoMes = transacoes.filter(t => t.conta_id === contaId && t.data.startsWith(mesSelecionado)).sort((a, b) => new Date(a.data) - new Date(b.data));
+
+    const transacoesAnteriores = transacoes.filter(t => {
+        const dataTransacao = new Date(t.data + 'T12:00:00');
+        return t.conta_id === contaId && dataTransacao < inicioDoMes;
+    });
+    const saldoAnterior = transacoesAnteriores.reduce((acc, t) => {
+        return t.tipo === 'receita' ? acc + t.valor : acc - t.valor;
+    }, conta.saldo_inicial);
+
+    const transacoesDoMes = transacoes
+        .filter(t => t.conta_id === contaId && t.data.startsWith(mesSelecionado))
+        .sort((a, b) => new Date(a.data) - new Date(b.data));
+
     const totalEntradas = transacoesDoMes.filter(t => t.tipo === 'receita').reduce((acc, t) => acc + t.valor, 0);
     const totalSaidas = transacoesDoMes.filter(t => t.tipo === 'despesa').reduce((acc, t) => acc + t.valor, 0);
     const saldoFinal = saldoAnterior + totalEntradas - totalSaidas;
-    const itemsHtml = transacoesDoMes.length ? transacoesDoMes.map(renderTransactionCard).join('') : '<p class="text-center">Sem transações.</p>';
-    container.innerHTML = `<ul class="list-group list-group-flush mb-3"><li class="list-group-item d-flex justify-content-between"><span>Saldo Anterior:</span> <span>${formatarMoeda(saldoAnterior)}</span></li><li class="list-group-item d-flex justify-content-between"><span>Entradas:</span> <span class="income-text">${formatarMoeda(totalEntradas)}</span></li><li class="list-group-item d-flex justify-content-between"><span>Saídas:</span> <span class="expense-text">${formatarMoeda(totalSaidas)}</span></li><li class="list-group-item d-flex justify-content-between fw-bold"><span>Final:</span> <span>${formatarMoeda(saldoFinal)}</span></li></ul><div class="accordion">${itemsHtml}</div>`;
+
+    const itemsHtml = transacoesDoMes.length ?
+        transacoesDoMes.map(renderTransactionCard).join('') :
+        '<p class="text-center text-body-secondary p-3">Nenhuma transação neste mês.</p>';
+
+    container.innerHTML = `
+        <ul class="list-group list-group-flush mb-3">
+            <li class="list-group-item d-flex justify-content-between"><span>Saldo Anterior:</span> <span>${formatarMoeda(saldoAnterior)}</span></li>
+            <li class="list-group-item d-flex justify-content-between"><span>Total de Entradas:</span> <span class="income-text">${formatarMoeda(totalEntradas)}</span></li>
+            <li class="list-group-item d-flex justify-content-between"><span>Total de Saídas:</span> <span class="expense-text">${formatarMoeda(totalSaidas)}</span></li>
+            <li class="list-group-item d-flex justify-content-between fw-bold"><span>Saldo Final:</span> <span>${formatarMoeda(saldoFinal)}</span></li>
+        </ul>
+        <div class="accordion">
+            ${itemsHtml}
+        </div>`;
 };
 
 // --- FUNÇÃO PARA A TAB DE EXTRATO MENSAL NO DASHBOARD ---
+
 export const renderMonthlyStatementTab = () => {
     const container = document.getElementById('statement-tab-pane');
     if (!container) return;
+
     const { transacoes } = getState();
+    
+    // Pega os meses disponíveis nas transações
     const months = [...new Set(transacoes.map(t => t.data.substring(0, 7)))].sort().reverse();
+    
+    // Define o mês atual como padrão, ou o primeiro disponível
     const currentMonth = new Date().toISOString().slice(0, 7);
     const selectedMonth = months.includes(currentMonth) ? currentMonth : (months[0] || currentMonth);
-    const options = months.map(m => `<option value="${m}" ${m === selectedMonth ? 'selected' : ''}>${new Date(m.split('-')[0], m.split('-')[1]-1).toLocaleString('pt-BR', {month:'long', year:'numeric'})}</option>`).join('');
-    container.innerHTML = `<div class="card mb-3 shadow-sm border-0"><div class="card-body py-3"><div class="row align-items-center justify-content-center justify-content-md-start"><div class="col-auto"><label class="col-form-label fw-bold text-body-secondary">Mês de Referência:</label></div><div class="col-auto flex-grow-1 flex-md-grow-0" style="min-width: 200px;"><select id="tab-statement-month-select" class="form-select">${options || '<option>Sem transações</option>'}</select></div></div></div></div><div id="tab-statement-content"></div>`;
+
+    const options = months.map(m => {
+        const [ano, mes] = m.split('-');
+        const date = new Date(ano, mes - 1);
+        const label = date.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        // Letra maiúscula na primeira letra do mês
+        const labelCapitalized = label.charAt(0).toUpperCase() + label.slice(1);
+        return `<option value="${m}" ${m === selectedMonth ? 'selected' : ''}>${labelCapitalized}</option>`;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="card mb-3 shadow-sm border-0">
+            <div class="card-body py-3">
+                <div class="row align-items-center justify-content-center justify-content-md-start">
+                    <div class="col-auto"><label class="col-form-label fw-bold text-body-secondary">Mês de Referência:</label></div>
+                    <div class="col-auto flex-grow-1 flex-md-grow-0" style="min-width: 200px;">
+                        <select id="tab-statement-month-select" class="form-select">
+                            ${options || '<option>Sem transações registradas</option>'}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="tab-statement-content"></div>
+    `;
+
+    // Renderiza o conteúdo do mês selecionado inicialmente
+    // Nota: Mesmo que não haja "transacoes" (histórico), pode haver "pendentes", então chamamos a função.
     renderMonthlyStatementDetails(selectedMonth || currentMonth);
 };
 
 export const renderMonthlyStatementDetails = (mes) => {
     const container = document.getElementById('tab-statement-content');
     if (!container || !mes) return;
+
     const { transacoes, lancamentosFuturos } = getState();
-    const realizados = transacoes.filter(t => t.data.startsWith(mes)).map(t => ({ ...t, isPending: false }));
-    const pendentes = lancamentosFuturos.filter(l => l.data_vencimento.startsWith(mes) && l.status === 'pendente').map(l => ({ ...l, data: l.data_vencimento, tipo: l.tipo === 'a_pagar' ? 'despesa' : 'receita', isPending: true }));
+    
+    // 1. Busca Transações Realizadas (Histórico)
+    const realizados = transacoes
+        .filter(t => t.data.startsWith(mes))
+        .map(t => ({ ...t, isPending: false })); // Marca como realizado
+
+    // 2. Busca Lançamentos Pendentes (Futuro/Recorrente)
+    const pendentes = lancamentosFuturos
+        .filter(l => l.data_vencimento.startsWith(mes) && l.status === 'pendente')
+        .map(l => ({ 
+            ...l, 
+            data: l.data_vencimento, // Unifica nome do campo de data para ordenação
+            tipo: l.tipo === 'a_pagar' ? 'despesa' : 'receita', // Unifica tipos para cálculo
+            isPending: true // Marca como pendente
+        }));
+
+    // 3. Combina tudo
     const todasMovimentacoes = [...realizados, ...pendentes].sort((a, b) => new Date(b.data) - new Date(a.data));
-    if (todasMovimentacoes.length === 0) { container.innerHTML = '<div class="alert alert-info text-center">Nenhuma movimentação neste mês.</div>'; return; }
+
+    if (todasMovimentacoes.length === 0) {
+        container.innerHTML = '<div class="alert alert-info text-center">Nenhuma movimentação (realizada ou prevista) neste mês.</div>';
+        return;
+    }
+
+    // Cálculos de totais
     const entradas = todasMovimentacoes.filter(t => t.tipo === 'receita').reduce((acc, t) => acc + t.valor, 0);
     const saidas = todasMovimentacoes.filter(t => t.tipo === 'despesa').reduce((acc, t) => acc + t.valor, 0);
     const resultado = entradas - saidas;
+
     const listHtml = todasMovimentacoes.map(t => renderTransactionCard(t)).join('');
-    container.innerHTML = `<div class="row mb-4 g-3 text-center"><div class="col-md-4"><div class="card h-100 border-success shadow-sm"><div class="card-header bg-success text-white py-2 fw-bold">Entradas (Previsto)</div><div class="card-body"><h4 class="card-title text-success mb-0">${formatarMoeda(entradas)}</h4></div></div></div><div class="col-md-4"><div class="card h-100 border-danger shadow-sm"><div class="card-header bg-danger text-white py-2 fw-bold">Saídas (Previsto)</div><div class="card-body"><h4 class="card-title text-danger mb-0">${formatarMoeda(saidas)}</h4></div></div></div><div class="col-md-4"><div class="card h-100 border-${resultado >= 0 ? 'success' : 'danger'} shadow-sm"><div class="card-header bg-${resultado >= 0 ? 'success' : 'danger'} text-white py-2 fw-bold">Balanço Final</div><div class="card-body"><h4 class="card-title text-${resultado >= 0 ? 'success' : 'danger'} mb-0">${formatarMoeda(resultado)}</h4></div></div></div></div><h6 class="border-bottom pb-2 mb-3 text-body-secondary d-flex justify-content-between align-items-center"><span>Detalhamento das Movimentações</span><small class="text-muted fw-normal"><span class="badge bg-warning text-dark">Pendente</span> = Agendado</small></h6><div class="accordion" id="statement-accordion">${listHtml}</div>`;
+
+    container.innerHTML = `
+        <div class="row mb-4 g-3 text-center">
+            <div class="col-md-4">
+                <div class="card h-100 border-success shadow-sm">
+                    <div class="card-header bg-success text-white py-2 fw-bold">Entradas (Previsto)</div>
+                    <div class="card-body">
+                        <h4 class="card-title text-success mb-0">${formatarMoeda(entradas)}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 border-danger shadow-sm">
+                    <div class="card-header bg-danger text-white py-2 fw-bold">Saídas (Previsto)</div>
+                    <div class="card-body">
+                        <h4 class="card-title text-danger mb-0">${formatarMoeda(saidas)}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 border-${resultado >= 0 ? 'success' : 'danger'} shadow-sm">
+                    <div class="card-header bg-${resultado >= 0 ? 'success' : 'danger'} text-white py-2 fw-bold">Balanço Final</div>
+                    <div class="card-body">
+                        <h4 class="card-title text-${resultado >= 0 ? 'success' : 'danger'} mb-0">${formatarMoeda(resultado)}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <h6 class="border-bottom pb-2 mb-3 text-body-secondary d-flex justify-content-between align-items-center">
+            <span>Detalhamento das Movimentações</span>
+            <small class="text-muted fw-normal"><span class="badge bg-warning text-dark">Pendente</span> = Agendado</small>
+        </h6>
+        <div class="accordion" id="statement-accordion">
+            ${listHtml}
+        </div>
+    `;
 };
 
 // =========================================================================
