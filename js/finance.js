@@ -23,6 +23,7 @@ export const calculateFinancialHealthMetrics = (state) => {
         }
     });
 
+    // Soma passivos futuros (Dívidas pendentes)
     totalPassivos += lancamentosFuturos
         .filter(l => l.status === 'pendente' && l.tipo === 'a_pagar')
         .reduce((acc, l) => acc + l.valor, 0);
@@ -41,20 +42,30 @@ export const calculateFinancialHealthMetrics = (state) => {
     const despesaPrevistaTotal = despesaRealizada + despesasPendentes;
     const saldoPrevisto = rendaPrevistaTotal - despesaPrevistaTotal;
 
-    // Indicadores
+    // Indicadores e Categorização
     const catsFixas = ['Moradia', 'Contas', 'Educação', 'Saúde', 'Transporte'];
+    const catsNecessidades = ['Moradia', 'Contas', 'Educação', 'Saúde', 'Transporte', 'Alimentação'];
+    const catsDesejos = ['Lazer', 'Compras', 'Outros'];
+
     const despesasFixas = transacoesMes.filter(t => t.tipo === 'despesa' && catsFixas.includes(t.categoria)).reduce((acc, t) => acc + t.valor, 0);
     const indiceEndividamento = totalAtivos > 0 ? (totalPassivos / totalAtivos) * 100 : 0;
     const reservaEmergenciaMeses = despesasFixas > 0 ? (totalAtivos / despesasFixas) : (totalAtivos > 0 ? 99 : 0);
     const saldoRealizado = rendaRealizada - despesaRealizada;
     const taxaPoupanca = rendaRealizada > 0 ? (saldoRealizado / rendaRealizada) * 100 : 0;
 
+    const gastosNecessidades = transacoesMes.filter(t => t.tipo === 'despesa' && catsNecessidades.includes(t.categoria)).reduce((acc, t) => acc + t.valor, 0);
+    const gastosDesejos = transacoesMes.filter(t => t.tipo === 'despesa' && catsDesejos.includes(t.categoria)).reduce((acc, t) => acc + t.valor, 0);
+
+    const percNecessidades = rendaRealizada > 0 ? (gastosNecessidades / rendaRealizada) * 100 : 0;
+    const percDesejos = rendaRealizada > 0 ? (gastosDesejos / rendaRealizada) * 100 : 0;
+    const percPoupanca = taxaPoupanca;
+
     // Score
     const scorePoupanca = Math.min(100, Math.max(0, (taxaPoupanca / 20) * 100));
     const scoreEndividamento = Math.min(100, Math.max(0, (1 - (indiceEndividamento / 50)) * 100));
     const financialScore = (scorePoupanca * 0.5) + (scoreEndividamento * 0.5);
 
-    // Dados Históricos
+    // Dados Históricos para Gráficos
     let gastosPorCategoria = {};
     let meses = new Set();
     transacoes.forEach(t => {
@@ -82,8 +93,9 @@ export const calculateFinancialHealthMetrics = (state) => {
         rendaRealizada, despesaRealizada, saldoRealizado,
         receitasPendentes, despesasPendentes, rendaPrevistaTotal, despesaPrevistaTotal, saldoPrevisto,
         totalAtivos, totalPassivos, patrimonioLiquido,
-        indiceEndividamento, reservaEmergenciaMeses, taxaPoupanca, financialScore,
-        mediaGastosCategoria, historicoPatrimonio
+        indiceEndividamento, reservaEmergenciaMeses, taxaPoupanca,
+        percNecessidades, percDesejos, percPoupanca,
+        financialScore, mediaGastosCategoria, historicoPatrimonio
     };
 };
 
@@ -113,7 +125,7 @@ export const calculateAnnualTimeline = (state, anoSelecionado) => {
             return acc;
         }, 0);
 
-    // C. Histórico PENDENTE (Contas não pagas/recebidas antes desse ano que afetam o saldo)
+    // C. Histórico PENDENTE (Contas Atrasadas ou Futuras anteriores a este ano que ainda não foram baixadas)
     // Ex: Se estou olhando 2026, preciso somar o que planejei ganhar em Dez/2025.
     const deltaPendente = lancamentosFuturos
         .filter(l => l.status === 'pendente' && l.data_vencimento < dataCorteInicioAno)
@@ -185,7 +197,7 @@ export const calculateAnnualTimeline = (state, anoSelecionado) => {
     });
 };
 
-// 3. Tabela Detalhada (Grid)
+// 3. Tabela Detalhada (Grid Categoria x Mês)
 export const calculateCategoryGrid = (state, anoSelecionado) => {
     const { transacoes, lancamentosFuturos } = state;
     const ano = anoSelecionado || new Date().getFullYear();
