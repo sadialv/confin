@@ -1,17 +1,19 @@
 // ARQUIVO: js/ui.js
 import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, CHART_COLORS } from './utils.js';
 import { getState, getContaPorId, getContas, getCategorias, getTiposContas, isTipoCartao } from './state.js';
-import { calculateFinancialHealthMetrics, calculateAnnualTimeline, calculateCategoryGrid } from './finance.js';
+import { calculateFinancialHealthMetrics, calculateAnnualTimeline, calculateCategoryGrid, calculateDailyEvolution } from './finance.js';
 
 // --- VARIÁVEIS GLOBAIS (Controle de Gráficos e Estado de UI) ---
 let summaryChart = null;
+let dailyChart = null; // Gráfico diário
 let annualChart = null;
 let netWorthChart = null;
 let avgSpendingChart = null;
 let annualMixedChart = null;
 
-// Estado local da UI para o ano de planejamento
+// Estados locais da UI
 let currentPlanningYear = new Date().getFullYear();
+let currentDashboardMonth = new Date().toISOString().slice(0, 7);
 
 const ITEMS_PER_PAGE = 10;
 
@@ -98,7 +100,7 @@ export const closeModal = () => {
 // === RENDERIZADORES DE COMPONENTES ===
 // =========================================================================
 
-// 1. Renderiza Cards de Contas (Com Scrollbar)
+// 1. Renderiza Cards de Contas (Com Scrollbar e Botão de Categorias)
 export const renderContas = () => {
     const container = document.getElementById('accounts-container');
     const { contas, transacoes } = getState();
@@ -106,7 +108,7 @@ export const renderContas = () => {
     const headerHtml = `
         <div class="d-flex justify-content-end mb-3">
             <button id="btn-manage-categories" class="btn btn-outline-primary btn-sm">
-                <i class="fas fa-tags me-2"></i>Gerenciar Categorias
+                <i class="fas fa-tags me-2"></i> Gerenciar Categorias
             </button>
         </div>
     `;
@@ -132,15 +134,26 @@ export const renderContas = () => {
         const iconClass = ACCOUNT_TYPE_ICONS[conta.tipo] || ACCOUNT_TYPE_ICONS['default'];
 
         let acoesEspecificas = '';
+        // Verifica se é cartão usando a função do state.js
         if (isTipoCartao(conta.tipo)) {
-            acoesEspecificas = `<button class="btn btn-outline-secondary btn-sm" data-action="ver-fatura" data-id="${conta.id}" title="Ver Fatura"><i class="fas fa-receipt fa-fw"></i></button>`;
+            acoesEspecificas = `
+                <button class="btn btn-outline-secondary btn-sm" data-action="ver-fatura" data-id="${conta.id}" title="Ver Fatura">
+                    <i class="fas fa-receipt fa-fw"></i>
+                </button>`;
         } else {
-            acoesEspecificas = `<button class="btn btn-outline-secondary btn-sm" data-action="ver-extrato" data-id="${conta.id}" title="Ver Extrato"><i class="fas fa-chart-bar fa-fw"></i></button>`;
+            acoesEspecificas = `
+                <button class="btn btn-outline-secondary btn-sm" data-action="ver-extrato" data-id="${conta.id}" title="Ver Extrato">
+                    <i class="fas fa-chart-bar fa-fw"></i>
+                </button>`;
         }
 
         const botoesGerais = `
-            <button class="btn btn-outline-secondary btn-sm" data-action="editar-conta" data-id="${conta.id}" title="Editar"><i class="fas fa-pen fa-fw"></i></button>
-            <button class="btn btn-outline-danger btn-sm" data-action="deletar-conta" data-id="${conta.id}" title="Deletar"><i class="fas fa-trash-can fa-fw"></i></button>
+            <button class="btn btn-outline-secondary btn-sm" data-action="editar-conta" data-id="${conta.id}" title="Editar">
+                <i class="fas fa-pen fa-fw"></i>
+            </button>
+            <button class="btn btn-outline-danger btn-sm" data-action="deletar-conta" data-id="${conta.id}" title="Deletar">
+                <i class="fas fa-trash-can fa-fw"></i>
+            </button>
         `;
 
         return `
@@ -174,7 +187,7 @@ export const renderContas = () => {
         </div>`;
 };
 
-// 2. Renderiza Formulário de Transação Rápida
+// 2. Renderiza Formulário de Transação Rápida (Com Categorias Dinâmicas)
 export const renderFormTransacaoRapida = () => {
     const container = document.getElementById('form-transacao-unificada');
     if (!container) return;
@@ -263,22 +276,30 @@ export const renderAnnualPlanningTab = () => {
     const container = document.getElementById('planning-tab-pane');
     if (!container) return;
 
-    // Estrutura com Navegação de Ano
+    // Estrutura com Navegação de Ano e Toggle
     container.innerHTML = `
         <div class="p-3">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <div class="d-flex align-items-center bg-white border rounded px-2 py-1">
-                    <button class="btn btn-link text-decoration-none p-0 text-dark" id="btn-prev-year"><i class="fas fa-chevron-left"></i></button>
+                    <button class="btn btn-link text-decoration-none p-0 text-dark" id="btn-prev-year">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
                     <span class="mx-3 fw-bold fs-5" id="label-planning-year">${currentPlanningYear}</span>
-                    <button class="btn btn-link text-decoration-none p-0 text-dark" id="btn-next-year"><i class="fas fa-chevron-right"></i></button>
+                    <button class="btn btn-link text-decoration-none p-0 text-dark" id="btn-next-year">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
                 </div>
 
                 <div class="btn-group" role="group">
                     <input type="radio" class="btn-check" name="btnradio" id="btn-view-chart" autocomplete="off" checked>
-                    <label class="btn btn-outline-primary btn-sm" for="btn-view-chart"><i class="fas fa-chart-bar"></i> Gráfico</label>
+                    <label class="btn btn-outline-primary btn-sm" for="btn-view-chart">
+                        <i class="fas fa-chart-bar"></i> Gráfico
+                    </label>
 
                     <input type="radio" class="btn-check" name="btnradio" id="btn-view-table" autocomplete="off">
-                    <label class="btn btn-outline-primary btn-sm" for="btn-view-table"><i class="fas fa-table"></i> Detalhado</label>
+                    <label class="btn btn-outline-primary btn-sm" for="btn-view-table">
+                        <i class="fas fa-table"></i> Detalhado
+                    </label>
                 </div>
             </div>
 
@@ -286,16 +307,19 @@ export const renderAnnualPlanningTab = () => {
                 <div style="height: 400px; position: relative;">
                     <canvas id="annual-mixed-chart"></canvas>
                 </div>
-                <div class="row text-center mt-4" id="chart-summary-footer"></div>
+                <div class="row text-center mt-4" id="chart-summary-footer">
+                    </div>
             </div>
 
-            <div id="panel-table-view" class="table-responsive" style="display: none;"></div>
+            <div id="panel-table-view" class="table-responsive" style="display: none;">
+                </div>
         </div>
     `;
 
+    // Renderiza inicialmente o gráfico
     renderMixedChart();
 
-    // Listeners de Ano
+    // Listeners de Navegação de Ano
     document.getElementById('btn-prev-year').addEventListener('click', () => {
         currentPlanningYear--;
         updatePlanningView();
@@ -305,11 +329,11 @@ export const renderAnnualPlanningTab = () => {
         updatePlanningView();
     });
 
-    // Listeners de Toggle View
+    // Listeners de Troca de Visualização (Gráfico/Tabela)
     document.getElementById('btn-view-chart').addEventListener('change', () => {
         document.getElementById('panel-chart-view').style.display = 'block';
         document.getElementById('panel-table-view').style.display = 'none';
-        renderMixedChart(); // Renderiza o gráfico novamente ao exibir
+        renderMixedChart();
     });
 
     document.getElementById('btn-view-table').addEventListener('change', () => {
@@ -329,7 +353,7 @@ const updatePlanningView = () => {
 };
 
 const renderMixedChart = () => {
-    // Passa o ano selecionado
+    // Busca dados calculados no finance.js (considerando o ano selecionado)
     const timelineData = calculateAnnualTimeline(getState(), currentPlanningYear);
 
     const labels = timelineData.map(d => d.mes.substring(0, 3).toUpperCase());
@@ -341,13 +365,23 @@ const renderMixedChart = () => {
     const totalDesp = despesas.reduce((a, b) => a + b, 0);
     const saldoAno = totalRec - totalDesp;
 
-    const footerHTML = `
-        <div class="col-4"><small class="text-body-secondary">Receitas</small><h5 class="income-text">${formatarMoeda(totalRec)}</h5></div>
-        <div class="col-4"><small class="text-body-secondary">Despesas</small><h5 class="expense-text">${formatarMoeda(totalDesp)}</h5></div>
-        <div class="col-4"><small class="text-body-secondary">Resultado</small><h5 class="${saldoAno>=0?'income-text':'expense-text'}">${formatarMoeda(saldoAno)}</h5></div>
-    `;
     const elFooter = document.getElementById('chart-summary-footer');
-    if(elFooter) elFooter.innerHTML = footerHTML;
+    if(elFooter) {
+        elFooter.innerHTML = `
+            <div class="col-4">
+                <small class="text-body-secondary">Receitas</small>
+                <h5 class="income-text">${formatarMoeda(totalRec)}</h5>
+            </div>
+            <div class="col-4">
+                <small class="text-body-secondary">Despesas</small>
+                <h5 class="expense-text">${formatarMoeda(totalDesp)}</h5>
+            </div>
+            <div class="col-4">
+                <small class="text-body-secondary">Resultado do Ano</small>
+                <h5 class="${saldoAno >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldoAno)}</h5>
+            </div>
+        `;
+    }
 
     const elChart = document.getElementById('annual-mixed-chart');
     if(!elChart) return;
@@ -381,7 +415,7 @@ const renderMixedChart = () => {
                     order: 2
                 },
                 {
-                    label: 'Despesas',
+                    label: 'Despesas Totais',
                     data: despesas,
                     backgroundColor: 'rgba(229, 62, 62, 0.6)',
                     borderColor: 'rgba(229, 62, 62, 1)',
@@ -397,8 +431,8 @@ const renderMixedChart = () => {
             plugins: { legend: { position: 'bottom' } },
             scales: {
                 x: { grid: { display: false } },
-                y: { display: false },
-                y1: { display: false }
+                y: { display: false }, // Eixo Y principal oculto para limpeza visual
+                y1: { display: false } // Eixo Y secundário oculto
             }
         }
     });
@@ -408,7 +442,7 @@ const renderDetailedTable = () => {
     const container = document.getElementById('panel-table-view');
     if(!container) return;
     
-    // Passa o ano selecionado
+    // Busca dados do finance.js
     const data = calculateCategoryGrid(getState(), currentPlanningYear);
     
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -430,7 +464,7 @@ const renderDetailedTable = () => {
         return `<td class="text-end fw-bold ${color}" style="font-size: 0.8rem;">${formatarMoeda(v).replace('R$', '')}</td>`;
     }).join('');
 
-    // Nova linha: Saldo Acumulado (Exibe o saldo bancário projetado)
+    // Nova Linha: SALDO ACUMULADO (A correção principal)
     const rowAcumulado = data.acumulados.map(v => {
         const color = v >= 0 ? 'text-success' : 'text-danger';
         return `<td class="text-end fw-bold ${color}" style="font-size: 0.85rem; background-color: #f8f9fa;">${formatarMoeda(v).replace('R$', '')}</td>`;
@@ -469,59 +503,128 @@ export const renderVisaoMensal = () => {
     const container = document.getElementById('dashboard-monthly-container');
     if (!container) return;
     
-    const metrics = calculateFinancialHealthMetrics(getState());
+    // Agora aceita um seletor de mês
+    const metrics = calculateFinancialHealthMetrics(getState(), currentDashboardMonth);
 
     container.innerHTML = `
-        <h5 class="mb-3">Resumo do Mês (Previsão)</h5>
-        <div class="row text-center mb-3">
-            <div class="col-4">
-                <h6>Receitas</h6>
-                <p class="h4 income-text mb-0">${formatarMoeda(metrics.rendaPrevistaTotal)}</p>
-                <small class="text-body-secondary" style="font-size:0.7rem">(Real: ${formatarMoeda(metrics.rendaRealizada)})</small>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5 class="mb-0">Resumo do Mês</h5>
+            <input type="month" id="dashboard-month-picker" class="form-control form-control-sm w-auto" value="${currentDashboardMonth}">
+        </div>
+
+        <div class="row text-center mb-4 g-2">
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm h-100 bg-success-subtle">
+                    <div class="card-body py-2">
+                        <small class="text-success-emphasis fw-bold">RECEITAS PREVISTAS</small>
+                        <h4 class="mb-0 text-success">${formatarMoeda(metrics.rendaPrevistaTotal)}</h4>
+                        <small style="font-size: 0.75rem" class="text-muted">Realizado: ${formatarMoeda(metrics.rendaRealizada)}</small>
+                    </div>
+                </div>
             </div>
-            <div class="col-4">
-                <h6>Despesas</h6>
-                <p class="h4 expense-text mb-0">${formatarMoeda(metrics.despesaPrevistaTotal)}</p>
-                <small class="text-body-secondary" style="font-size:0.7rem">(Real: ${formatarMoeda(metrics.despesaRealizada)})</small>
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm h-100 bg-danger-subtle">
+                    <div class="card-body py-2">
+                        <small class="text-danger-emphasis fw-bold">DESPESAS PREVISTAS</small>
+                        <h4 class="mb-0 text-danger">${formatarMoeda(metrics.despesaPrevistaTotal)}</h4>
+                        <small style="font-size: 0.75rem" class="text-muted">Realizado: ${formatarMoeda(metrics.despesaRealizada)}</small>
+                    </div>
+                </div>
             </div>
-            <div class="col-4">
-                <h6>Saldo</h6>
-                <p class="h4 ${metrics.saldoPrevisto >= 0 ? 'income-text':'expense-text'} mb-0">${formatarMoeda(metrics.saldoPrevisto)}</p>
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm h-100 ${metrics.saldoPrevisto >= 0 ? 'bg-primary-subtle' : 'bg-warning-subtle'}">
+                    <div class="card-body py-2">
+                        <small class="text-primary-emphasis fw-bold">SALDO PREVISTO</small>
+                        <h4 class="mb-0 ${metrics.saldoPrevisto >= 0 ? 'text-primary' : 'text-danger'}">${formatarMoeda(metrics.saldoPrevisto)}</h4>
+                        <small style="font-size: 0.75rem" class="text-muted">Líquido do Mês</small>
+                    </div>
+                </div>
             </div>
         </div>
-        <div style="height: 250px;"><canvas id="summary-chart-monthly"></canvas></div>`;
+
+        <div class="row">
+            <div class="col-lg-7 mb-3">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white"><h6 class="mb-0">Fluxo de Caixa Diário</h6></div>
+                    <div class="card-body">
+                        <div style="height: 250px;"><canvas id="daily-evolution-chart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-5 mb-3">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white"><h6 class="mb-0">Despesas por Categoria</h6></div>
+                    <div class="card-body">
+                        <div style="height: 250px;"><canvas id="summary-chart-monthly"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Listeners do Picker e renderização dos sub-gráficos
+    document.getElementById('dashboard-month-picker').addEventListener('change', (e) => {
+        currentDashboardMonth = e.target.value;
+        renderVisaoMensal(); 
+    });
     
-    if (summaryChart) summaryChart.destroy();
+    renderDailyChart();
+    renderCategoryChart();
+};
+
+const renderDailyChart = () => {
+    const ctx = document.getElementById('daily-evolution-chart')?.getContext('2d');
+    if (!ctx) return;
+    if (dailyChart) dailyChart.destroy();
+
+    const dailyData = calculateDailyEvolution(getState(), currentDashboardMonth);
+    const labels = dailyData.map(d => d.dia);
+    const dataAcumulado = dailyData.map(d => d.acumulado);
+
+    dailyChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Saldo Acumulado',
+                data: dataAcumulado,
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: { x: { grid: { display: false } } }
+        }
+    });
+};
+
+const renderCategoryChart = () => {
     const ctx = document.getElementById('summary-chart-monthly')?.getContext('2d');
+    if (!ctx) return;
+    if (summaryChart) summaryChart.destroy();
     
     const { transacoes, lancamentosFuturos } = getState();
-    const mesAtual = new Date().toISOString().slice(0, 7);
     const despesasMap = {};
     
-    // Realizadas
-    transacoes.filter(t => t.data.startsWith(mesAtual) && t.tipo === 'despesa').forEach(t => {
+    // Lógica para somar Realizado + Previsto nas categorias
+    transacoes.filter(t => t.data.startsWith(currentDashboardMonth) && t.tipo === 'despesa').forEach(t => {
         despesasMap[t.categoria] = (despesasMap[t.categoria] || 0) + t.valor;
     });
-    // Pendentes
-    lancamentosFuturos.filter(l => l.data_vencimento.startsWith(mesAtual) && l.tipo === 'a_pagar' && l.status === 'pendente').forEach(l => {
+    lancamentosFuturos.filter(l => l.data_vencimento.startsWith(currentDashboardMonth) && l.tipo === 'a_pagar' && l.status === 'pendente').forEach(l => {
         despesasMap[l.categoria] = (despesasMap[l.categoria] || 0) + l.valor;
     });
 
-    if(ctx && Object.keys(despesasMap).length > 0) {
+    if (Object.keys(despesasMap).length > 0) {
         summaryChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: Object.keys(despesasMap),
-                datasets: [{
-                    data: Object.values(despesasMap),
-                    backgroundColor: CHART_COLORS
-                }]
+                datasets: [{ data: Object.values(despesasMap), backgroundColor: CHART_COLORS }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } }
-            }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
         });
     }
 };
@@ -530,15 +633,13 @@ export const renderVisaoAnual = () => {
     const container = document.getElementById('dashboard-yearly-container');
     if (!container) return;
     
-    // MUDANÇA IMPORTANTE: Usa calculateAnnualTimeline para mostrar o ano todo (Realizado + Previsto)
-    // Isso garante que o gráfico da home mostre as barras de todo o ano corrente, não só o passado.
+    // Timeline anual completa (Real + Previsto)
     const timelineData = calculateAnnualTimeline(getState(), new Date().getFullYear());
-    
     const labels = timelineData.map(d => d.mes.substring(0, 3));
     const receitas = timelineData.map(d => d.receitas);
-    const despesas = timelineData.map(d => d.despesas); // Despesas de Caixa
+    const despesas = timelineData.map(d => d.despesas);
 
-    container.innerHTML = `<h5 class="mb-3">Fluxo de Caixa (Real + Previsto)</h5><div style="height: 300px;"><canvas id="annual-chart"></canvas></div>`;
+    container.innerHTML = `<h5 class="mb-3">Fluxo Anual (Realizado + Previsto)</h5><div style="height: 300px;"><canvas id="annual-chart"></canvas></div>`;
     
     if(annualChart) annualChart.destroy();
     const ctx = document.getElementById('annual-chart')?.getContext('2d');
@@ -553,11 +654,7 @@ export const renderVisaoAnual = () => {
                     { label: 'Despesas', data: despesas, backgroundColor: 'rgba(220,53,69,0.7)' }
                 ]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: { y: { beginAtZero: true } }
-            }
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
         });
     }
 };
@@ -603,7 +700,7 @@ export const renderFinancialHealth = () => {
             </div>
             <div class="col-lg-6 mb-3">
                 <div class="card h-100">
-                    <div class="card-header"><h6 class="mb-0">Evolução do Patrimônio (Histórico + Projeção)</h6></div>
+                    <div class="card-header"><h6 class="mb-0">Evolução do Patrimônio</h6></div>
                     <div class="card-body"><canvas id="net-worth-chart"></canvas></div>
                 </div>
             </div>
@@ -614,21 +711,14 @@ export const renderFinancialHealth = () => {
     const nwCtx = document.getElementById('net-worth-chart')?.getContext('2d');
     
     if (nwCtx && metrics.historicoPatrimonio.length) {
-        const labels = metrics.historicoPatrimonio.map(h => h.mes);
-        const data = metrics.historicoPatrimonio.map(h => h.valor);
-
         netWorthChart = new Chart(nwCtx, {
             type: 'line',
             data: {
-                labels: labels,
+                labels: metrics.historicoPatrimonio.map(h => h.mes),
                 datasets: [{
                     label: 'Patrimônio',
-                    data: data,
+                    data: metrics.historicoPatrimonio.map(h => h.valor),
                     borderColor: '#4A5568',
-                    // Cria uma linha pontilhada para o futuro (assumindo que os últimos 12 meses são o futuro)
-                    segment: {
-                        borderDash: ctx => ctx.p0DataIndex >= 12 ? [6, 6] : undefined,
-                    },
                     tension: 0.1,
                     fill: false
                 }]
@@ -710,6 +800,7 @@ const renderTransactionCard = (t) => {
     const statusBadge = isPendente ? '<span class="badge bg-warning text-dark me-2">Pendente</span>' : '<span class="badge bg-success me-2">Realizado</span>';
     const opacityClass = isPendente ? 'opacity-75' : '';
     
+    // Botão de Engrenagem (Se tiver vínculo de série)
     const extraBtn = (t.compra_parcelada_id) 
         ? `<button class="btn btn-outline-secondary btn-sm" data-action="recriar-compra-parcelada" data-id="${t.compra_parcelada_id}" title="Configurar Série"><i class="fas fa-cog"></i></button>` 
         : '';
@@ -737,9 +828,8 @@ const renderTransactionCard = (t) => {
             </div>`;
     }
 
-    const tipo = t.tipo === 'despesa' || t.tipo === 'a_pagar' ? 'despesa' : 'receita';
-    const sinal = tipo === 'despesa' ? '-' : '+';
-    const corValor = tipo === 'despesa' ? 'expense-text' : 'income-text';
+    const sinal = (t.tipo === 'despesa' || t.tipo === 'a_pagar') ? '-' : '+';
+    const corValor = (t.tipo === 'despesa' || t.tipo === 'a_pagar') ? 'expense-text' : 'income-text';
 
     return `
         <div class="accordion-item ${opacityClass}">
