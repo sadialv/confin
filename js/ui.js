@@ -381,7 +381,7 @@ const renderMixedChart = () => {
                     order: 2
                 },
                 {
-                    label: 'Despesas Totais',
+                    label: 'Despesas',
                     data: despesas,
                     backgroundColor: 'rgba(229, 62, 62, 0.6)',
                     borderColor: 'rgba(229, 62, 62, 1)',
@@ -430,7 +430,7 @@ const renderDetailedTable = () => {
         return `<td class="text-end fw-bold ${color}" style="font-size: 0.8rem;">${formatarMoeda(v).replace('R$', '')}</td>`;
     }).join('');
 
-    // Nova linha: Saldo Acumulado
+    // Nova linha: Saldo Acumulado (Exibe o saldo bancário projetado)
     const rowAcumulado = data.acumulados.map(v => {
         const color = v >= 0 ? 'text-success' : 'text-danger';
         return `<td class="text-end fw-bold ${color}" style="font-size: 0.85rem; background-color: #f8f9fa;">${formatarMoeda(v).replace('R$', '')}</td>`;
@@ -462,7 +462,7 @@ const renderDetailedTable = () => {
 };
 
 // =========================================================================
-// === RENDERIZADORES DE TELA (DASHBOARD/CONTAS) ===
+// === DASHBOARDS E GRÁFICOS (MENSAL/ANUAL/SAÚDE) ===
 // =========================================================================
 
 export const renderVisaoMensal = () => {
@@ -529,19 +529,16 @@ export const renderVisaoMensal = () => {
 export const renderVisaoAnual = () => {
     const container = document.getElementById('dashboard-yearly-container');
     if (!container) return;
-    const ano = new Date().getFullYear();
-    const transacoesAno = [...getState().transacoes, ...gerarTransacoesVirtuais()].filter(t => t.data?.startsWith(ano));
     
-    let receitasPorMes = Array(12).fill(0);
-    let despesasPorMes = Array(12).fill(0);
+    // MUDANÇA IMPORTANTE: Usa calculateAnnualTimeline para mostrar o ano todo (Realizado + Previsto)
+    // Isso garante que o gráfico da home mostre as barras de todo o ano corrente, não só o passado.
+    const timelineData = calculateAnnualTimeline(getState(), new Date().getFullYear());
     
-    transacoesAno.forEach(t => {
-        const mes = new Date(t.data + 'T12:00:00').getMonth();
-        if(t.tipo === 'receita') receitasPorMes[mes] += t.valor;
-        else despesasPorMes[mes] += t.valor;
-    });
+    const labels = timelineData.map(d => d.mes.substring(0, 3));
+    const receitas = timelineData.map(d => d.receitas);
+    const despesas = timelineData.map(d => d.despesas); // Despesas de Caixa
 
-    container.innerHTML = `<h5 class="mb-3">Fluxo de Caixa Anual (Realizado)</h5><div style="height: 300px;"><canvas id="annual-chart"></canvas></div>`;
+    container.innerHTML = `<h5 class="mb-3">Fluxo de Caixa (Real + Previsto)</h5><div style="height: 300px;"><canvas id="annual-chart"></canvas></div>`;
     
     if(annualChart) annualChart.destroy();
     const ctx = document.getElementById('annual-chart')?.getContext('2d');
@@ -550,10 +547,10 @@ export const renderVisaoAnual = () => {
         annualChart = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'],
+                labels: labels,
                 datasets: [
-                    { label: 'Receitas', data: receitasPorMes, backgroundColor: 'rgba(25,135,84,0.7)' },
-                    { label: 'Despesas', data: despesasPorMes, backgroundColor: 'rgba(220,53,69,0.7)' }
+                    { label: 'Receitas', data: receitas, backgroundColor: 'rgba(25,135,84,0.7)' },
+                    { label: 'Despesas', data: despesas, backgroundColor: 'rgba(220,53,69,0.7)' }
                 ]
             },
             options: {
@@ -606,7 +603,7 @@ export const renderFinancialHealth = () => {
             </div>
             <div class="col-lg-6 mb-3">
                 <div class="card h-100">
-                    <div class="card-header"><h6 class="mb-0">Evolução do Patrimônio</h6></div>
+                    <div class="card-header"><h6 class="mb-0">Evolução do Patrimônio (Histórico + Projeção)</h6></div>
                     <div class="card-body"><canvas id="net-worth-chart"></canvas></div>
                 </div>
             </div>
@@ -617,14 +614,21 @@ export const renderFinancialHealth = () => {
     const nwCtx = document.getElementById('net-worth-chart')?.getContext('2d');
     
     if (nwCtx && metrics.historicoPatrimonio.length) {
+        const labels = metrics.historicoPatrimonio.map(h => h.mes);
+        const data = metrics.historicoPatrimonio.map(h => h.valor);
+
         netWorthChart = new Chart(nwCtx, {
             type: 'line',
             data: {
-                labels: metrics.historicoPatrimonio.map(h => h.mes),
+                labels: labels,
                 datasets: [{
                     label: 'Patrimônio',
-                    data: metrics.historicoPatrimonio.map(h => h.valor),
+                    data: data,
                     borderColor: '#4A5568',
+                    // Cria uma linha pontilhada para o futuro (assumindo que os últimos 12 meses são o futuro)
+                    segment: {
+                        borderDash: ctx => ctx.p0DataIndex >= 12 ? [6, 6] : undefined,
+                    },
                     tension: 0.1,
                     fill: false
                 }]
@@ -706,7 +710,6 @@ const renderTransactionCard = (t) => {
     const statusBadge = isPendente ? '<span class="badge bg-warning text-dark me-2">Pendente</span>' : '<span class="badge bg-success me-2">Realizado</span>';
     const opacityClass = isPendente ? 'opacity-75' : '';
     
-    // Botão de Engrenagem (Se tiver vínculo de série)
     const extraBtn = (t.compra_parcelada_id) 
         ? `<button class="btn btn-outline-secondary btn-sm" data-action="recriar-compra-parcelada" data-id="${t.compra_parcelada_id}" title="Configurar Série"><i class="fas fa-cog"></i></button>` 
         : '';
@@ -821,7 +824,7 @@ const renderBillItem = (bill, compras) => {
                         <button class="btn ${payButtonClass} btn-sm" data-action="pagar-conta" data-id="${bill.id}" title="${payButtonTitle}"><i class="${payButtonIcon}"></i></button>
                         <button class="btn btn-outline-secondary btn-sm" data-action="editar-lancamento" data-id="${bill.id}"><i class="fas fa-edit"></i></button>
                         ${extraButton}
-                        <button class="btn btn-outline-danger btn-sm" data-action="deletar-lancamento" data-id="${bill.id}" data-compra-id="${bill.compra_parcelada_id || ''}"><i class="fas fa-trash"></i></button>
+                        <button class="btn btn-outline-danger btn-sm" data-action="deletar-lancamento" data-id="${bill.id}" data-compra-id="${bill.compra_parcelada_id || ''}" title="Apagar"><i class="fas fa-trash"></i></button>
                     </div>
                 </div>
             </div>
