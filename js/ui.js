@@ -8,7 +8,6 @@ let summaryChart = null;
 let dailyChart = null;
 let annualChart = null;
 let netWorthChart = null;
-let avgSpendingChart = null;
 let annualMixedChart = null;
 
 // Estados locais da UI
@@ -100,7 +99,7 @@ export const closeModal = () => {
 // === RENDERIZADORES DE COMPONENTES ===
 // =========================================================================
 
-// 1. Renderiza Cards de Contas (Com Scrollbar)
+// 1. Renderiza Cards de Contas
 export const renderContas = () => {
     const container = document.getElementById('accounts-container');
     const { contas, transacoes } = getState();
@@ -267,7 +266,7 @@ export const renderFormTransacaoRapida = () => {
 };
 
 // =========================================================================
-// === ABA: PLANEJAMENTO ANUAL (GRÁFICO MISTO E TABELA) ===
+// === ABA: PLANEJAMENTO ANUAL ===
 // =========================================================================
 
 export const renderAnnualPlanningTab = () => {
@@ -416,8 +415,6 @@ const renderMixedChart = () => {
     });
 };
 
-// ARQUIVO: js/ui.js - Substitua APENAS a função renderDetailedTable
-
 const renderDetailedTable = () => {
     const container = document.getElementById('panel-table-view');
     if(!container) return;
@@ -425,18 +422,16 @@ const renderDetailedTable = () => {
     const data = calculateCategoryGrid(getState(), currentPlanningYear);
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     
-    // Estilos Inline para garantir o visual (Sticky Header/Column)
     const styleStickyHeader = 'position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);';
     const styleStickyCol = 'position: sticky; left: 0; z-index: 5; border-right: 1px solid #dee2e6;';
     
-    // Cores (Paleta Suave/Formal)
     const bgHeader = '#f8f9fa';
-    const bgReceitasHeader = '#e6fffa'; // Verde muito claro
-    const textReceitas = '#047857';     // Verde escuro elegante
-    const bgDespesasHeader = '#fff5f5'; // Vermelho muito claro
-    const textDespesas = '#c53030';     // Vermelho escuro elegante
-    const bgResumo = '#edf2f7';         // Cinza azulado (neutro)
-    const bgSaldoLiquido = '#ebf8ff';   // Azul claro destaque
+    const bgReceitasHeader = '#e6fffa'; 
+    const textReceitas = '#047857';     
+    const bgDespesasHeader = '#fff5f5'; 
+    const textDespesas = '#c53030';     
+    const bgResumo = '#edf2f7';         
+    const bgSaldoLiquido = '#ebf8ff';   
     
     const headerCols = meses.map(m => `
         <th class="text-center py-2 text-secondary text-uppercase" 
@@ -444,7 +439,6 @@ const renderDetailedTable = () => {
             ${m}
         </th>`).join('');
 
-    // Helper para linhas de dados
     const createRows = (objData) => Object.keys(objData).sort().map(cat => {
         const cols = objData[cat].map(v => 
             `<td class="text-end border-light px-2" style="font-size: 0.85rem; color: #4a5568;">
@@ -461,7 +455,6 @@ const renderDetailedTable = () => {
             </tr>`;
     }).join('');
 
-    // Helper para linhas de Resumo/Total
     const renderSumRow = (label, values, bgColor, textColor, isBold = false) => {
         const weight = isBold ? 'fw-bold' : 'fw-normal';
         const cols = values.map(v => 
@@ -479,18 +472,15 @@ const renderDetailedTable = () => {
             </tr>`;
     };
 
-    // Montagem das Linhas
     const rowsReceitasDetails = createRows(data.receitas);
     const rowTotalEntradas = renderSumRow('Total Entradas', data.totalReceitas, bgReceitasHeader, textReceitas, true);
     
     const rowsDespesasDetails = createRows(data.despesas);
     const rowTotalSaidas = renderSumRow('Total Saídas', data.totalDespesas, bgDespesasHeader, textDespesas, true);
 
-    // Bloco Resumo (Sem a linha repetida de "Despesas")
     const rowResumoReceitas = renderSumRow('Receitas', data.totalReceitas, '#fff', '#2d3748');
     const rowResumoInvest = renderSumRow('Investimentos', data.saldosInvestimento, '#fff', '#2d3748');
     const rowResumoSaldos = renderSumRow('Saldos de contas', data.saldosConta, '#fff', '#2d3748');
-    // REMOVIDA A LINHA DE DESPESAS AQUI CONFORME SOLICITADO
     
     const rowSaldoLiquido = renderSumRow('Saldo Líquido (Projetado)', data.saldoLiquido, bgSaldoLiquido, '#2b6cb0', true);
 
@@ -545,7 +535,7 @@ const renderDetailedTable = () => {
 };
 
 // =========================================================================
-// === DASHBOARDS E GRÁFICOS (MENSAL/ANUAL/SAÚDE) ===
+// === DASHBOARDS E GRÁFICOS ===
 // =========================================================================
 
 export const renderVisaoMensal = () => {
@@ -834,7 +824,7 @@ export const renderFilters = (type, currentFilters = {}) => {
         </div>`;
 };
 
-// EM: js/ui.js
+// --- PAINEL DE RESUMO MODERNO ---
 const renderSummaryPanel = (containerId, items, type) => {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -850,7 +840,6 @@ const renderSummaryPanel = (containerId, items, type) => {
         
     const saldo = totalReceitas - totalDespesas;
 
-    // Novo Layout HTML (Stat Strip)
     container.innerHTML = `
         <div class="summary-panel-modern">
             <div class="stat-item">
@@ -874,7 +863,7 @@ const renderSummaryPanel = (containerId, items, type) => {
         </div>`;
 };
 
-// EM: js/ui.js
+// --- CARD FLUTUANTE (HISTÓRICO) ---
 const renderTransactionCard = (t) => {
     const conta = getContaPorId(t.conta_id);
     const icon = CATEGORY_ICONS[t.categoria] || CATEGORY_ICONS['Outros'];
@@ -882,24 +871,21 @@ const renderTransactionCard = (t) => {
     const dataExibicao = t.data || t.data_vencimento; 
     const collapseId = `collapse-trans-${t.id || Math.random().toString(36).substr(2, 9)}`;
     
-    // Status Badge mais discreta e apenas se necessário
+    // Status Badge discreta
     const statusBadge = isPendente 
         ? '<span class="badge bg-warning text-dark border border-warning-subtle" style="font-size:0.65rem">Pendente</span>' 
-        : ''; // Removemos o "Realizado" verde para limpar o visual, assumimos que sem badge = realizado
+        : ''; 
 
     const opacityClass = isPendente ? 'opacity-75' : '';
     
-    // Botões (Mantidos iguais, apenas lógica de exibição)
     const extraBtn = (t.compra_parcelada_id) 
         ? `<button class="btn btn-outline-secondary btn-sm" data-action="recriar-compra-parcelada" data-id="${t.compra_parcelada_id}" title="Configurar Série"><i class="fas fa-cog"></i></button>` 
         : '';
 
     let actions = '';
-    // ... (Mantenha sua lógica existente de actions aqui) ...
-    // Vou simplificar aqui para focar no layout visual:
     if (isPendente) {
         const isReceita = t.tipo === 'a_receber';
-        actions = `<div class="btn-group"><button class="btn ${isReceita ? 'btn-primary' : 'btn-success'} btn-sm" data-action="pagar-conta" data-id="${t.id}"><i class="${isReceita ? 'fas fa-hand-holding-usd' : 'fas fa-check'}"></i></button><button class="btn btn-outline-secondary btn-sm" data-action="editar-lancamento" data-id="${t.id}"><i class="fas fa-edit"></i></button>${extraBtn}<button class="btn btn-outline-danger btn-sm" data-action="deletar-lancamento" data-id="${t.id}"><i class="fas fa-trash"></i></button></div>`;
+        actions = `<div class="btn-group"><button class="btn ${isReceita ? 'btn-primary' : 'btn-success'} btn-sm" data-action="pagar-conta" data-id="${t.id}" title="Confirmar"><i class="${isReceita ? 'fas fa-hand-holding-usd' : 'fas fa-check'}"></i></button><button class="btn btn-outline-secondary btn-sm" data-action="editar-lancamento" data-id="${t.id}"><i class="fas fa-edit"></i></button>${extraBtn}<button class="btn btn-outline-danger btn-sm" data-action="deletar-lancamento" data-id="${t.id}"><i class="fas fa-trash"></i></button></div>`;
     } else {
         actions = `<div class="btn-group"><button class="btn btn-outline-secondary btn-sm" data-action="editar-transacao" data-id="${t.id}"><i class="fas fa-edit"></i></button>${extraBtn}<button class="btn btn-outline-danger btn-sm" data-action="deletar-transacao" data-id="${t.id}"><i class="fas fa-trash"></i></button></div>`;
     }
@@ -907,7 +893,7 @@ const renderTransactionCard = (t) => {
     const sinal = (t.tipo === 'despesa' || t.tipo === 'a_pagar') ? '-' : '+';
     const corValor = (t.tipo === 'despesa' || t.tipo === 'a_pagar') ? 'expense-text' : 'income-text';
     
-    // Formatação da Data para o subtítulo (Ex: 12 Dez)
+    // Formatação da Data
     const dateObj = new Date(dataExibicao + 'T12:00:00');
     const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 
@@ -916,11 +902,9 @@ const renderTransactionCard = (t) => {
             <h2 class="accordion-header">
                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
                     <div class="d-flex w-100 align-items-center">
-                        
                         <span class="transaction-icon-wrapper flex-shrink-0" style="background-color:${icon.color}; color: white;">
                             <i class="${icon.icon}"></i>
                         </span>
-
                         <div class="flex-grow-1 me-3" style="min-width: 0;">
                             <div class="d-flex align-items-center gap-2">
                                 <span class="trans-desc text-truncate">${t.descricao}</span>
@@ -932,7 +916,6 @@ const renderTransactionCard = (t) => {
                                 <span class="d-none d-sm-inline text-truncate">${conta ? conta.nome : 'N/A'}</span>
                             </div>
                         </div>
-
                         <span class="trans-amount ${corValor} ms-auto">${sinal} ${formatarMoeda(t.valor).replace('R$', '')}</span>
                     </div>
                 </button>
@@ -942,7 +925,7 @@ const renderTransactionCard = (t) => {
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <small class="text-body-secondary">
                              <strong>Detalhes:</strong> ${t.categoria} via ${conta ? conta.nome : 'Conta Excluída'} <br>
-                             Completo: ${dateObj.toLocaleDateString('pt-BR')}
+                             Data Completa: ${dateObj.toLocaleDateString('pt-BR')}
                         </small>
                         ${actions}
                     </div>
@@ -950,17 +933,21 @@ const renderTransactionCard = (t) => {
             </div>
         </div>`;
 };
+
+// --- CARD FLUTUANTE (CONTAS A PAGAR) ---
 const renderBillItem = (bill, compras) => {
     const isParcela = !!bill.compra_parcelada_id;
     let cat = bill.categoria;
-    let isSerie = false;
+    let infoSerie = '';
 
     if (isParcela) {
         const c = compras.find(compra => compra.id === bill.compra_parcelada_id);
         if(c) {
             cat = c.categoria;
             if (c.descricao && c.descricao.includes('(Série)')) {
-                isSerie = true;
+                infoSerie = '<span class="badge bg-info text-dark ms-1" style="font-size:0.6rem">Série</span>';
+            } else {
+                infoSerie = '<span class="badge bg-secondary ms-1" style="font-size:0.6rem">Parcelado</span>';
             }
         }
     }
@@ -971,40 +958,49 @@ const renderBillItem = (bill, compras) => {
         ? `<button class="btn btn-outline-secondary btn-sm" data-action="recriar-compra-parcelada" data-id="${bill.compra_parcelada_id}" title="Configurar Série"><i class="fas fa-cog"></i></button>` 
         : '';
 
-    let linkText = '';
-    if (isParcela) {
-        linkText = isSerie 
-            ? '<br><small class="text-success"><i class="fas fa-sync-alt"></i> Série Recorrente</small>' 
-            : '<br><small class="text-info"><i class="fas fa-credit-card"></i> Compra Parcelada</small>';
-    }
-
     const isReceita = bill.tipo === 'a_receber';
-    const payButtonClass = isReceita ? 'btn-primary' : 'btn-success';
-    const payButtonIcon = isReceita ? 'fas fa-hand-holding-usd' : 'fas fa-check';
-    const payButtonTitle = isReceita ? 'Confirmar Recebimento' : 'Pagar';
+    const payBtnClass = isReceita ? 'btn-primary' : 'btn-success';
+    const payIcon = isReceita ? 'fas fa-hand-holding-usd' : 'fas fa-check';
+    
+    // Formatação Data
+    const dateObj = new Date(bill.data_vencimento + 'T12:00:00');
+    const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+    const corValor = bill.tipo === 'a_pagar' ? 'expense-text' : 'income-text';
 
     return `
         <div class="accordion-item">
             <h2 class="accordion-header">
                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
                     <div class="d-flex w-100 align-items-center">
-                        <span class="transaction-icon-wrapper me-3" style="background-color:${icon.color};"><i class="${icon.icon}"></i></span>
-                        <span>${bill.descricao}</span>
-                        <span class="ms-auto fw-bold ${bill.tipo === 'a_pagar' ? 'expense-text' : 'income-text'}">${formatarMoeda(bill.valor)}</span>
+                        <span class="transaction-icon-wrapper flex-shrink-0" style="background-color:${icon.color}; color: white;">
+                            <i class="${icon.icon}"></i>
+                        </span>
+                        <div class="flex-grow-1 me-3" style="min-width: 0;">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="trans-desc text-truncate">${bill.descricao}</span>
+                                ${infoSerie}
+                            </div>
+                            <div class="trans-meta">
+                                <span><i class="far fa-clock me-1"></i>Vence: ${dateStr}</span>
+                            </div>
+                        </div>
+                        <span class="trans-amount ${corValor} ms-auto">${formatarMoeda(bill.valor).replace('R$', '')}</span>
                     </div>
                 </button>
             </h2>
             <div id="${collapseId}" class="accordion-collapse collapse">
-                <div class="accordion-body d-flex justify-content-between align-items-center">
-                    <div>
-                        <small class="text-body-secondary">Vencimento: ${new Date(bill.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}</small>
-                        ${linkText}
-                    </div>
-                    <div class="btn-group">
-                        <button class="btn ${payButtonClass} btn-sm" data-action="pagar-conta" data-id="${bill.id}" title="${payButtonTitle}"><i class="${payButtonIcon}"></i></button>
-                        <button class="btn btn-outline-secondary btn-sm" data-action="editar-lancamento" data-id="${bill.id}"><i class="fas fa-edit"></i></button>
-                        ${extraButton}
-                        <button class="btn btn-outline-danger btn-sm" data-action="deletar-lancamento" data-id="${bill.id}" data-compra-id="${bill.compra_parcelada_id || ''}" title="Apagar"><i class="fas fa-trash"></i></button>
+                <div class="accordion-body bg-light-subtle">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <small class="text-body-secondary">
+                            Vencimento Completo: ${dateObj.toLocaleDateString('pt-BR')} <br>
+                            ${isParcela ? 'Item vinculado a um planejamento.' : 'Lançamento avulso.'}
+                        </small>
+                        <div class="btn-group">
+                            <button class="btn ${payBtnClass} btn-sm" data-action="pagar-conta" data-id="${bill.id}" title="Baixar"><i class="${payIcon}"></i></button>
+                            <button class="btn btn-outline-secondary btn-sm" data-action="editar-lancamento" data-id="${bill.id}"><i class="fas fa-edit"></i></button>
+                            ${extraButton}
+                            <button class="btn btn-outline-danger btn-sm" data-action="deletar-lancamento" data-id="${bill.id}" data-compra-id="${bill.compra_parcelada_id || ''}" title="Apagar"><i class="fas fa-trash"></i></button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1586,7 +1582,7 @@ export const renderMonthlyStatementDetails = (mes) => {
 };
 
 // =========================================================================
-// === MASTER RENDERER - NO FINAL PARA EVITAR ERROS DE ORDEM ===
+// === MASTER RENDERER ===
 // =========================================================================
 
 export const renderAllComponents = (initialFilters) => {
@@ -1602,7 +1598,6 @@ export const renderAllComponents = (initialFilters) => {
     renderMonthlyStatementTab();
     renderAnnualPlanningTab();
 };
-// Adicione ao final do js/ui.js
 
 // --- AUTENTICAÇÃO UI ---
 
@@ -1647,10 +1642,8 @@ export const toggleAppView = (showApp) => {
     }
 };
 
-// Adicione um botão de Sair no renderContas ou no Header para chamar depois
 export const renderLogoutButton = () => {
-    // Exemplo: injetar no header existente
-    const header = document.querySelector('.navbar .container-fluid'); // Ajuste conforme seu HTML
+    const header = document.querySelector('.navbar .container-fluid'); 
     if(header && !document.getElementById('btn-logout')) {
         const btn = document.createElement('button');
         btn.id = 'btn-logout';
@@ -1659,6 +1652,3 @@ export const renderLogoutButton = () => {
         header.appendChild(btn);
     }
 };
-
-
-
