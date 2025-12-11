@@ -440,6 +440,10 @@ const renderMixedChart = () => {
 
 // ARQUIVO: js/ui.js (Substitua APENAS a função renderDetailedTable)
 
+// ARQUIVO: js/ui.js (Substitua a função renderDetailedTable)
+
+// ... (Restante do arquivo igual)
+
 const renderDetailedTable = () => {
     const container = document.getElementById('panel-table-view');
     if(!container) return;
@@ -447,91 +451,82 @@ const renderDetailedTable = () => {
     const data = calculateCategoryGrid(getState(), currentPlanningYear);
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     
-    // Estilos inline para garantir visual moderno
+    // Cores e Estilos
     const styleStickyHeader = 'position: sticky; top: 0; z-index: 10;';
-    const styleStickyCol = 'position: sticky; left: 0; z-index: 5; background-color: inherit; border-right: 2px solid #dee2e6;';
+    const styleStickyCol = 'position: sticky; left: 0; z-index: 5; border-right: 2px solid #dee2e6;';
     
-    const headerCols = meses.map(m => `<th class="text-center py-3" style="min-width: 100px; background-color: #f8f9fa;">${m.toUpperCase()}</th>`).join('');
+    const headerCols = meses.map(m => `<th class="text-center py-3 text-secondary bg-light" style="min-width: 100px;">${m.toUpperCase()}</th>`).join('');
 
-    // Helper para criar linhas
+    // Helper para gerar linhas de categoria
     const createRows = (objData) => {
         const keys = Object.keys(objData).sort();
         if (keys.length === 0) return `<tr><td colspan="13" class="text-center text-muted small py-2">Sem lançamentos</td></tr>`;
         
         return keys.map(cat => {
             const vals = objData[cat].map(v => v === 0 ? '<span class="text-muted opacity-25">-</span>' : formatarMoeda(v).replace('R$', ''));
-            const cols = vals.map(v => `<td class="text-end small">${v}</td>`).join('');
+            const cols = vals.map(v => `<td class="text-end small border-start-0 border-end-0">${v}</td>`).join('');
             return `
-                <tr class="align-middle">
-                    <td class="fw-bold text-secondary small text-truncate ps-3" style="${styleStickyCol} max-width: 180px; background-color: #fff;">${cat}</td>
+                <tr class="align-middle bg-white">
+                    <td class="fw-bold text-secondary small text-truncate ps-3 bg-white" style="${styleStickyCol} max-width: 180px;">${cat}</td>
                     ${cols}
                 </tr>`;
         }).join('');
     };
 
-    // Linhas de Dados
     const rowsReceitas = createRows(data.receitas);
     const rowsDespesas = createRows(data.despesas);
     
-    // Linhas de Totais
-    const renderTotalRow = (label, values, colorClass, bgColor) => {
-        const cols = values.map(v => `<td class="text-end fw-bold ${colorClass}" style="font-size: 0.85rem;">${formatarMoeda(v).replace('R$', '')}</td>`).join('');
-        return `<tr style="background-color: ${bgColor};">
-            <td class="fw-bold ps-3 text-uppercase" style="${styleStickyCol} background-color: ${bgColor}; color: #495057;">${label}</td>
-            ${cols}
-        </tr>`;
-    };
-
-    const rowTotalRec = renderTotalRow('Total Entradas', data.totalReceitas, 'text-success', '#d1e7dd');
-    const rowTotalDesp = renderTotalRow('Total Saídas', data.totalDespesas, 'text-danger', '#f8d7da');
-    
-    // Linha de Resultado (Fluxo)
+    // Linha: RESULTADO MENSAL (Receita - Despesa do mês)
     const rowResultado = data.saldoMensal.map(v => {
         const color = v >= 0 ? 'text-primary' : 'text-danger';
-        return `<td class="text-end fw-bold ${color}">${formatarMoeda(v).replace('R$', '')}</td>`;
+        return `<td class="text-end fw-bold ${color} bg-light">${formatarMoeda(v).replace('R$', '')}</td>`;
     }).join('');
 
-    // Linha de Acumulado (Caixa)
+    // Linha: SALDO EM CONTA (Acumulado Real)
     const rowAcumulado = data.saldoAcumulado.map(v => {
         const color = v >= 0 ? 'text-success' : 'text-danger';
-        return `<td class="text-end fw-bold ${color}">${formatarMoeda(v).replace('R$', '')}</td>`;
+        // Fundo escuro, texto claro, destaque total
+        return `<td class="text-end fw-bold ${color} bg-dark bg-opacity-75 text-white" style="font-size: 0.9rem;">${formatarMoeda(v).replace('R$', '')}</td>`;
     }).join('');
 
     container.innerHTML = `
-        <div class="table-responsive shadow-sm border rounded" style="max-height: 600px;">
+        <div class="table-responsive shadow-sm border rounded" style="max-height: 600px; border: 1px solid #ccc;">
             <table class="table table-bordered table-hover mb-0" style="font-size: 0.85rem; border-collapse: separate; border-spacing: 0;">
                 <thead style="${styleStickyHeader}">
                     <tr>
-                        <th class="ps-3 bg-light text-secondary text-uppercase" style="${styleStickyCol} min-width: 180px; z-index: 11;">Categoria</th>
+                        <th class="ps-3 bg-light text-dark fw-bold text-uppercase border-bottom" style="${styleStickyCol} min-width: 180px; z-index: 11;">Categoria</th>
                         ${headerCols}
                     </tr>
                 </thead>
                 <tbody>
-                    <tr class="table-group-divider"><td colspan="13" class="bg-success text-white ps-3 fw-bold"><i class="fas fa-arrow-up me-2"></i>RECEITAS</td></tr>
-                    ${rowsReceitas}
-                    ${rowTotalRec}
-
-                    <tr class="table-group-divider"><td colspan="13" class="bg-danger text-white ps-3 fw-bold mt-3"><i class="fas fa-arrow-down me-2"></i>DESPESAS</td></tr>
-                    ${rowsDespesas}
-                    ${rowTotalDesp}
-
-                    <tr class="table-group-divider table-dark">
-                        <td colspan="13" class="ps-3 fw-bold text-uppercase"><i class="fas fa-chart-line me-2"></i>RESUMO DO CAIXA</td>
+                    <tr class="table-group-divider">
+                        <td colspan="13" class="ps-3 fw-bold text-uppercase" style="background-color: #d1e7dd; color: #0f5132;">
+                            <i class="fas fa-arrow-up me-2"></i> Receitas
+                        </td>
                     </tr>
-                    <tr class="bg-light">
-                        <td class="fw-bold ps-3" style="${styleStickyCol} background-color: #f8f9fa;">RESULTADO (Mês)</td>
+                    ${rowsReceitas}
+
+                    <tr class="table-group-divider">
+                        <td colspan="13" class="ps-3 fw-bold text-uppercase mt-3" style="background-color: #f8d7da; color: #842029;">
+                            <i class="fas fa-arrow-down me-2"></i> Despesas
+                        </td>
+                    </tr>
+                    ${rowsDespesas}
+
+                    <tr class="table-group-divider border-top border-3">
+                        <td class="fw-bold ps-3 bg-light text-dark">RESULTADO MENSAL</td>
                         ${rowResultado}
                     </tr>
-                    <tr style="background-color: #e2e3e5;">
-                        <td class="fw-bold ps-3" style="${styleStickyCol} background-color: #e2e3e5;">SALDO EM CONTA (Acumulado)</td>
+                    <tr>
+                        <td class="fw-bold ps-3 text-white bg-dark">SALDO EM CONTA (Acumulado)</td>
                         ${rowAcumulado}
                     </tr>
                 </tbody>
             </table>
         </div>
-        <div class="mt-2 text-muted small fst-italic">
-            * <strong>Resultado (Mês):</strong> Diferença entre Entradas e Saídas apenas deste mês.<br>
-            * <strong>Saldo em Conta:</strong> Valor projetado que você terá no banco (considerando o saldo inicial do ano + histórico).
+        <div class="mt-2 d-flex justify-content-between text-muted small px-1">
+            <span>* <strong>Resultado Mensal:</strong> Quanto sobrou ou faltou neste mês isolado.</span>
+            <span>* <strong>Saldo em Conta:</strong> O valor real projetado na sua conta bancária.</span>
         </div>
     `;
 };
@@ -1552,4 +1547,5 @@ export const renderAllComponents = (initialFilters) => {
     renderMonthlyStatementTab();
     renderAnnualPlanningTab();
 };
+
 
