@@ -1,124 +1,81 @@
-  /* =======================================================
-   ATUALIZAÇÃO VISUAL: LISTAS E RESUMOS (PROFISSIONAL)
-   ======================================================= */
-
-/* 1. Painel de Resumo (Stats Strip) */
-.summary-panel-modern {
-    background-color: var(--card-background-color);
-    border-radius: 12px;
-    box-shadow: var(--shadow);
-    border: 1px solid var(--border-color);
-    padding: 1rem 1.5rem;
-    margin-bottom: 1.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-around;
-    flex-wrap: wrap;
-    gap: 1rem;
+/* ARQUIVO: style.css */
+:root {
+    --primary-color: #4A5568; 
+    --bg-body: #f3f4f6;
+    --card-bg: #ffffff;
+    --text-main: #1f2937;
+    --text-sec: #6b7280;
+    --border-color: #e5e7eb;
+    --success: #10b981;
+    --danger: #ef4444;
 }
 
-.stat-item {
-    text-align: center;
-    display: flex;
-    flex-direction: column;
+[data-theme="dark"] {
+    --bg-body: #111827;
+    --card-bg: #1f2937;
+    --text-main: #f9fafb;
+    --text-sec: #9ca3af;
+    --border-color: #374151;
 }
 
-.stat-label {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-secondary-color);
-    font-weight: 600;
-    margin-bottom: 2px;
-}
+body { background-color: var(--bg-body); color: var(--text-main); font-family: 'Segoe UI', system-ui, sans-serif; }
+.card { background-color: var(--card-bg); border: 1px solid var(--border-color); }
 
-.stat-value {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--text-color);
-}
+/* --- TABS --- */
+.nav-pills .nav-link { color: var(--text-sec); border-radius: 8px; transition: all 0.2s; }
+.nav-pills .nav-link.active { background-color: var(--primary-color); color: white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
 
-/* Divisores verticais no desktop */
-@media (min-width: 768px) {
-    .stat-item { border-right: 1px solid var(--border-color); padding-right: 2rem; width: auto; }
-    .stat-item:last-child { border-right: none; padding-right: 0; }
-}
-
-/* 2. Lista de Transações (Efeito Card Flutuante) */
+/* --- CARTÕES FLUTUANTES (A SOLUÇÃO DO VISUAL) --- */
+/* Isso força o espaçamento entre os itens da lista */
 #bills-list-container .accordion-item,
 #history-list-container .accordion-item {
-    border: 1px solid var(--border-color);
-    border-radius: 12px !important; /* Força bordas arredondadas */
-    margin-bottom: 0.75rem; /* Espaço entre itens */
-    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    margin-bottom: 12px !important; 
+    border: 1px solid var(--border-color) !important;
+    border-radius: 12px !important;
     overflow: hidden;
-    background-color: var(--card-background-color);
-    transition: transform 0.2s, box-shadow 0.2s;
+    background-color: var(--card-bg);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
-#bills-list-container .accordion-item:hover,
-#history-list-container .accordion-item:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-}
-
-/* Remove bordas duplas padrão do Bootstrap */
-.accordion-item:not(:first-of-type) { border-top: 1px solid var(--border-color); }
-
-/* 3. Header do Item (Parte clicável) */
 .accordion-button {
-    background-color: var(--card-background-color) !important;
-    padding: 1rem 1.25rem;
-    box-shadow: none !important; /* Remove glow azul */
+    background-color: var(--card-bg) !important;
+    padding: 1rem;
+    box-shadow: none !important; /* Remove glow azul padrão */
+    color: var(--text-main);
 }
-
 .accordion-button:not(.collapsed) {
-    background-color: var(--background-color) !important; /* Cor sutil quando aberto */
-    border-bottom: 1px solid var(--border-color);
-    color: var(--text-color);
+    background-color: var(--bg-body) !important; /* Cor levemente diferente ao abrir */
 }
+.accordion-body { border-top: 1px solid var(--border-color); }
 
-.accordion-button::after {
-    background-size: 1rem;
-    opacity: 0.5;
-}
-
-/* 4. Ícone da Categoria */
+/* Ícone */
 .transaction-icon-wrapper {
-    width: 42px;
-    height: 42px;
-    border-radius: 12px; /* Quadrado arredondado (Moderno) */
-    font-size: 1.1rem;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    margin-right: 1rem !important; /* Mais espaço para o texto */
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 1.1rem;
+    margin-right: 12px;
 }
 
-/* 5. Tipografia Interna */
-.trans-desc {
-    font-weight: 600;
-    font-size: 0.95rem;
-    color: var(--text-color);
-    margin-bottom: 2px;
-    display: block;
-}
+/* Tipografia */
+.income-text { color: var(--success) !important; }
+.expense-text { color: var(--danger) !important; }
+.text-body-secondary { color: var(--text-sec) !important; }
 
-.trans-meta {
-    font-size: 0.75rem;
-    color: var(--text-secondary-color);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+/* Dashboard Strip */
+.summary-panel-modern {
+    display: flex; gap: 1rem; flex-wrap: wrap; justify-content: space-around;
+    background: var(--card-bg); padding: 1rem; border-radius: 12px;
+    border: 1px solid var(--border-color); margin-bottom: 1.5rem;
 }
+.stat-item { text-align: center; }
+.stat-label { font-size: 0.7rem; text-transform: uppercase; color: var(--text-sec); font-weight: bold; }
+.stat-value { font-size: 1.2rem; font-weight: bold; }
 
-.trans-amount {
-    font-size: 1rem;
-    font-weight: 700;
-    white-space: nowrap;
-}
-
-/* Badges mais sutis */
-.badge {
-    font-weight: 500;
-    padding: 0.35em 0.65em;
-    border-radius: 6px;
-}
+/* Modais e Toasts */
+#modal-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1050; display: none; align-items: center; justify-content: center; }
+#modal-container.active { display: flex; }
+.popup-dialog { background: var(--card-bg); width: 90%; max-width: 500px; border-radius: 12px; padding: 0; overflow: hidden; }
+.popup-header { padding: 1rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+.popup-body { padding: 1.5rem; max-height: 80vh; overflow-y: auto; }
+#toast-container { position: fixed; top: 20px; right: 20px; z-index: 1100; }
