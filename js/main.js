@@ -693,7 +693,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function initializeApp() {
         UI.showToast('Iniciando sistema...');
-        // await carregarDadosOtimizados(); // Dados carregados no checkAuthAndInit
+        // AQUI ESTÁ A CORREÇÃO: Linha descomentada para carregar os dados
+        await carregarDadosOtimizados(); 
     }
 
     applyTheme(localStorage.getItem('confin-theme') || 'light');
