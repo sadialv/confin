@@ -100,3 +100,27 @@ export const atualizarNomeCategoriaEmMassa = async (nomeAntigo, nomeNovo) => {
     ];
     await Promise.all(updates);
 };
+// Adicione/Atualize no js/api.js
+
+// ... (sua inicialização do supabaseClient existente) ...
+
+export const login = async (email, password) => {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email: email,
+        password: password,
+    });
+    if (error) throw error;
+    return data;
+};
+
+export const logout = async () => {
+    const { error } = await supabaseClient.auth.signOut();
+    if (error) throw error;
+};
+
+export const getSession = async () => {
+    const { data } = await supabaseClient.auth.getSession();
+    return data.session;
+};
+
+// ... (o resto das suas funções de fetch/salvar/deletar continuam iguais)
