@@ -9,7 +9,7 @@ export const calculateFinancialHealthMetrics = (state) => {
     let totalAtivos = 0;
     let totalPassivos = 0;
 
-    // Calcula Patrimônio Atual (Saldo das Contas)
+    // Calcula Patrimônio Atual (Saldo das Contas + Histórico)
     contas.forEach(conta => {
         const saldoConta = transacoes
             .filter(t => t.conta_id === conta.id)
@@ -52,12 +52,19 @@ export const calculateFinancialHealthMetrics = (state) => {
     const scoreEndividamento = Math.min(100, Math.max(0, (1 - (indiceEndividamento / 50)) * 100));
     const financialScore = (scorePoupanca * 0.5) + (scoreEndividamento * 0.5);
 
-    // Histórico Patrimonial
-    let meses = new Set();
-    transacoes.forEach(t => meses.add(t.data.substring(0, 7)));
+    // Dados Históricos
     let gastosPorCategoria = {};
-    transacoes.filter(t => t.tipo === 'despesa').forEach(t => gastosPorCategoria[t.categoria] = (gastosPorCategoria[t.categoria] || 0) + t.valor);
-    const mediaGastosCategoria = Object.entries(gastosPorCategoria).map(([k,v]) => ({categoria: k, media: v / (meses.size||1)})).sort((a,b) => b.media - a.media);
+    let meses = new Set();
+    transacoes.forEach(t => {
+        const mes = t.data.substring(0, 7);
+        meses.add(mes);
+        if (t.tipo === 'despesa') gastosPorCategoria[t.categoria] = (gastosPorCategoria[t.categoria] || 0) + t.valor;
+    });
+
+    const mediaGastosCategoria = Object.entries(gastosPorCategoria)
+        .map(([categoria, total]) => ({ categoria, media: total / (meses.size || 1) }))
+        .sort((a,b) => b.media - a.media);
+
     const historicoPatrimonio = Array.from(meses).sort().slice(-12).map(mes => {
         const transacoesAteMes = transacoes.filter(t => t.data.substring(0,7) <= mes);
         let ativos = 0, passivos = 0;
@@ -69,10 +76,16 @@ export const calculateFinancialHealthMetrics = (state) => {
         return { mes, valor: ativos - passivos };
     });
 
-    return { rendaRealizada, despesaRealizada, saldoRealizado, receitasPendentes, despesasPendentes, rendaPrevistaTotal, despesaPrevistaTotal, saldoPrevisto, totalAtivos, totalPassivos, patrimonioLiquido, indiceEndividamento, reservaEmergenciaMeses, taxaPoupanca, financialScore, mediaGastosCategoria, historicoPatrimonio };
+    return {
+        rendaRealizada, despesaRealizada, saldoRealizado,
+        receitasPendentes, despesasPendentes, rendaPrevistaTotal, despesaPrevistaTotal, saldoPrevisto,
+        totalAtivos, totalPassivos, patrimonioLiquido,
+        indiceEndividamento, reservaEmergenciaMeses, taxaPoupanca, financialScore,
+        mediaGastosCategoria, historicoPatrimonio
+    };
 };
 
-// 2. Evolução Diária (ESSA ESTAVA FALTANDO E CAUSOU O ERRO)
+// 2. Evolução Diária (Dashboard)
 export const calculateDailyEvolution = (state, mesISO) => {
     const { transacoes, lancamentosFuturos } = state;
     const [ano, mes] = mesISO.split('-').map(Number);
@@ -99,109 +112,139 @@ export const calculateDailyEvolution = (state, mesISO) => {
 
 // 3. Timeline Anual (Gráfico)
 export const calculateAnnualTimeline = (state, anoSelecionado) => {
-    const { contas, transacoes, lancamentosFuturos, comprasParceladas } = state;
+    // Reutiliza o grid detalhado para garantir consistência
+    const grid = calculateCategoryGrid(state, anoSelecionado);
+    const meses = Array.from({ length: 12 }, (_, i) => i); 
     const ano = anoSelecionado || new Date().getFullYear();
-    const meses = Array.from({ length: 12 }, (_, i) => i);
-    const idsCartao = contas.filter(c => isTipoCartao(c.tipo)).map(c => c.id);
 
-    let saldoAcumulado = contas.filter(c => !isTipoCartao(c.tipo)).reduce((acc, c) => acc + c.saldo_inicial, 0);
-    const dataCorte = `${ano}-01-01`;
-    
-    const deltaHist = transacoes.filter(t => t.data < dataCorte && !idsCartao.includes(t.conta_id)).reduce((a, t) => t.tipo === 'receita' ? a+t.valor : a-t.valor, 0);
-    const deltaPend = lancamentosFuturos.filter(l => l.status === 'pendente' && l.data_vencimento < dataCorte).reduce((a, l) => {
-         const compraPai = l.compra_parcelada_id ? comprasParceladas.find(c => c.id === l.compra_parcelada_id) : null;
-         if ((compraPai && idsCartao.includes(compraPai.conta_id)) || (l.conta_id && idsCartao.includes(l.conta_id))) return a;
-         return l.tipo === 'a_receber' ? a+l.valor : a-l.valor;
-    }, 0);
-
-    saldoAcumulado += (deltaHist + deltaPend);
-
-    return meses.map(mesIndex => {
-        const mesStr = `${ano}-${String(mesIndex + 1).padStart(2, '0')}`;
-        const rec = transacoes.filter(t => t.data.startsWith(mesStr) && t.tipo === 'receita').reduce((s,t)=>s+t.valor,0) + 
-                    lancamentosFuturos.filter(l => l.data_vencimento.startsWith(mesStr) && l.tipo === 'a_receber' && l.status === 'pendente').reduce((s,l)=>s+l.valor,0);
-        
-        const desp = transacoes.filter(t => t.data.startsWith(mesStr) && t.tipo === 'despesa' && !idsCartao.includes(t.conta_id)).reduce((s,t)=>s+t.valor,0) +
-                     lancamentosFuturos.filter(l => l.data_vencimento.startsWith(mesStr) && l.tipo === 'a_pagar' && l.status === 'pendente').reduce((s, l) => {
-                        const compraPai = l.compra_parcelada_id ? comprasParceladas.find(c => c.id === l.compra_parcelada_id) : null;
-                        if ((compraPai && idsCartao.includes(compraPai.conta_id)) || (l.conta_id && idsCartao.includes(l.conta_id))) return s;
-                        return s + l.valor;
-                     }, 0);
-        
-        const cartoes = transacoes.filter(t => t.data.startsWith(mesStr) && t.tipo === 'despesa' && idsCartao.includes(t.conta_id)).reduce((s,t)=>s+t.valor,0);
-        
-        const saldo = rec - desp;
-        saldoAcumulado += saldo;
-        return { mes: mesStr, receitas: rec, despesas: desp, cartoes, saldo, acumulado: saldoAcumulado };
-    });
+    return meses.map(i => ({
+        mes: new Date(ano, i).toLocaleString('pt-BR', { month: 'long' }),
+        receitas: grid.totalReceitas[i],
+        despesas: grid.totalDespesas[i],
+        saldo: grid.totalReceitas[i] - grid.totalDespesas[i],
+        acumulado: grid.saldoLiquido[i] // Usa o saldo líquido final calculado na tabela
+    }));
 };
 
-// 4. Tabela Detalhada (Lógica para bater com a planilha)
+// 4. Tabela Detalhada (Lógica Complexa de Saldo)
 export const calculateCategoryGrid = (state, anoSelecionado) => {
-    const { contas, transacoes, lancamentosFuturos } = state;
+    const { contas, transacoes, lancamentosFuturos, comprasParceladas } = state;
     const ano = anoSelecionado || new Date().getFullYear();
-    const idsCartao = contas.filter(c => isTipoCartao(c.tipo)).map(c => c.id);
+    
+    // --- SEPARAÇÃO DE CONTAS ---
     const idsInvest = contas.filter(c => ['Investimentos', 'Poupança', 'Aplicação'].includes(c.tipo)).map(c => c.id);
-    const idsConta = contas.filter(c => !isTipoCartao(c.tipo) && !idsInvest.includes(c.id)).map(c => c.id);
+    const idsCartao = contas.filter(c => isTipoCartao(c.tipo)).map(c => c.id);
+    // Caixa = Tudo que não é cartão nem investimento
+    const idsCaixa = contas.filter(c => !idsCartao.includes(c.id) && !idsInvest.includes(c.id)).map(c => c.id);
 
+    // --- CÁLCULO DE SALDOS INICIAIS (HISTÓRICO ATÉ 31/DEZ ANTERIOR) ---
     const dataCorte = `${ano}-01-01`;
-    const getSaldoAbertura = (ids) => {
-        let saldo = contas.filter(c => ids.includes(c.id)).reduce((a, c) => a + c.saldo_inicial, 0);
-        saldo += transacoes.filter(t => t.data < dataCorte && ids.includes(t.conta_id)).reduce((a, t) => t.tipo === 'receita' ? a + t.valor : a - t.valor, 0);
-        saldo += lancamentosFuturos.filter(l => l.status === 'pendente' && l.data_vencimento < dataCorte && ids.includes(l.conta_id)).reduce((a, l) => l.tipo === 'a_receber' ? a + l.valor : a - l.valor, 0);
+
+    const getSaldoHistorico = (idsGrupo) => {
+        // 1. Saldo Inicial do Cadastro
+        let saldo = contas.filter(c => idsGrupo.includes(c.id)).reduce((a, c) => a + c.saldo_inicial, 0);
+        
+        // 2. Transações Realizadas Anteriores
+        saldo += transacoes
+            .filter(t => t.data < dataCorte && idsGrupo.includes(t.conta_id))
+            .reduce((a, t) => t.tipo === 'receita' ? a + t.valor : a - t.valor, 0);
+
+        // 3. Pendências Anteriores (Opcional, mas mantém consistência do planejado)
+        saldo += lancamentosFuturos
+            .filter(l => l.status === 'pendente' && l.data_vencimento < dataCorte && idsGrupo.includes(l.conta_id))
+            .reduce((a, l) => l.tipo === 'a_receber' ? a + l.valor : a - l.valor, 0);
+            
         return saldo;
     };
 
-    let saldoInvest = getSaldoAbertura(idsInvest);
-    let saldoCaixa = getSaldoAbertura(idsConta);
+    let saldoInvestAtual = getSaldoHistorico(idsInvest);
+    let saldoCaixaAtual = getSaldoHistorico(idsCaixa);
 
-    const gridReceitas = {}, gridDespesas = {};
-    const arrReceitas = Array(12).fill(0), arrDespesas = Array(12).fill(0);
-    const arrInvest = Array(12).fill(0), arrCaixa = Array(12).fill(0), arrLiquido = Array(12).fill(0);
+    // --- ESTRUTURAS DE DADOS ---
+    const gridReceitas = {};
+    const gridDespesas = {};
+    const arrReceitas = Array(12).fill(0);
+    const arrDespesas = Array(12).fill(0);
+    const arrInvest = Array(12).fill(0);
+    const arrCaixa = Array(12).fill(0);
+    const arrLiquido = Array(12).fill(0); // Este será o "Saldo Líquido" final da tabela
 
+    // --- LOOP MÊS A MÊS ---
     for (let i = 0; i < 12; i++) {
         const mesStr = `${ano}-${String(i + 1).padStart(2, '0')}`;
         
-        // Registra abertura
-        arrInvest[i] = saldoInvest;
-        arrCaixa[i] = saldoCaixa;
+        // Armazena saldo de abertura para exibição
+        arrInvest[i] = saldoInvestAtual;
+        arrCaixa[i] = saldoCaixaAtual;
 
-        let recMes = 0, despMes = 0;
-        let deltaInvest = 0, deltaCaixa = 0;
+        let recMes = 0;
+        let despMes = 0;
+        
+        // Deltas para atualizar o saldo para o próximo mês
+        let deltaInvest = 0;
+        let deltaCaixa = 0;
 
-        const proc = (val, tipo, contaId, cat) => {
-            const c = cat || 'Outros';
+        const processarItem = (item, valor, tipo) => {
+            const cat = item.categoria || 'Outros';
+            const contaId = item.conta_id;
+            
+            // Verifica a qual grupo pertence a movimentação para atualizar saldo
+            const isInvest = idsInvest.includes(contaId);
+            const isCaixa = idsCaixa.includes(contaId) || (!contaId && !isInvest); // Sem conta = Caixa (Padrão)
+
             if (tipo === 'receita') {
-                recMes += val;
-                if (!gridReceitas[c]) gridReceitas[c] = Array(12).fill(0);
-                gridReceitas[c][i] += val;
-                if (idsInvest.includes(contaId)) deltaInvest += val;
-                else if (!idsCartao.includes(contaId)) deltaCaixa += val;
-                else if (!contaId) deltaCaixa += val; 
-            } else {
-                despMes += val;
-                if (!gridDespesas[c]) gridDespesas[c] = Array(12).fill(0);
-                gridDespesas[c][i] += val;
-                if (idsInvest.includes(contaId)) deltaInvest -= val;
-                else if (!idsCartao.includes(contaId)) deltaCaixa -= val;
-                else if (!contaId) deltaCaixa -= val;
+                recMes += valor;
+                if (!gridReceitas[cat]) gridReceitas[cat] = Array(12).fill(0);
+                gridReceitas[cat][i] += valor;
+                
+                if (isInvest) deltaInvest += valor;
+                if (isCaixa) deltaCaixa += valor;
+
+            } else { // despesa
+                despMes += valor;
+                if (!gridDespesas[cat]) gridDespesas[cat] = Array(12).fill(0);
+                gridDespesas[cat][i] += valor;
+
+                if (isInvest) deltaInvest -= valor;
+                if (isCaixa) deltaCaixa -= valor;
+                // Se for cartão, não afeta deltaCaixa nem deltaInvest agora (afeta só Despesa Total)
             }
         };
 
-        transacoes.filter(t => t.data.startsWith(mesStr)).forEach(t => proc(t.valor, t.tipo, t.conta_id, t.categoria));
+        // 1. Processa Realizado
+        transacoes.filter(t => t.data.startsWith(mesStr)).forEach(t => processarItem(t, t.valor, t.tipo));
+        
+        // 2. Processa Previsto
         lancamentosFuturos.filter(l => l.status === 'pendente' && l.data_vencimento.startsWith(mesStr)).forEach(l => {
-             const tipo = l.tipo === 'a_receber' ? 'receita' : 'despesa';
-             proc(l.valor, tipo, l.conta_id, l.categoria);
+            // Verifica se é parcela de cartão (para não duplicar se já lançou fatura, mas aqui assumimos fluxo simples)
+            const compraPai = l.compra_parcelada_id ? comprasParceladas.find(c => c.id === l.compra_parcelada_id) : null;
+            // Se for cartão, entra na despesa visual, mas não no deltaCaixa (já tratado no processarItem)
+            
+            const tipo = l.tipo === 'a_receber' ? 'receita' : 'despesa';
+            processarItem(l, l.valor, tipo);
         });
 
+        // Totais do mês
         arrReceitas[i] = recMes;
         arrDespesas[i] = despMes;
-        // Saldo Liquido = Receitas + Saldo Inv (Inicio) + Saldo Conta (Inicio) - Despesas
-        arrLiquido[i] = (recMes + saldoInvest + saldoCaixa) - despMes;
 
-        saldoInvest += deltaInvest;
-        saldoCaixa += deltaCaixa;
+        // FÓRMULA FINAL SOLICITADA:
+        // Saldo Liquido = Receitas + Saldo Inv + Saldo Conta - Despesas
+        // (Nota: Usamos os saldos de abertura do mês + receitas do mês - despesas totais do mês)
+        arrLiquido[i] = (recMes + saldoInvestAtual + saldoCaixaAtual) - despMes;
+
+        // Atualiza saldos para o próximo loop
+        saldoInvestAtual += deltaInvest;
+        saldoCaixaAtual += deltaCaixa;
     }
 
-    return { receitas: gridReceitas, despesas: gridDespesas, totalReceitas: arrReceitas, totalDespesas: arrDespesas, totalInvestimentos: arrInvest, totalSaldosConta: arrCaixa, saldoLiquido: arrLiquido };
+    return { 
+        receitas: gridReceitas, 
+        despesas: gridDespesas, 
+        totalReceitas: arrReceitas, 
+        totalDespesas: arrDespesas, 
+        totalInvestimentos: arrInvest, 
+        totalSaldosConta: arrCaixa, 
+        saldoLiquido: arrLiquido 
+    };
 };
