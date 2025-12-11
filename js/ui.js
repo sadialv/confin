@@ -874,74 +874,82 @@ const renderSummaryPanel = (containerId, items, type) => {
         </div>`;
 };
 
+// EM: js/ui.js
 const renderTransactionCard = (t) => {
     const conta = getContaPorId(t.conta_id);
     const icon = CATEGORY_ICONS[t.categoria] || CATEGORY_ICONS['Outros'];
     const isPendente = t.isPending === true; 
     const dataExibicao = t.data || t.data_vencimento; 
     const collapseId = `collapse-trans-${t.id || Math.random().toString(36).substr(2, 9)}`;
-    const statusBadge = isPendente ? '<span class="badge bg-warning text-dark me-2">Pendente</span>' : '<span class="badge bg-success me-2">Realizado</span>';
+    
+    // Status Badge mais discreta e apenas se necessário
+    const statusBadge = isPendente 
+        ? '<span class="badge bg-warning text-dark border border-warning-subtle" style="font-size:0.65rem">Pendente</span>' 
+        : ''; // Removemos o "Realizado" verde para limpar o visual, assumimos que sem badge = realizado
+
     const opacityClass = isPendente ? 'opacity-75' : '';
     
+    // Botões (Mantidos iguais, apenas lógica de exibição)
     const extraBtn = (t.compra_parcelada_id) 
         ? `<button class="btn btn-outline-secondary btn-sm" data-action="recriar-compra-parcelada" data-id="${t.compra_parcelada_id}" title="Configurar Série"><i class="fas fa-cog"></i></button>` 
         : '';
 
     let actions = '';
+    // ... (Mantenha sua lógica existente de actions aqui) ...
+    // Vou simplificar aqui para focar no layout visual:
     if (isPendente) {
         const isReceita = t.tipo === 'a_receber';
-        const btnClass = isReceita ? 'btn-primary' : 'btn-success';
-        const btnIcon = isReceita ? 'fas fa-hand-holding-usd' : 'fas fa-check';
-        const btnTitle = isReceita ? 'Confirmar Recebimento' : 'Pagar';
-        
-        actions = `
-            <div class="btn-group">
-                <button class="btn ${btnClass} btn-sm" data-action="pagar-conta" data-id="${t.id}" title="${btnTitle}"><i class="${btnIcon}"></i></button>
-                <button class="btn btn-outline-secondary btn-sm" data-action="editar-lancamento" data-id="${t.id}"><i class="fas fa-edit"></i></button>
-                ${extraBtn}
-                <button class="btn btn-outline-danger btn-sm" data-action="deletar-lancamento" data-id="${t.id}" title="Apagar"><i class="fas fa-trash"></i></button>
-            </div>`;
+        actions = `<div class="btn-group"><button class="btn ${isReceita ? 'btn-primary' : 'btn-success'} btn-sm" data-action="pagar-conta" data-id="${t.id}"><i class="${isReceita ? 'fas fa-hand-holding-usd' : 'fas fa-check'}"></i></button><button class="btn btn-outline-secondary btn-sm" data-action="editar-lancamento" data-id="${t.id}"><i class="fas fa-edit"></i></button>${extraBtn}<button class="btn btn-outline-danger btn-sm" data-action="deletar-lancamento" data-id="${t.id}"><i class="fas fa-trash"></i></button></div>`;
     } else {
-        actions = `
-            <div class="btn-group">
-                <button class="btn btn-outline-secondary btn-sm" data-action="editar-transacao" data-id="${t.id}"><i class="fas fa-edit"></i></button>
-                ${extraBtn}
-                <button class="btn btn-outline-danger btn-sm" data-action="deletar-transacao" data-id="${t.id}"><i class="fas fa-trash"></i></button>
-            </div>`;
+        actions = `<div class="btn-group"><button class="btn btn-outline-secondary btn-sm" data-action="editar-transacao" data-id="${t.id}"><i class="fas fa-edit"></i></button>${extraBtn}<button class="btn btn-outline-danger btn-sm" data-action="deletar-transacao" data-id="${t.id}"><i class="fas fa-trash"></i></button></div>`;
     }
 
     const sinal = (t.tipo === 'despesa' || t.tipo === 'a_pagar') ? '-' : '+';
     const corValor = (t.tipo === 'despesa' || t.tipo === 'a_pagar') ? 'expense-text' : 'income-text';
+    
+    // Formatação da Data para o subtítulo (Ex: 12 Dez)
+    const dateObj = new Date(dataExibicao + 'T12:00:00');
+    const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 
     return `
         <div class="accordion-item ${opacityClass}">
             <h2 class="accordion-header">
                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
                     <div class="d-flex w-100 align-items-center">
-                        <span class="transaction-icon-wrapper me-3" style="background-color:${icon.color};"><i class="${icon.icon}"></i></span>
-                        <div class="flex-grow-1">
-                            <span>${t.descricao}</span>
-                            <div class="small">${statusBadge}</div>
+                        
+                        <span class="transaction-icon-wrapper flex-shrink-0" style="background-color:${icon.color}; color: white;">
+                            <i class="${icon.icon}"></i>
+                        </span>
+
+                        <div class="flex-grow-1 me-3" style="min-width: 0;">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="trans-desc text-truncate">${t.descricao}</span>
+                                ${statusBadge}
+                            </div>
+                            <div class="trans-meta">
+                                <span><i class="far fa-calendar me-1"></i>${dateStr}</span>
+                                <span class="d-none d-sm-inline">•</span>
+                                <span class="d-none d-sm-inline text-truncate">${conta ? conta.nome : 'N/A'}</span>
+                            </div>
                         </div>
-                        <span class="ms-auto fw-bold ${corValor}">${sinal} ${formatarMoeda(t.valor)}</span>
+
+                        <span class="trans-amount ${corValor} ms-auto">${sinal} ${formatarMoeda(t.valor).replace('R$', '')}</span>
                     </div>
                 </button>
             </h2>
             <div id="${collapseId}" class="accordion-collapse collapse">
-                <div class="accordion-body d-flex justify-content-between align-items-center">
-                    <div>
+                <div class="accordion-body bg-light-subtle">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <small class="text-body-secondary">
-                            <i class="fas fa-calendar-alt"></i> ${new Date(dataExibicao + 'T12:00:00').toLocaleDateString('pt-BR')} | 
-                            <i class="fas fa-tag"></i> ${t.categoria} | 
-                            <i class="fas fa-wallet"></i> ${conta ? conta.nome : 'N/A'}
+                             <strong>Detalhes:</strong> ${t.categoria} via ${conta ? conta.nome : 'Conta Excluída'} <br>
+                             Completo: ${dateObj.toLocaleDateString('pt-BR')}
                         </small>
+                        ${actions}
                     </div>
-                    ${actions}
                 </div>
             </div>
         </div>`;
 };
-
 const renderBillItem = (bill, compras) => {
     const isParcela = !!bill.compra_parcelada_id;
     let cat = bill.categoria;
@@ -1651,5 +1659,6 @@ export const renderLogoutButton = () => {
         header.appendChild(btn);
     }
 };
+
 
 
