@@ -1,104 +1,124 @@
-/* =================================
-   PALETAS DE CORES E TEMAS
-   ================================= */
+  /* =======================================================
+   ATUALIZAÇÃO VISUAL: LISTAS E RESUMOS (PROFISSIONAL)
+   ======================================================= */
 
-/* TEMA CLARO (PADRÃO) */
-:root {
-    --primary-color: #4A5568; 
-    --background-color: #F7FAFC;
-    --card-background-color: #FFFFFF;
-    --text-color: #2D3748;
-    --text-secondary-color: #718096;
-    --border-color: #E2E8F0;
-    --income-color: #38A169;
-    --expense-color: #E53E3E;
-    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+/* 1. Painel de Resumo (Stats Strip) */
+.summary-panel-modern {
+    background-color: var(--card-background-color);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-color);
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    gap: 1rem;
 }
 
-/* TEMA ESCURO (ALTO CONTRASTE) */
-[data-theme="dark"] {
-    --primary-color: #90cdf4;
-    --background-color: #121212;
-    --card-background-color: #1E1E1E;
-    --text-color: #EAEAEA;
-    --text-secondary-color: #A0AEC0;
-    --border-color: #4A5568;
-    
-    --bs-body-bg: #121212;
-    --bs-body-color: #EAEAEA;
-    --bs-tertiary-bg: #1E1E1E;
-    --bs-secondary-bg: #333333;
-    --bs-border-color: #4A5568;
-    --bs-light-rgb: 30, 30, 30;
+.stat-item {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
 }
 
-/* NOVO TEMA: NORDIC NIGHT */
-[data-theme="nordic-night"] {
-    --primary-color: #88C0D0; /* Azul Gelo */
-    --background-color: #2E3440; /* Noite Polar (Fundo) */
-    --card-background-color: #3B4252; /* Noite Polar (Card) */
-    --text-color: #ECEFF4; /* Neve */
-    --text-secondary-color: #D8DEE9; /* Neve Clara */
-    --border-color: #4C566A; /* Noite Polar (Borda) */
-    --income-color: #A3BE8C; /* Verde Aurora */
-    --expense-color: #BF616A; /* Vermelho Aurora */
-
-    --bs-body-bg: #2E3440;
-    --bs-body-color: #ECEFF4;
-    --bs-tertiary-bg: #3B4252;
-    --bs-secondary-bg: #4C566A;
-    --bs-border-color: #4C566A;
-    --bs-light-rgb: 59, 66, 82;
+.stat-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary-color);
+    font-weight: 600;
+    margin-bottom: 2px;
 }
 
-/* Lógica para mostrar o ícone de tema correto */
-[data-theme="dark"] .fa-sun, [data-theme="nordic-night"] .fa-sun { display: none; }
-[data-theme="light"] .fa-moon { display: none; }
-
-
-/* AJUSTES FINOS PARA TEMAS ESCUROS */
-[data-theme="dark"] .popup-dialog,
-[data-theme="dark"] .accordion-button,
-[data-theme="nordic-night"] .popup-dialog,
-[data-theme="nordic-night"] .accordion-button {
-    background-color: var(--bs-tertiary-bg);
-}
-[data-theme="dark"] .nav-tabs .nav-link.active,
-[data-theme="nordic-night"] .nav-tabs .nav-link.active {
-    background-color: var(--bs-body-bg);
-}
-[data-theme="dark"] .accordion-button:not(.collapsed),
-[data-theme="nordic-night"] .accordion-button:not(.collapsed) {
-    background-color: var(--bs-secondary-bg);
-}
-[data-theme="dark"] .accordion-button::after,
-[data-theme="nordic-night"] .accordion-button::after {
-    filter: invert(1) grayscale(100) brightness(200%);
-}
-[data-theme="dark"] .list-group-item,
-[data-theme="nordic-night"] .list-group-item {
-    background-color: var(--bs-tertiary-bg);
+.stat-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-color);
 }
 
-/* O restante do CSS continua igual */
-#toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 1100; }
-.toast { padding: 1rem 1.5rem; margin-bottom: 1rem; border-radius: 0.25rem; color: white; opacity: 0; transition: opacity 0.3s ease-in-out; }
-.toast.show { opacity: 1; }
-.toast.success { background-color: #198754; }
-.toast.error { background-color: #dc3545; }
-#modal-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); z-index: 1050; display: none; align-items: center; justify-content: center; }
-#modal-container.active { display: flex; }
-.popup-dialog { background-color: var(--card-background-color); border-radius: 0.5rem; box-shadow: 0 5px 15px rgba(0,0,0,0.5); width: 90%; max-width: 500px; animation: fadeIn 0.3s ease-out; }
-.popup-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid var(--border-color); }
-.popup-body { padding: 1.5rem; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-.income-text { color: var(--income-color) !important; }
-.expense-text { color: var(--expense-color) !important; }
-.accordion-button::after { transition: transform 0.2s ease-in-out; }
-.accordion-button:not(.collapsed)::after { transform: rotate(-180deg); }
-.transaction-icon-wrapper { width: 38px; height: 38px; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: white; font-size: 1rem; flex-shrink: 0; }
-.extra-fields { display: none; }
-#statement-details-container .accordion { max-height: 40vh; overflow-y: auto; padding-right: 8px; }
-#statement-details-container .accordion::-webkit-scrollbar { width: 8px; }
-#statement-details-container .accordion::-webkit-scrollbar-track { background: var(--bs-body-bg); border-radius: 4px; }
-#statement-details-container .accordion::-webkit-scrollbar-thumb { background-color: var(--bs-secondary-bg); border-radius: 4px; }
+/* Divisores verticais no desktop */
+@media (min-width: 768px) {
+    .stat-item { border-right: 1px solid var(--border-color); padding-right: 2rem; width: auto; }
+    .stat-item:last-child { border-right: none; padding-right: 0; }
+}
+
+/* 2. Lista de Transações (Efeito Card Flutuante) */
+#bills-list-container .accordion-item,
+#history-list-container .accordion-item {
+    border: 1px solid var(--border-color);
+    border-radius: 12px !important; /* Força bordas arredondadas */
+    margin-bottom: 0.75rem; /* Espaço entre itens */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    overflow: hidden;
+    background-color: var(--card-background-color);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+#bills-list-container .accordion-item:hover,
+#history-list-container .accordion-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+/* Remove bordas duplas padrão do Bootstrap */
+.accordion-item:not(:first-of-type) { border-top: 1px solid var(--border-color); }
+
+/* 3. Header do Item (Parte clicável) */
+.accordion-button {
+    background-color: var(--card-background-color) !important;
+    padding: 1rem 1.25rem;
+    box-shadow: none !important; /* Remove glow azul */
+}
+
+.accordion-button:not(.collapsed) {
+    background-color: var(--background-color) !important; /* Cor sutil quando aberto */
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+.accordion-button::after {
+    background-size: 1rem;
+    opacity: 0.5;
+}
+
+/* 4. Ícone da Categoria */
+.transaction-icon-wrapper {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px; /* Quadrado arredondado (Moderno) */
+    font-size: 1.1rem;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    margin-right: 1rem !important; /* Mais espaço para o texto */
+}
+
+/* 5. Tipografia Interna */
+.trans-desc {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-color);
+    margin-bottom: 2px;
+    display: block;
+}
+
+.trans-meta {
+    font-size: 0.75rem;
+    color: var(--text-secondary-color);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.trans-amount {
+    font-size: 1rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* Badges mais sutis */
+.badge {
+    font-weight: 500;
+    padding: 0.35em 0.65em;
+    border-radius: 6px;
+}
