@@ -3,7 +3,7 @@
 // --- 1. CONFIGURAÇÃO E INICIALIZAÇÃO ---
 // Recuperei a URL dos seus logs, mas VERIFIQUE A CHAVE!
 const SUPABASE_URL = 'https://fjrpiikhbsvauzbdugtd.supabase.co';
-const SUPABASE_KEY = 'sb_secret_kMQ40hbvRrhzT4GASSoWWw_0IadbjYh'; // <--- OBRIGATÓRIO: Cole sua chave 'anon public' aqui
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqcnBpaWtoYnN2YXV6YmR1Z3RkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDA4NTA2NywiZXhwIjoyMDY5NjYxMDY3fQ.1LnfrUaIeWGsFm1Nc4MCOMU01Q8ne1-xkfkbowSPVX4'; // <--- OBRIGATÓRIO: Cole sua chave 'anon public' aqui
 
 // Inicializa o cliente usando a biblioteca carregada no index.html
 if (!window.supabase) {
@@ -158,4 +158,5 @@ export const atualizarNomeCategoriaEmMassa = async (nomeAntigo, nomeNovo) => {
     await supabaseClient.from('compras_parceladas').update({ categoria: nomeNovo }).eq('categoria', nomeAntigo);
     return true;
 };
+
 
