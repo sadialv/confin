@@ -1574,4 +1574,61 @@ export const renderAllComponents = (initialFilters) => {
     renderMonthlyStatementTab();
     renderAnnualPlanningTab();
 };
+// Adicione ao final do js/ui.js
+
+// --- AUTENTICAÇÃO UI ---
+
+export const renderLoginScreen = () => {
+    const container = document.getElementById('login-container');
+    const app = document.getElementById('app-container');
+    
+    if(app) app.style.display = 'none'; // Esconde o app
+    if(!container) return;
+
+    container.style.display = 'flex';
+    container.innerHTML = `
+        <div class="card shadow-lg p-4" style="width: 100%; max-width: 400px;">
+            <div class="text-center mb-4">
+                <h3 class="text-primary fw-bold"><i class="fas fa-wallet me-2"></i>ConFin</h3>
+                <p class="text-muted">Gestão Financeira Pessoal</p>
+            </div>
+            <form id="form-login">
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="email" class="form-control" placeholder="seu@email.com" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Senha</label>
+                    <input type="password" name="password" class="form-control" placeholder="******" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 py-2">Entrar</button>
+            </form>
+        </div>
+    `;
+};
+
+export const toggleAppView = (showApp) => {
+    const loginDiv = document.getElementById('login-container');
+    const appDiv = document.getElementById('app-container');
+    
+    if (showApp) {
+        if(loginDiv) loginDiv.style.display = 'none';
+        if(appDiv) appDiv.style.display = 'block';
+    } else {
+        renderLoginScreen();
+    }
+};
+
+// Adicione um botão de Sair no renderContas ou no Header para chamar depois
+export const renderLogoutButton = () => {
+    // Exemplo: injetar no header existente
+    const header = document.querySelector('.navbar .container-fluid'); // Ajuste conforme seu HTML
+    if(header && !document.getElementById('btn-logout')) {
+        const btn = document.createElement('button');
+        btn.id = 'btn-logout';
+        btn.className = 'btn btn-outline-light btn-sm ms-auto';
+        btn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Sair';
+        header.appendChild(btn);
+    }
+};
 
