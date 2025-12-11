@@ -834,23 +834,43 @@ export const renderFilters = (type, currentFilters = {}) => {
         </div>`;
 };
 
+// EM: js/ui.js
 const renderSummaryPanel = (containerId, items, type) => {
     const container = document.getElementById(containerId);
     if (!container) return;
 
     const isHistory = type === 'history';
-    const totalReceitas = isHistory ? items.filter(t => t.tipo === 'receita').reduce((s, t) => s + t.valor, 0) : items.filter(t => t.tipo === 'a_receber').reduce((s, t) => s + t.valor, 0);
-    const totalDespesas = isHistory ? items.filter(t => t.tipo === 'despesa').reduce((s, t) => s + t.valor, 0) : items.filter(t => t.tipo === 'a_pagar').reduce((s, t) => s + t.valor, 0);
+    const totalReceitas = isHistory 
+        ? items.filter(t => t.tipo === 'receita').reduce((s, t) => s + t.valor, 0) 
+        : items.filter(t => t.tipo === 'a_receber').reduce((s, t) => s + t.valor, 0);
+        
+    const totalDespesas = isHistory 
+        ? items.filter(t => t.tipo === 'despesa').reduce((s, t) => s + t.valor, 0) 
+        : items.filter(t => t.tipo === 'a_pagar').reduce((s, t) => s + t.valor, 0);
+        
     const saldo = totalReceitas - totalDespesas;
 
+    // Novo Layout HTML (Stat Strip)
     container.innerHTML = `
-        <div class="alert alert-light py-2">
-            <div class="d-flex justify-content-around flex-wrap small text-center">
-                <span>Itens: <strong>${items.length}</strong></span>
-                <span class="income-text">${isHistory ? 'Receitas' : 'A Receber'}: <strong>${formatarMoeda(totalReceitas)}</strong></span>
-                <span class="expense-text">${isHistory ? 'Despesas' : 'A Pagar'}: <strong>${formatarMoeda(totalDespesas)}</strong></span>
-                ${isHistory ? `<span>Saldo: <strong class="${saldo >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldo)}</strong></span>` : ''}
+        <div class="summary-panel-modern">
+            <div class="stat-item">
+                <span class="stat-label">Total de Itens</span>
+                <span class="stat-value">${items.length}</span>
             </div>
+            <div class="stat-item">
+                <span class="stat-label">${isHistory ? 'Entradas' : 'A Receber'}</span>
+                <span class="stat-value income-text">${formatarMoeda(totalReceitas)}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">${isHistory ? 'Saídas' : 'A Pagar'}</span>
+                <span class="stat-value expense-text">${formatarMoeda(totalDespesas)}</span>
+            </div>
+            ${isHistory ? `
+            <div class="stat-item">
+                <span class="stat-label">Saldo do Período</span>
+                <span class="stat-value ${saldo >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldo)}</span>
+            </div>
+            ` : ''}
         </div>`;
 };
 
@@ -1631,4 +1651,5 @@ export const renderLogoutButton = () => {
         header.appendChild(btn);
     }
 };
+
 
