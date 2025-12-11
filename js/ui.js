@@ -416,6 +416,8 @@ const renderMixedChart = () => {
     });
 };
 
+// ARQUIVO: js/ui.js - Substitua APENAS a função renderDetailedTable
+
 const renderDetailedTable = () => {
     const container = document.getElementById('panel-table-view');
     if(!container) return;
@@ -423,60 +425,123 @@ const renderDetailedTable = () => {
     const data = calculateCategoryGrid(getState(), currentPlanningYear);
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     
-    const styleStickyHeader = 'position: sticky; top: 0; z-index: 10;';
-    const styleStickyCol = 'position: sticky; left: 0; z-index: 5; border-right: 2px solid #ccc;';
+    // Estilos Inline para garantir o visual (Sticky Header/Column)
+    const styleStickyHeader = 'position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);';
+    const styleStickyCol = 'position: sticky; left: 0; z-index: 5; border-right: 1px solid #dee2e6;';
     
-    const headerCols = meses.map(m => `<th class="text-center py-2 border text-uppercase" style="min-width: 90px; background-color: #e0e0e0;">${m}</th>`).join('');
+    // Cores (Paleta Suave/Formal)
+    const bgHeader = '#f8f9fa';
+    const bgReceitasHeader = '#e6fffa'; // Verde muito claro
+    const textReceitas = '#047857';     // Verde escuro elegante
+    const bgDespesasHeader = '#fff5f5'; // Vermelho muito claro
+    const textDespesas = '#c53030';     // Vermelho escuro elegante
+    const bgResumo = '#edf2f7';         // Cinza azulado (neutro)
+    const bgSaldoLiquido = '#ebf8ff';   // Azul claro destaque
+    
+    const headerCols = meses.map(m => `
+        <th class="text-center py-2 text-secondary text-uppercase" 
+            style="min-width: 90px; background-color: ${bgHeader}; font-size: 0.75rem; letter-spacing: 0.5px;">
+            ${m}
+        </th>`).join('');
 
+    // Helper para linhas de dados
     const createRows = (objData) => Object.keys(objData).sort().map(cat => {
-        const cols = objData[cat].map(v => `<td class="text-end small border px-1">${v===0?'-':formatarMoeda(v).replace('R$', '')}</td>`).join('');
-        return `<tr><td class="fw-bold small ps-2 bg-white border" style="${styleStickyCol}">${cat}</td>${cols}</tr>`;
+        const cols = objData[cat].map(v => 
+            `<td class="text-end border-light px-2" style="font-size: 0.85rem; color: #4a5568;">
+                ${v === 0 ? '<span class="text-muted opacity-25">-</span>' : formatarMoeda(v).replace('R$', '')}
+            </td>`
+        ).join('');
+        
+        return `
+            <tr class="bg-white hover-row">
+                <td class="fw-normal ps-3 bg-white" style="${styleStickyCol} font-size: 0.85rem; color: #2d3748;">
+                    ${cat}
+                </td>
+                ${cols}
+            </tr>`;
     }).join('');
 
-    const renderSumRow = (label, values, bgClass = '', textClass = 'text-dark') => {
-        const cols = values.map(v => `<td class="text-end fw-bold border px-1 ${textClass}" style="font-size:0.85rem;">${formatarMoeda(v).replace('R$', '')}</td>`).join('');
-        return `<tr class="${bgClass}">
-            <td class="fw-bold ps-2 border" style="${styleStickyCol} background-color: inherit;">${label}</td>
-            ${cols}
-        </tr>`;
+    // Helper para linhas de Resumo/Total
+    const renderSumRow = (label, values, bgColor, textColor, isBold = false) => {
+        const weight = isBold ? 'fw-bold' : 'fw-normal';
+        const cols = values.map(v => 
+            `<td class="text-end ${weight} px-2" style="color: ${textColor}; font-size: 0.85rem;">
+                ${formatarMoeda(v).replace('R$', '')}
+            </td>`
+        ).join('');
+        
+        return `
+            <tr style="background-color: ${bgColor};">
+                <td class="${weight} ps-3" style="${styleStickyCol} background-color: ${bgColor}; color: ${textColor}; font-size: 0.85rem;">
+                    ${label}
+                </td>
+                ${cols}
+            </tr>`;
     };
 
-    const rowTotalEntradas = renderSumRow('Total Entradas', data.totalReceitas, 'table-info');
-    const rowTotalSaidas = renderSumRow('Total Saídas', data.totalDespesas, 'bg-danger text-white');
+    // Montagem das Linhas
+    const rowsReceitasDetails = createRows(data.receitas);
+    const rowTotalEntradas = renderSumRow('Total Entradas', data.totalReceitas, bgReceitasHeader, textReceitas, true);
+    
+    const rowsDespesasDetails = createRows(data.despesas);
+    const rowTotalSaidas = renderSumRow('Total Saídas', data.totalDespesas, bgDespesasHeader, textDespesas, true);
 
-    const rowResumoReceitas = renderSumRow('Receitas', data.totalReceitas, 'bg-white');
-    const rowResumoInvest = renderSumRow('Investimentos', data.saldosInvestimento, 'bg-white');
-    const rowResumoSaldos = renderSumRow('Saldos de contas', data.saldosConta, 'bg-white');
-    const rowResumoDespesas = renderSumRow('Despesas', data.totalDespesas, 'bg-danger', 'text-white');
-    const rowResumoLiquido = renderSumRow('Saldo Liquido', data.saldoLiquido, 'table-primary');
+    // Bloco Resumo (Sem a linha repetida de "Despesas")
+    const rowResumoReceitas = renderSumRow('Receitas', data.totalReceitas, '#fff', '#2d3748');
+    const rowResumoInvest = renderSumRow('Investimentos', data.saldosInvestimento, '#fff', '#2d3748');
+    const rowResumoSaldos = renderSumRow('Saldos de contas', data.saldosConta, '#fff', '#2d3748');
+    // REMOVIDA A LINHA DE DESPESAS AQUI CONFORME SOLICITADO
+    
+    const rowSaldoLiquido = renderSumRow('Saldo Líquido (Projetado)', data.saldoLiquido, bgSaldoLiquido, '#2b6cb0', true);
 
     container.innerHTML = `
-        <div class="table-responsive" style="max-height: 600px; border: 1px solid #ccc;">
-            <table class="table table-sm mb-0" style="font-size: 0.8rem; border-collapse: separate; border-spacing: 0;">
+        <div class="table-responsive border rounded" style="max-height: 600px; border-color: #e2e8f0;">
+            <table class="table table-sm mb-0" style="border-collapse: separate; border-spacing: 0;">
                 <thead style="${styleStickyHeader}">
                     <tr>
-                        <th class="ps-2 bg-secondary text-white border" style="${styleStickyCol} min-width: 150px; z-index: 11;">PERIODO</th>
+                        <th class="ps-3 text-secondary text-uppercase border-bottom" 
+                            style="${styleStickyCol} min-width: 180px; background-color: ${bgHeader}; z-index: 11; font-size: 0.75rem;">
+                            Categoria
+                        </th>
                         ${headerCols}
                     </tr>
                 </thead>
                 <tbody>
-                    <tr class="table-info"><td colspan="13" class="fw-bold ps-2 text-primary">RECEITAS</td></tr>
-                    ${createRows(data.receitas)}
+                    <tr>
+                        <td colspan="13" class="py-1 ps-3 fw-bold text-uppercase" 
+                            style="background-color: #f0fdf4; color: ${textReceitas}; font-size: 0.75rem; letter-spacing: 1px;">
+                            Receitas
+                        </td>
+                    </tr>
+                    ${rowsReceitasDetails || '<tr><td colspan="13" class="text-center text-muted small py-2">Sem receitas lançadas</td></tr>'}
                     ${rowTotalEntradas}
 
-                    <tr class="table-danger"><td colspan="13" class="fw-bold ps-2 text-danger">DESPESAS</td></tr>
-                    ${createRows(data.despesas)}
+                    <tr>
+                        <td colspan="13" class="py-1 ps-3 fw-bold text-uppercase border-top" 
+                            style="background-color: #fff5f5; color: ${textDespesas}; font-size: 0.75rem; letter-spacing: 1px;">
+                            Despesas
+                        </td>
+                    </tr>
+                    ${rowsDespesasDetails || '<tr><td colspan="13" class="text-center text-muted small py-2">Sem despesas lançadas</td></tr>'}
                     ${rowTotalSaidas}
 
-                    <tr class="table-secondary"><td colspan="13" class="fw-bold ps-2 text-uppercase border-top border-dark border-2">RESUMO DO CAIXA</td></tr>
+                    <tr>
+                        <td colspan="13" class="py-2 ps-3 fw-bold text-uppercase border-top border-2" 
+                            style="background-color: ${bgResumo}; color: #4a5568; font-size: 0.8rem; letter-spacing: 1px;">
+                            Resumo do Caixa
+                        </td>
+                    </tr>
                     ${rowResumoReceitas}
                     ${rowResumoInvest}
                     ${rowResumoSaldos}
-                    ${rowResumoDespesas}
-                    ${rowResumoLiquido}
+                    ${rowSaldoLiquido}
                 </tbody>
             </table>
-        </div>`;
+        </div>
+        <div class="mt-2 text-end text-muted fst-italic" style="font-size: 0.75rem;">
+            * Valores projetados com base no saldo inicial + histórico + lançamentos futuros.
+        </div>
+    `;
 };
 
 // =========================================================================
@@ -1509,3 +1574,4 @@ export const renderAllComponents = (initialFilters) => {
     renderMonthlyStatementTab();
     renderAnnualPlanningTab();
 };
+
