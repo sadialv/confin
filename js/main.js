@@ -18,7 +18,75 @@ document.addEventListener('DOMContentLoaded', () => {
         contaId: 'todas'
     };
 
-    // --- LÓGICA DE CARREGAMENTO INTELIGENTE (Performance) ---
+    // =========================================================================
+    // === AUTENTICAÇÃO E CONTROLE DE SESSÃO ===
+    // =========================================================================
+
+    async function checkAuthAndInit() {
+        try {
+            const session = await API.getSession();
+            if (!session) {
+                // Sem sessão: Mostra Login
+                UI.renderLoginScreen();
+                setupLoginListener();
+            } else {
+                // Com sessão: Mostra App e carrega dados
+                UI.toggleAppView(true);
+                UI.renderLogoutButton(); 
+                await initializeApp();
+            }
+        } catch (err) {
+            console.error("Erro de autenticação:", err);
+            UI.showToast("Erro ao verificar sessão.", "error");
+        }
+    }
+
+    function setupLoginListener() {
+        const form = document.getElementById('form-login');
+        if (!form) return;
+
+        // Remove listeners antigos para evitar duplicidade se renderizar varias vezes
+        const newForm = form.cloneNode(true);
+        form.parentNode.replaceChild(newForm, form);
+
+        newForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = newForm.querySelector('button');
+            const email = newForm.querySelector('input[name="email"]').value;
+            const password = newForm.querySelector('input[name="password"]').value;
+
+            UI.setLoadingState(btn, true, 'Entrando...');
+            try {
+                await API.login(email, password);
+                UI.showToast('Login realizado com sucesso!');
+                // Recarrega para limpar memória e iniciar app limpo
+                window.location.reload(); 
+            } catch (err) {
+                console.error(err);
+                UI.showToast('Falha no login. Verifique seus dados.', 'error');
+                UI.setLoadingState(btn, false, 'Entrar');
+            }
+        });
+    }
+
+    // Listener Global de Logout
+    document.body.addEventListener('click', async (e) => {
+        if (e.target.id === 'btn-logout' || e.target.closest('#btn-logout')) {
+            if(confirm('Deseja realmente sair?')) {
+                try {
+                    await API.logout();
+                    window.location.reload();
+                } catch(err) {
+                    UI.showToast("Erro ao sair.", "error");
+                }
+            }
+        }
+    });
+
+    // =========================================================================
+    // === CARREGAMENTO DE DADOS ===
+    // =========================================================================
+
     async function carregarDadosOtimizados() {
         try {
             // 1. Define Data de Corte: 1º de Janeiro do ano atual
@@ -53,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 contas: contasAjustadas.sort((a, b) => a.nome.localeCompare(b.nome)),
                 lancamentosFuturos: auxiliares.lancamentosFuturos,
                 comprasParceladas: auxiliares.comprasParceladas,
-                transacoes: transacoesRecentes, // Apenas transações deste ano em diante
+                transacoes: transacoesRecentes, // Apenas transações deste ano
                 categorias: auxiliares.categorias,
                 tiposContas: auxiliares.tiposContas
             });
@@ -62,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
             UI.renderAllComponents({ history: historyFilters, bills: billsFilters });
             
         } catch (error) {
-            UI.showToast(`Erro ao carregar: ${error.message}`, 'error');
+            UI.showToast(`Erro ao carregar dados: ${error.message}`, 'error');
             console.error(error);
         }
     }
@@ -72,13 +140,15 @@ document.addEventListener('DOMContentLoaded', () => {
         await carregarDadosOtimizados();
     }
 
-    // --- AÇÕES DO SISTEMA ---
+    // =========================================================================
+    // === LÓGICA DE NEGÓCIO (TRANSAÇÕES, SÉRIES, CONTAS) ===
+    // =========================================================================
 
     async function criarLancamentosParcelados(dadosCompra) {
         const conta = State.getContaPorId(dadosCompra.conta_id);
         const isCartao = State.isTipoCartao(conta.tipo);
         
-        // Validação específica para cartão de crédito
+        // Se for cartão, exige datas.
         if (isCartao && (!conta.dia_fechamento_cartao || !conta.dia_vencimento_cartao)) {
             throw new Error("Para compras no Cartão de Crédito, configure o Dia de Fechamento e Vencimento no cadastro da conta.");
         }
@@ -92,16 +162,16 @@ document.addEventListener('DOMContentLoaded', () => {
         let diaVencimento = dataCompra.getDate();
         let dataBase = new Date(dataCompra);
 
-        // Lógica de datas para Cartão vs Outros
+        // Lógica específica de cartão
         if (isCartao) {
             const diaFechamento = conta.dia_fechamento_cartao;
             diaVencimento = conta.dia_vencimento_cartao;
             
-            // Se comprou no dia do fechamento ou depois, joga pro próximo mês
+            // Se comprou depois do fechamento, joga pro próximo mês
             if (dataCompra.getDate() >= diaFechamento) {
                 dataBase.setMonth(dataBase.getMonth() + 1);
             }
-            // Se o dia do vencimento é menor que o fechamento (ex: fecha dia 20, vence dia 5), já é mês seguinte
+            // Se o vencimento é menor que o fechamento, já é no mês seguinte
             if (diaVencimento < diaFechamento) {
                 dataBase.setMonth(dataBase.getMonth() + 1);
             }
@@ -127,16 +197,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const form = e.target;
         const btn = form.querySelector('button[type="submit"]');
         UI.setLoadingState(btn, true, 'Salvando...');
-        
         try {
             const id = form.dataset.id;
             const data = Object.fromEntries(new FormData(form));
-            
-            // Tratamento de tipos numéricos
             data.saldo_inicial = parseFloat(data.saldo_inicial) || 0;
-
-            // LÓGICA DE CORREÇÃO: Trata campos vazios de cartão como NULL
-            // Isso evita o erro "invalid input syntax for type integer" no Supabase
+            
+            // CORREÇÃO: Trata campos vazios de cartão como NULL
             const isCartao = State.isTipoCartao(data.tipo);
             
             data.dia_fechamento_cartao = (isCartao && data.dia_fechamento_cartao) 
@@ -148,21 +214,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 : null;
             
             await API.salvarDados('contas', data, id);
-            
             UI.closeModal();
-            UI.showToast('Conta salva com sucesso!');
+            UI.showToast('Conta salva!');
             await reloadStateAndRender();
-            
         } catch (err) {
+            UI.showToast(err.message, 'error');
             console.error(err);
-            UI.showToast(err.message || 'Erro ao salvar conta', 'error');
         } finally {
             UI.setLoadingState(btn, false, 'Salvar');
         }
     }
 
     async function deletarConta(id) {
-        if (!confirm('Apagar conta? As transações associadas não serão apagadas, mas perderão o vínculo.')) return;
+        if (!confirm('Apagar conta? As transações associadas não serão apagadas.')) return;
         try {
             await API.deletarDados('contas', id);
             UI.showToast('Conta deletada.');
@@ -179,7 +243,6 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = Object.fromEntries(new FormData(form));
             
-            // Recupera o tipo original (receita/despesa) do lançamento para manter consistência
             const lancamentoOriginal = State.getState().lancamentosFuturos.find(l => l.id == form.dataset.billId);
             const tipoFinal = lancamentoOriginal && lancamentoOriginal.tipo === 'a_receber' ? 'receita' : 'despesa';
 
@@ -197,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await API.salvarDados('lancamentos_futuros', { status: 'pago' }, form.dataset.billId);
             
             UI.closeModal();
-            UI.showToast(tipoFinal === 'receita' ? 'Recebimento confirmado!' : 'Pagamento confirmado!');
+            UI.showToast('Registrado com sucesso!');
             await reloadStateAndRender();
         } catch (err) {
             UI.showToast(err.message, 'error');
@@ -212,8 +275,6 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.setLoadingState(btn, true, "Salvando...");
         try {
             const data = Object.fromEntries(new FormData(form));
-            
-            // Define o tipo futuro corretamente (a_receber para receitas, a_pagar para despesas)
             const tipoLancamentoFuturo = data.tipo === 'receita' ? 'a_receber' : 'a_pagar';
 
             if (data.tipo_compra === 'vista') {
@@ -242,7 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const diaVencimento = parseInt(data.dia_vencimento);
                 const frequencia = data.frequencia;
 
-                // 1. Cria série PAI para agrupar
+                // 1. Cria série PAI
                 const dadosSerie = {
                     descricao: `${data.descricao} (Série)`,
                     valor_total: valor * quantidade,
@@ -254,20 +315,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const serieSalva = await API.salvarDados('compras_parceladas', dadosSerie);
 
-                // 2. Gera lançamentos vinculados
+                // 2. Gera lançamentos
                 const lancamentos = [];
                 for (let i = 0; i < quantidade; i++) {
                     let proximaData = new Date(dataInicio); 
-                    // Clone da data para não alterar a referência no loop
                     if (frequencia === 'mensal') {
                         proximaData.setMonth(dataInicio.getMonth() + i);
-                        // Ajusta para o dia de vencimento desejado
                         proximaData.setDate(Math.min(diaVencimento, new Date(proximaData.getFullYear(), proximaData.getMonth() + 1, 0).getDate()));
                     } else if (frequencia === 'anual') {
                         proximaData.setFullYear(dataInicio.getFullYear() + i);
                     } else if (frequencia === 'quinzenal') {
                         proximaData.setDate(dataInicio.getDate() + (i * 15));
-                    } else { // diaria
+                    } else { 
                         proximaData.setDate(dataInicio.getDate() + i);
                     }
 
@@ -275,7 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         descricao: `${data.descricao} (${i + 1}/${quantidade})`, 
                         valor: Math.abs(valor),
                         data_vencimento: toISODateString(proximaData), 
-                        tipo: tipoLancamentoFuturo, // Correto (receita/despesa)
+                        tipo: tipoLancamentoFuturo, 
                         status: 'pendente', 
                         categoria: data.categoria,
                         compra_parcelada_id: serieSalva.id
@@ -335,7 +394,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- FUNÇÃO INTELIGENTE DE ATUALIZAÇÃO DE SÉRIE ---
     async function salvarCompraParcelada(e) {
         const form = e.target;
         const btn = form.querySelector('button[type="submit"]');
@@ -348,18 +406,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const tipoSerie = data.tipo_serie; 
             const valorUnitario = parseFloat(data.valor_total);
             
-            // 1. Atualiza dados do Pai (Série/Compra)
+            // 1. Atualiza dados do Pai
             await API.salvarDados('compras_parceladas', {
                 descricao: data.descricao, 
                 conta_id: parseInt(data.conta_id),
                 categoria: data.categoria, 
-                data_compra: data.data_inicio // Nova referência
+                data_compra: data.data_inicio
             }, idSerie);
 
             // 2. Apaga FUTUROS PENDENTES
             await API.deletarLancamentosPendentesPorCompraId(idSerie);
 
-            // 3. Verifica HISTÓRICO PAGO para evitar duplicidade de mês
+            // 3. Verifica HISTÓRICO PAGO
             const itensPagos = State.getState().lancamentosFuturos.filter(l => 
                 l.compra_parcelada_id === idSerie && l.status === 'pago'
             );
@@ -372,7 +430,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const tipoOriginal = lancamentosAntigos.length > 0 ? lancamentosAntigos[0].tipo : 'a_pagar'; 
 
             if (tipoSerie === 'parcelada') {
-                // Se for cartão, recria como parcelamento padrão
                 for (let i = 0; i < parseInt(data.numero_parcelas); i++) {
                      let dataVenc = new Date(dataInicio);
                      dataVenc.setMonth(dataInicio.getMonth() + i);
@@ -384,7 +441,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 }
             } else {
-                // RECORRENTE (SALÁRIO / CONTAS FIXAS)
                 const quantidade = parseInt(data.quantidade);
                 const frequencia = data.frequencia;
                 
@@ -393,13 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     if (frequencia === 'mensal') {
                         proximaData.setMonth(dataInicio.getMonth() + i);
-                        
-                        // CHECK ANTI-DUPLICIDADE:
-                        // Se já existe um pagamento REALIZADO para este mês nesta série, não cria o pendente.
-                        if (mesesPagos.has(toISODateString(proximaData).substring(0, 7))) {
-                            continue; 
-                        }
-
+                        if (mesesPagos.has(toISODateString(proximaData).substring(0, 7))) continue;
                     } else if (frequencia === 'semestral') {
                         proximaData.setMonth(dataInicio.getMonth() + (i * 6));
                     } else if (frequencia === 'anual') {
@@ -419,7 +469,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (lancamentos.length > 0) await API.salvarMultiplosLancamentos(lancamentos);
-            
             UI.closeModal();
             UI.showToast('Série atualizada!');
             await reloadStateAndRender();
@@ -458,16 +507,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function deletarTransacao(id) { 
         if (!confirm('Apagar transação?')) return;
-        try {
-            await API.deletarDados('transacoes', id);
-            UI.showToast('Deletada.');
-            await reloadStateAndRender();
-        } catch (err) {
-            UI.showToast(err.message, 'error');
-        }
+        try { await API.deletarDados('transacoes', id); UI.showToast('Deletada.'); await reloadStateAndRender(); } catch (err) { UI.showToast(err.message, 'error'); }
     }
 
-    // --- SETUP LISTENERS (Eventos Globais) ---
+    // =========================================================================
+    // === LISTENERS E EVENTOS GLOBAIS ===
+    // =========================================================================
+
     function setupEventListeners() {
         document.getElementById('theme-switcher').addEventListener('click', () => {
             const current = document.documentElement.getAttribute('data-theme');
@@ -483,7 +529,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 UI.closeModal();
             }
             
-            // Listeners para Botão de Gerenciar Categorias e Tipos
             if (e.target.id === 'btn-manage-categories' || e.target.closest('#btn-manage-categories')) {
                 UI.openModal(UI.getCategoriesModalContent());
             }
@@ -492,7 +537,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 UI.openModal(UI.getAccountTypesModalContent());
             }
 
-            // Listeners de Ação (Delegated)
+            // Delegated Actions
             const target = e.target.closest('[data-action]');
             if (!target) return;
             
@@ -521,9 +566,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'editar-transacao': UI.openModal(UI.getTransactionModalContent(id)); break;
                 case 'deletar-transacao': deletarTransacao(id); break;
                 
-                // Gerenciamento de Categorias/Tipos
                 case 'deletar-categoria':
-                    if(confirm('Remover esta categoria da lista? (Histórico não muda)')) {
+                    if(confirm('Remover esta categoria?')) {
                         API.deletarDados('categorias', id).then(() => {
                             UI.showToast('Categoria removida.');
                             reloadStateAndRender().then(() => UI.openModal(UI.getCategoriesModalContent()));
@@ -548,10 +592,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.target.id === 'tab-statement-month-select') {
                 UI.renderMonthlyStatementDetails(e.target.value);
             }
-            // Lógica para mostrar campos de cartão apenas se o tipo for cartão
             if (e.target.id === 'conta-tipo') {
                 const selectedOption = e.target.options[e.target.selectedIndex];
-                const isCard = selectedOption.dataset.isCard === 'true'; // Leitura do atributo data
+                const isCard = selectedOption.dataset.isCard === 'true';
                 const div = document.getElementById('cartao-credito-fields');
                 if (div) div.style.display = isCard ? 'block' : 'none';
             }
@@ -579,7 +622,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             
-            // Filtros
             if (e.target.id.includes('filter')) {
                 if(e.target.id.includes('history')) {
                     historyFilters[e.target.id.includes('month') ? 'mes' : 'contaId'] = e.target.value;
@@ -604,6 +646,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Submit de formulários
         document.body.addEventListener('submit', e => {
+            if (e.target.id === 'form-login') return; // Login tratado separadamente
+
             e.preventDefault();
             switch (e.target.id) {
                 case 'form-conta': salvarConta(e); break;
@@ -613,7 +657,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'form-lancamento': salvarLancamentoFuturo(e); break;
                 case 'form-compra-parcelada': salvarCompraParcelada(e); break;
                 
-                // Categorias
                 case 'form-nova-categoria':
                     const inputCat = e.target.querySelector('input[name="nome"]');
                     if(inputCat.value.trim()) {
@@ -637,7 +680,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                     }
                     break;
-                // Tipos de Conta
                 case 'form-novo-tipo-conta':
                     const dataTipo = Object.fromEntries(new FormData(e.target));
                     API.salvarDados('tipos_contas', { nome: dataTipo.nome, e_cartao: !!dataTipo.e_cartao }).then(() => {
@@ -650,11 +692,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function initializeApp() {
-        UI.showToast('Iniciando...');
-        await carregarDadosOtimizados();
+        UI.showToast('Iniciando sistema...');
+        // await carregarDadosOtimizados(); // Dados carregados no checkAuthAndInit
     }
 
     applyTheme(localStorage.getItem('confin-theme') || 'light');
     setupEventListeners();
-    initializeApp();
+    checkAuthAndInit(); // Chama verificação de login
 });
