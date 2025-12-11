@@ -438,63 +438,103 @@ const renderMixedChart = () => {
     });
 };
 
+// ARQUIVO: js/ui.js (Substitua APENAS a função renderDetailedTable)
+
 const renderDetailedTable = () => {
     const container = document.getElementById('panel-table-view');
     if(!container) return;
     
-    // Busca dados do finance.js
     const data = calculateCategoryGrid(getState(), currentPlanningYear);
-    
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    const headerCols = meses.map(m => `<th class="text-center bg-light">${m}</th>`).join('');
+    
+    // Estilos inline para garantir visual moderno
+    const styleStickyHeader = 'position: sticky; top: 0; z-index: 10;';
+    const styleStickyCol = 'position: sticky; left: 0; z-index: 5; background-color: inherit; border-right: 2px solid #dee2e6;';
+    
+    const headerCols = meses.map(m => `<th class="text-center py-3" style="min-width: 100px; background-color: #f8f9fa;">${m.toUpperCase()}</th>`).join('');
 
-    const createRows = (objData, cssClass) => {
-        return Object.keys(objData).sort().map(cat => {
+    // Helper para criar linhas
+    const createRows = (objData) => {
+        const keys = Object.keys(objData).sort();
+        if (keys.length === 0) return `<tr><td colspan="13" class="text-center text-muted small py-2">Sem lançamentos</td></tr>`;
+        
+        return keys.map(cat => {
             const vals = objData[cat].map(v => v === 0 ? '<span class="text-muted opacity-25">-</span>' : formatarMoeda(v).replace('R$', ''));
             const cols = vals.map(v => `<td class="text-end small">${v}</td>`).join('');
-            return `<tr><td class="fw-bold small text-truncate" style="max-width: 150px;">${cat}</td>${cols}</tr>`;
+            return `
+                <tr class="align-middle">
+                    <td class="fw-bold text-secondary small text-truncate ps-3" style="${styleStickyCol} max-width: 180px; background-color: #fff;">${cat}</td>
+                    ${cols}
+                </tr>`;
         }).join('');
     };
 
-    const rowsReceitas = createRows(data.receitas, 'income-text');
-    const rowsDespesas = createRows(data.despesas, 'expense-text');
+    // Linhas de Dados
+    const rowsReceitas = createRows(data.receitas);
+    const rowsDespesas = createRows(data.despesas);
     
-    const rowSaldo = data.saldos.map(v => {
+    // Linhas de Totais
+    const renderTotalRow = (label, values, colorClass, bgColor) => {
+        const cols = values.map(v => `<td class="text-end fw-bold ${colorClass}" style="font-size: 0.85rem;">${formatarMoeda(v).replace('R$', '')}</td>`).join('');
+        return `<tr style="background-color: ${bgColor};">
+            <td class="fw-bold ps-3 text-uppercase" style="${styleStickyCol} background-color: ${bgColor}; color: #495057;">${label}</td>
+            ${cols}
+        </tr>`;
+    };
+
+    const rowTotalRec = renderTotalRow('Total Entradas', data.totalReceitas, 'text-success', '#d1e7dd');
+    const rowTotalDesp = renderTotalRow('Total Saídas', data.totalDespesas, 'text-danger', '#f8d7da');
+    
+    // Linha de Resultado (Fluxo)
+    const rowResultado = data.saldoMensal.map(v => {
         const color = v >= 0 ? 'text-primary' : 'text-danger';
-        return `<td class="text-end fw-bold ${color}" style="font-size: 0.8rem;">${formatarMoeda(v).replace('R$', '')}</td>`;
+        return `<td class="text-end fw-bold ${color}">${formatarMoeda(v).replace('R$', '')}</td>`;
     }).join('');
 
-    // Nova Linha: SALDO ACUMULADO (A correção principal)
-    const rowAcumulado = data.acumulados.map(v => {
+    // Linha de Acumulado (Caixa)
+    const rowAcumulado = data.saldoAcumulado.map(v => {
         const color = v >= 0 ? 'text-success' : 'text-danger';
-        return `<td class="text-end fw-bold ${color}" style="font-size: 0.85rem; background-color: #f8f9fa;">${formatarMoeda(v).replace('R$', '')}</td>`;
+        return `<td class="text-end fw-bold ${color}">${formatarMoeda(v).replace('R$', '')}</td>`;
     }).join('');
 
     container.innerHTML = `
-        <table class="table table-bordered table-sm table-hover" style="font-size: 0.85rem;">
-            <thead style="position: sticky; top: 0; z-index: 2;">
-                <tr><th class="bg-light" style="min-width: 120px;">Categoria</th>${headerCols}</tr>
-            </thead>
-            <tbody>
-                <tr class="table-success"><td colspan="13"><strong>RECEITAS</strong></td></tr>
-                ${rowsReceitas || '<tr><td colspan="13" class="text-center text-muted">Sem dados</td></tr>'}
-                
-                <tr class="table-danger border-top"><td colspan="13"><strong>DESPESAS</strong></td></tr>
-                ${rowsDespesas || '<tr><td colspan="13" class="text-center text-muted">Sem dados</td></tr>'}
-                
-                <tr class="border-top" style="background-color: #e9ecef;">
-                    <td><strong>RESULTADO MENSAL</strong></td>
-                    ${rowSaldo}
-                </tr>
-                <tr class="table-dark border-top" style="position: sticky; bottom: 0; z-index: 2;">
-                    <td><strong>SALDO EM CONTA (Acumulado)</strong></td>
-                    ${rowAcumulado}
-                </tr>
-            </tbody>
-        </table>
+        <div class="table-responsive shadow-sm border rounded" style="max-height: 600px;">
+            <table class="table table-bordered table-hover mb-0" style="font-size: 0.85rem; border-collapse: separate; border-spacing: 0;">
+                <thead style="${styleStickyHeader}">
+                    <tr>
+                        <th class="ps-3 bg-light text-secondary text-uppercase" style="${styleStickyCol} min-width: 180px; z-index: 11;">Categoria</th>
+                        ${headerCols}
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="table-group-divider"><td colspan="13" class="bg-success text-white ps-3 fw-bold"><i class="fas fa-arrow-up me-2"></i>RECEITAS</td></tr>
+                    ${rowsReceitas}
+                    ${rowTotalRec}
+
+                    <tr class="table-group-divider"><td colspan="13" class="bg-danger text-white ps-3 fw-bold mt-3"><i class="fas fa-arrow-down me-2"></i>DESPESAS</td></tr>
+                    ${rowsDespesas}
+                    ${rowTotalDesp}
+
+                    <tr class="table-group-divider table-dark">
+                        <td colspan="13" class="ps-3 fw-bold text-uppercase"><i class="fas fa-chart-line me-2"></i>RESUMO DO CAIXA</td>
+                    </tr>
+                    <tr class="bg-light">
+                        <td class="fw-bold ps-3" style="${styleStickyCol} background-color: #f8f9fa;">RESULTADO (Mês)</td>
+                        ${rowResultado}
+                    </tr>
+                    <tr style="background-color: #e2e3e5;">
+                        <td class="fw-bold ps-3" style="${styleStickyCol} background-color: #e2e3e5;">SALDO EM CONTA (Acumulado)</td>
+                        ${rowAcumulado}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="mt-2 text-muted small fst-italic">
+            * <strong>Resultado (Mês):</strong> Diferença entre Entradas e Saídas apenas deste mês.<br>
+            * <strong>Saldo em Conta:</strong> Valor projetado que você terá no banco (considerando o saldo inicial do ano + histórico).
+        </div>
     `;
 };
-
 // =========================================================================
 // === DASHBOARDS E GRÁFICOS (MENSAL/ANUAL/SAÚDE) ===
 // =========================================================================
@@ -1512,3 +1552,4 @@ export const renderAllComponents = (initialFilters) => {
     renderMonthlyStatementTab();
     renderAnnualPlanningTab();
 };
+
