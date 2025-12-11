@@ -444,92 +444,145 @@ const renderMixedChart = () => {
 
 // ... (Restante do arquivo igual)
 
+// ARQUIVO: js/ui.js
+import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, CHART_COLORS } from './utils.js';
+import { getState, getContaPorId, getContas, getCategorias, getTiposContas, isTipoCartao } from './state.js';
+import { calculateFinancialHealthMetrics, calculateAnnualTimeline, calculateCategoryGrid } from './finance.js';
+
+let summaryChart = null;
+let annualChart = null;
+let netWorthChart = null;
+let annualMixedChart = null;
+let currentPlanningYear = new Date().getFullYear();
+let currentDashboardMonth = new Date().toISOString().slice(0, 7);
+
+// --- HELPERS ---
+const getCategoriaOptionsHTML = (selecionada = null) => {
+    const categorias = getCategorias();
+    return categorias.length ? categorias.map(c => `<option value="${c.nome}" ${c.nome === selecionada ? 'selected' : ''}>${c.nome}</option>`).join('') : '<option disabled>Nenhuma categoria</option>';
+};
+
+const gerarTransacoesVirtuais = () => {
+    const { comprasParceladas, lancamentosFuturos } = getState();
+    return lancamentosFuturos.filter(l => l.compra_parcelada_id && l.status === 'pendente').map(parcela => {
+        const compra = comprasParceladas.find(c => c.id === parcela.compra_parcelada_id);
+        if (!compra) return null;
+        return { id: `v_${parcela.id}`, descricao: parcela.descricao, valor: parcela.valor, data: parcela.data_vencimento, categoria: compra.categoria, conta_id: compra.conta_id, tipo: 'despesa', isVirtual: true };
+    }).filter(Boolean);
+};
+
+// --- UI GENÉRICA ---
+export const showToast = (msg, type = 'success') => { const d = document.getElementById('toast-container'); if(d) { const t = document.createElement('div'); t.className=`toast ${type} show`; t.textContent=msg; d.appendChild(t); setTimeout(()=>t.remove(), 3000); }};
+export const setLoadingState = (btn, load, txt='Salvar') => { if(btn) { btn.disabled=load; btn.innerHTML=load?'<span class="spinner-border spinner-border-sm"></span>':txt; }};
+export const openModal = (html) => { const c = document.getElementById('modal-container'); if(c) { c.innerHTML=`<div class="popup-dialog"><div class="popup-header"><h5 class="popup-title">${html.title}</h5><button class="btn-close" id="modal-close-btn"></button></div><div class="popup-body">${html.body}</div></div>`; c.classList.add('active'); }};
+export const closeModal = () => { document.getElementById('modal-container')?.classList.remove('active'); };
+
+// --- TABELA DETALHADA (REFORMULADA) ---
 const renderDetailedTable = () => {
     const container = document.getElementById('panel-table-view');
     if(!container) return;
     
     const data = calculateCategoryGrid(getState(), currentPlanningYear);
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    
-    // Cores e Estilos
-    const styleStickyHeader = 'position: sticky; top: 0; z-index: 10;';
-    const styleStickyCol = 'position: sticky; left: 0; z-index: 5; border-right: 2px solid #dee2e6;';
-    
-    const headerCols = meses.map(m => `<th class="text-center py-3 text-secondary bg-light" style="min-width: 100px;">${m.toUpperCase()}</th>`).join('');
+    const styleStickyCol = 'position: sticky; left: 0; z-index: 5; border-right: 2px solid #999;';
 
-    // Helper para gerar linhas de categoria
-    const createRows = (objData) => {
-        const keys = Object.keys(objData).sort();
-        if (keys.length === 0) return `<tr><td colspan="13" class="text-center text-muted small py-2">Sem lançamentos</td></tr>`;
-        
-        return keys.map(cat => {
-            const vals = objData[cat].map(v => v === 0 ? '<span class="text-muted opacity-25">-</span>' : formatarMoeda(v).replace('R$', ''));
-            const cols = vals.map(v => `<td class="text-end small border-start-0 border-end-0">${v}</td>`).join('');
-            return `
-                <tr class="align-middle bg-white">
-                    <td class="fw-bold text-secondary small text-truncate ps-3 bg-white" style="${styleStickyCol} max-width: 180px;">${cat}</td>
-                    ${cols}
-                </tr>`;
-        }).join('');
+    const headerCols = meses.map(m => `<th class="text-center py-1 border fw-bold" style="min-width: 90px; background-color: #ddd;">${m}</th>`).join('');
+
+    const createRows = (objData) => Object.keys(objData).sort().map(cat => {
+        const cols = objData[cat].map(v => `<td class="text-end small border px-1">${v===0?'-':formatarMoeda(v).replace('R$', '')}</td>`).join('');
+        return `<tr><td class="fw-bold small ps-2 bg-white border" style="${styleStickyCol}">${cat}</td>${cols}</tr>`;
+    }).join('');
+
+    // Linhas de Resumo (Estilo Idêntico à Imagem)
+    const renderSumRow = (label, values, bgClass, textClass='text-dark') => {
+        const cols = values.map(v => `<td class="text-end fw-bold border px-1 ${textClass}" style="font-size:0.85rem;">${formatarMoeda(v).replace('R$', '')}</td>`).join('');
+        return `<tr class="${bgClass}"><td class="fw-bold ps-2 border" style="${styleStickyCol} background-color: inherit;">${label}</td>${cols}</tr>`;
     };
 
-    const rowsReceitas = createRows(data.receitas);
-    const rowsDespesas = createRows(data.despesas);
-    
-    // Linha: RESULTADO MENSAL (Receita - Despesa do mês)
-    const rowResultado = data.saldoMensal.map(v => {
-        const color = v >= 0 ? 'text-primary' : 'text-danger';
-        return `<td class="text-end fw-bold ${color} bg-light">${formatarMoeda(v).replace('R$', '')}</td>`;
-    }).join('');
+    // Construção das Linhas Específicas
+    const rowReceitas = renderSumRow('Receitas', data.totalReceitas, 'bg-white');
+    const rowInvestimentos = renderSumRow('Investimentos', data.saldosInvestimento, 'bg-white'); // Agora mostra saldo
+    const rowSaldos = renderSumRow('Saldos de contas', data.saldosConta, 'bg-white'); // Agora mostra saldo
+    const rowDespesas = renderSumRow('Despesas', data.totalDespesas, 'bg-danger', 'text-white'); // Fundo Vermelho
+    const rowSaldoLiquido = renderSumRow('Saldo Liquido', data.saldoLiquido, 'bg-info bg-opacity-25'); // Azul Claro
 
-    // Linha: SALDO EM CONTA (Acumulado Real)
-    const rowAcumulado = data.saldoAcumulado.map(v => {
-        const color = v >= 0 ? 'text-success' : 'text-danger';
-        // Fundo escuro, texto claro, destaque total
-        return `<td class="text-end fw-bold ${color} bg-dark bg-opacity-75 text-white" style="font-size: 0.9rem;">${formatarMoeda(v).replace('R$', '')}</td>`;
-    }).join('');
+    // Totais dos Blocos Superiores
+    const rowTotalEntradas = renderSumRow('Total Entradas', data.totalReceitas, 'table-info');
+    const rowTotalSaidas = renderSumRow('Total Saídas', data.totalDespesas, 'bg-danger text-white');
 
     container.innerHTML = `
-        <div class="table-responsive shadow-sm border rounded" style="max-height: 600px; border: 1px solid #ccc;">
-            <table class="table table-bordered table-hover mb-0" style="font-size: 0.85rem; border-collapse: separate; border-spacing: 0;">
-                <thead style="${styleStickyHeader}">
-                    <tr>
-                        <th class="ps-3 bg-light text-dark fw-bold text-uppercase border-bottom" style="${styleStickyCol} min-width: 180px; z-index: 11;">Categoria</th>
-                        ${headerCols}
-                    </tr>
+        <div class="table-responsive" style="max-height: 600px; border: 1px solid #ccc;">
+            <table class="table table-sm mb-0" style="font-size: 0.8rem; border-collapse: separate; border-spacing: 0;">
+                <thead style="position: sticky; top: 0; z-index: 10;">
+                    <tr><th class="ps-2 bg-secondary text-white border" style="${styleStickyCol} min-width: 150px; z-index: 11;">PERIODO</th>${headerCols}</tr>
                 </thead>
                 <tbody>
-                    <tr class="table-group-divider">
-                        <td colspan="13" class="ps-3 fw-bold text-uppercase" style="background-color: #d1e7dd; color: #0f5132;">
-                            <i class="fas fa-arrow-up me-2"></i> Receitas
-                        </td>
-                    </tr>
-                    ${rowsReceitas}
+                    <tr class="table-info"><td colspan="13" class="fw-bold ps-2 text-primary">RECEITAS</td></tr>
+                    ${createRows(data.receitas)}
+                    ${rowTotalEntradas}
 
-                    <tr class="table-group-divider">
-                        <td colspan="13" class="ps-3 fw-bold text-uppercase mt-3" style="background-color: #f8d7da; color: #842029;">
-                            <i class="fas fa-arrow-down me-2"></i> Despesas
-                        </td>
-                    </tr>
-                    ${rowsDespesas}
+                    <tr class="table-danger"><td colspan="13" class="fw-bold ps-2 text-danger">DESPESAS</td></tr>
+                    ${createRows(data.despesas)}
+                    ${rowTotalSaidas}
 
-                    <tr class="table-group-divider border-top border-3">
-                        <td class="fw-bold ps-3 bg-light text-dark">RESULTADO MENSAL</td>
-                        ${rowResultado}
-                    </tr>
-                    <tr>
-                        <td class="fw-bold ps-3 text-white bg-dark">SALDO EM CONTA (Acumulado)</td>
-                        ${rowAcumulado}
-                    </tr>
+                    <tr style="background-color: #b0c4de;"><td colspan="13" class="fw-bold ps-2 text-uppercase border-top border-dark border-2">RESUMO DO CAIXA</td></tr>
+                    ${rowReceitas}
+                    ${rowInvestimentos}
+                    ${rowSaldos}
+                    ${rowDespesas}
+                    ${rowSaldoLiquido}
                 </tbody>
             </table>
-        </div>
-        <div class="mt-2 d-flex justify-content-between text-muted small px-1">
-            <span>* <strong>Resultado Mensal:</strong> Quanto sobrou ou faltou neste mês isolado.</span>
-            <span>* <strong>Saldo em Conta:</strong> O valor real projetado na sua conta bancária.</span>
-        </div>
-    `;
+        </div>`;
 };
+
+// ... (RESTO DO ARQUIVO COMPLETO) ...
+// Copie todas as funções abaixo para garantir funcionamento
+
+export const renderAnnualPlanningTab = () => {
+    const container = document.getElementById('planning-tab-pane');
+    if (!container) return;
+    container.innerHTML = `<div class="p-3"><div class="d-flex justify-content-between mb-3"><div class="d-flex align-items-center bg-white border rounded px-2"><button class="btn btn-link text-dark" id="btn-prev-year"><i class="fas fa-chevron-left"></i></button><span class="mx-3 fw-bold">${currentPlanningYear}</span><button class="btn btn-link text-dark" id="btn-next-year"><i class="fas fa-chevron-right"></i></button></div><div class="btn-group"><input type="radio" class="btn-check" name="btnradio" id="btn-view-chart" checked><label class="btn btn-outline-primary btn-sm" for="btn-view-chart">Gráfico</label><input type="radio" class="btn-check" name="btnradio" id="btn-view-table"><label class="btn btn-outline-primary btn-sm" for="btn-view-table">Detalhado</label></div></div><div id="panel-chart-view"><canvas id="annual-mixed-chart" style="max-height:400px"></canvas></div><div id="panel-table-view" style="display:none"></div></div>`;
+    renderMixedChart();
+    document.getElementById('btn-prev-year').onclick=()=>{currentPlanningYear--; updateView();};
+    document.getElementById('btn-next-year').onclick=()=>{currentPlanningYear++; updateView();};
+    document.getElementById('btn-view-chart').onchange=()=>{document.getElementById('panel-chart-view').style.display='block';document.getElementById('panel-table-view').style.display='none';renderMixedChart();};
+    document.getElementById('btn-view-table').onchange=()=>{document.getElementById('panel-chart-view').style.display='none';document.getElementById('panel-table-view').style.display='block';renderDetailedTable();};
+};
+const updateView=()=>{document.querySelector('#planning-tab-pane span').textContent=currentPlanningYear; if(document.getElementById('btn-view-chart').checked) renderMixedChart(); else renderDetailedTable();};
+const renderMixedChart=()=>{
+    const timeline=calculateAnnualTimeline(getState(), currentPlanningYear);
+    const ctx=document.getElementById('annual-mixed-chart')?.getContext('2d');
+    if(!ctx)return;
+    if(annualMixedChart)annualMixedChart.destroy();
+    annualMixedChart=new Chart(ctx,{type:'bar',data:{labels:timeline.map(d=>d.mes.substring(0,3)),datasets:[{label:'Saldo Acumulado',data:timeline.map(d=>d.acumulado),type:'line',borderColor:'#4A5568'},{label:'Receitas',data:timeline.map(d=>d.receitas),backgroundColor:'rgba(25,135,84,0.7)'},{label:'Despesas',data:timeline.map(d=>d.despesas),backgroundColor:'rgba(220,53,69,0.7)'}]}});
+};
+
+export const renderContas = () => {
+    const container = document.getElementById('accounts-container');
+    const { contas, transacoes } = getState();
+    const header = `<div class="d-flex justify-content-end mb-3"><button id="btn-manage-categories" class="btn btn-outline-primary btn-sm">Categorias</button></div>`;
+    if(!contas.length) { container.innerHTML = header+'<p class="text-center p-3">Sem contas.</p>'; return; }
+    const cards = contas.map(c => {
+        const saldo = transacoes.filter(t=>t.conta_id===c.id).reduce((a,t)=>t.tipo==='receita'?a+t.valor:a-t.valor, c.saldo_inicial);
+        const icon = isTipoCartao(c.tipo) ? 'far fa-credit-card' : 'fas fa-wallet';
+        const btns = `<button class="btn btn-sm btn-outline-secondary" data-action="editar-conta" data-id="${c.id}"><i class="fas fa-pen"></i></button><button class="btn btn-sm btn-outline-danger" data-action="deletar-conta" data-id="${c.id}"><i class="fas fa-trash"></i></button>`;
+        return `<div class="card shadow-sm mb-2"><div class="card-body p-3 d-flex align-items-center"><div class="me-3 fs-3 text-secondary"><i class="${icon}"></i></div><div class="flex-grow-1"><strong>${c.nome}</strong><br><small>${c.tipo}</small></div><div class="text-end"><span class="fw-bold ${saldo>=0?'text-success':'text-danger'}">${formatarMoeda(saldo)}</span></div></div><div class="card-footer text-end bg-white py-1">${btns}</div></div>`;
+    }).join('');
+    container.innerHTML = header + `<div style="max-height:550px; overflow-y:auto">${cards}</div>`;
+};
+
+// ... (Outras funções de renderização mantidas para brevidade, mas devem estar no arquivo: renderFormTransacaoRapida, renderVisaoMensal, etc.)
+// Inclua aqui todo o restante do arquivo ui.js anterior para garantir que nada quebre. 
+// A função CRÍTICA alterada foi renderDetailedTable acima.
+
+export const renderAllComponents = (initialFilters) => {
+    renderContas();
+    // renderFormTransacaoRapida(); ... chame todas as funções
+    renderAnnualPlanningTab();
+    // ...
+};
+// (Para garantir a integridade, use o restante do arquivo da resposta anterior, substituindo apenas renderDetailedTable pela versão nova acima)
 // =========================================================================
 // === DASHBOARDS E GRÁFICOS (MENSAL/ANUAL/SAÚDE) ===
 // =========================================================================
@@ -1547,5 +1600,6 @@ export const renderAllComponents = (initialFilters) => {
     renderMonthlyStatementTab();
     renderAnnualPlanningTab();
 };
+
 
 
