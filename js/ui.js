@@ -11,7 +11,7 @@ let netWorthChart = null;
 let avgSpendingChart = null;
 let annualMixedChart = null;
 
-// Estados locais da UI para o ano de planejamento e mês do dashboard
+// Estados locais da UI
 let currentPlanningYear = new Date().getFullYear();
 let currentDashboardMonth = new Date().toISOString().slice(0, 7);
 
@@ -179,7 +179,6 @@ export const renderContas = () => {
         `;
     }).join('');
 
-    // Container com Scrollbar aplicada
     container.innerHTML = headerHtml + `
         <div class="p-1" style="max-height: 550px; overflow-y: auto; padding-right: 5px;">
             ${cardsHtml}
@@ -275,7 +274,6 @@ export const renderAnnualPlanningTab = () => {
     const container = document.getElementById('planning-tab-pane');
     if (!container) return;
 
-    // Estrutura com Navegação de Ano e Toggle
     container.innerHTML = `
         <div class="p-3">
             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -302,19 +300,15 @@ export const renderAnnualPlanningTab = () => {
                 <div style="height: 400px; position: relative;">
                     <canvas id="annual-mixed-chart"></canvas>
                 </div>
-                <div class="row text-center mt-4" id="chart-summary-footer">
-                    </div>
+                <div class="row text-center mt-4" id="chart-summary-footer"></div>
             </div>
 
-            <div id="panel-table-view" class="table-responsive" style="display: none;">
-                </div>
+            <div id="panel-table-view" class="table-responsive" style="display: none;"></div>
         </div>
     `;
 
-    // Renderiza inicialmente o gráfico
     renderMixedChart();
 
-    // Listeners de Navegação de Ano
     document.getElementById('btn-prev-year').addEventListener('click', () => {
         currentPlanningYear--;
         updatePlanningView();
@@ -324,7 +318,6 @@ export const renderAnnualPlanningTab = () => {
         updatePlanningView();
     });
 
-    // Listeners de Troca de Visualização (Gráfico/Tabela)
     document.getElementById('btn-view-chart').addEventListener('change', () => {
         document.getElementById('panel-chart-view').style.display = 'block';
         document.getElementById('panel-table-view').style.display = 'none';
@@ -362,18 +355,9 @@ const renderMixedChart = () => {
     const elFooter = document.getElementById('chart-summary-footer');
     if(elFooter) {
         elFooter.innerHTML = `
-            <div class="col-4">
-                <small class="text-body-secondary">Receitas</small>
-                <h5 class="income-text">${formatarMoeda(totalRec)}</h5>
-            </div>
-            <div class="col-4">
-                <small class="text-body-secondary">Despesas</small>
-                <h5 class="expense-text">${formatarMoeda(totalDesp)}</h5>
-            </div>
-            <div class="col-4">
-                <small class="text-body-secondary">Resultado do Ano</small>
-                <h5 class="${saldoAno >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldoAno)}</h5>
-            </div>
+            <div class="col-4"><small class="text-body-secondary">Receitas</small><h5 class="income-text">${formatarMoeda(totalRec)}</h5></div>
+            <div class="col-4"><small class="text-body-secondary">Despesas</small><h5 class="expense-text">${formatarMoeda(totalDesp)}</h5></div>
+            <div class="col-4"><small class="text-body-secondary">Resultado do Ano</small><h5 class="${saldoAno >= 0 ? 'income-text' : 'expense-text'}">${formatarMoeda(saldoAno)}</h5></div>
         `;
     }
 
@@ -436,34 +420,19 @@ const renderDetailedTable = () => {
     const container = document.getElementById('panel-table-view');
     if(!container) return;
     
-    // Busca dados do finance.js
     const data = calculateCategoryGrid(getState(), currentPlanningYear);
-    
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     
-    // Cores e Estilos
     const styleStickyHeader = 'position: sticky; top: 0; z-index: 10;';
     const styleStickyCol = 'position: sticky; left: 0; z-index: 5; border-right: 2px solid #ccc;';
     
     const headerCols = meses.map(m => `<th class="text-center py-2 border text-uppercase" style="min-width: 90px; background-color: #e0e0e0;">${m}</th>`).join('');
 
-    // Helper para gerar linhas de categoria
-    const createRows = (objData) => {
-        const keys = Object.keys(objData).sort();
-        if (keys.length === 0) return `<tr><td colspan="13" class="text-center text-muted small py-2">Sem lançamentos</td></tr>`;
-        
-        return keys.map(cat => {
-            const vals = objData[cat].map(v => v === 0 ? '<span class="text-muted opacity-25">-</span>' : formatarMoeda(v).replace('R$', ''));
-            const cols = vals.map(v => `<td class="text-end small border px-1">${v}</td>`).join('');
-            return `
-                <tr class="align-middle bg-white">
-                    <td class="fw-bold small ps-2 bg-white border" style="${styleStickyCol} max-width: 180px;">${cat}</td>
-                    ${cols}
-                </tr>`;
-        }).join('');
-    };
+    const createRows = (objData) => Object.keys(objData).sort().map(cat => {
+        const cols = objData[cat].map(v => `<td class="text-end small border px-1">${v===0?'-':formatarMoeda(v).replace('R$', '')}</td>`).join('');
+        return `<tr><td class="fw-bold small ps-2 bg-white border" style="${styleStickyCol}">${cat}</td>${cols}</tr>`;
+    }).join('');
 
-    // Helper para linhas de resumo/total
     const renderSumRow = (label, values, bgClass = '', textClass = 'text-dark') => {
         const cols = values.map(v => `<td class="text-end fw-bold border px-1 ${textClass}" style="font-size:0.85rem;">${formatarMoeda(v).replace('R$', '')}</td>`).join('');
         return `<tr class="${bgClass}">
@@ -472,22 +441,17 @@ const renderDetailedTable = () => {
         </tr>`;
     };
 
-    const rowsReceitas = createRows(data.receitas);
-    const rowsDespesas = createRows(data.despesas);
-
-    // Totais dos Blocos
     const rowTotalEntradas = renderSumRow('Total Entradas', data.totalReceitas, 'table-info');
     const rowTotalSaidas = renderSumRow('Total Saídas', data.totalDespesas, 'bg-danger text-white');
 
-    // Linhas do Resumo de Caixa (Fluxo Completo)
     const rowResumoReceitas = renderSumRow('Receitas', data.totalReceitas, 'bg-white');
-    const rowResumoInvest = renderSumRow('Investimentos', data.totalInvestimentos, 'bg-white');
-    const rowResumoSaldos = renderSumRow('Saldos de contas', data.totalSaldosConta, 'bg-white');
+    const rowResumoInvest = renderSumRow('Investimentos', data.saldosInvestimento, 'bg-white');
+    const rowResumoSaldos = renderSumRow('Saldos de contas', data.saldosConta, 'bg-white');
     const rowResumoDespesas = renderSumRow('Despesas', data.totalDespesas, 'bg-danger', 'text-white');
     const rowResumoLiquido = renderSumRow('Saldo Liquido', data.saldoLiquido, 'table-primary');
 
     container.innerHTML = `
-        <div class="table-responsive shadow-sm border rounded" style="max-height: 600px; border: 1px solid #ccc;">
+        <div class="table-responsive" style="max-height: 600px; border: 1px solid #ccc;">
             <table class="table table-sm mb-0" style="font-size: 0.8rem; border-collapse: separate; border-spacing: 0;">
                 <thead style="${styleStickyHeader}">
                     <tr>
@@ -497,16 +461,14 @@ const renderDetailedTable = () => {
                 </thead>
                 <tbody>
                     <tr class="table-info"><td colspan="13" class="fw-bold ps-2 text-primary">RECEITAS</td></tr>
-                    ${rowsReceitas}
+                    ${createRows(data.receitas)}
                     ${rowTotalEntradas}
 
                     <tr class="table-danger"><td colspan="13" class="fw-bold ps-2 text-danger">DESPESAS</td></tr>
-                    ${rowsDespesas}
+                    ${createRows(data.despesas)}
                     ${rowTotalSaidas}
 
-                    <tr class="table-secondary">
-                        <td colspan="13" class="fw-bold ps-2 text-uppercase border-top border-dark border-2">RESUMO DO CAIXA</td>
-                    </tr>
+                    <tr class="table-secondary"><td colspan="13" class="fw-bold ps-2 text-uppercase border-top border-dark border-2">RESUMO DO CAIXA</td></tr>
                     ${rowResumoReceitas}
                     ${rowResumoInvest}
                     ${rowResumoSaldos}
@@ -566,7 +528,7 @@ export const renderVisaoMensal = () => {
         <div class="row">
             <div class="col-lg-7 mb-3">
                 <div class="card shadow-sm h-100">
-                    <div class="card-header bg-white"><h6 class="mb-0">Fluxo de Caixa Diário (Previsto vs Real)</h6></div>
+                    <div class="card-header bg-white"><h6 class="mb-0">Fluxo de Caixa Diário</h6></div>
                     <div class="card-body">
                         <div style="height: 250px;"><canvas id="daily-evolution-chart"></canvas></div>
                     </div>
@@ -583,10 +545,9 @@ export const renderVisaoMensal = () => {
         </div>
     `;
 
-    // Listener do Picker
     document.getElementById('dashboard-month-picker').addEventListener('change', (e) => {
         currentDashboardMonth = e.target.value;
-        renderVisaoMensal(); // Re-renderiza o dashboard
+        renderVisaoMensal(); 
     });
     
     renderDailyChart();
@@ -609,7 +570,7 @@ const renderDailyChart = () => {
             labels: labels,
             datasets: [
                 {
-                    label: 'Saldo Acumulado do Mês',
+                    label: 'Saldo Acumulado',
                     data: dataAcumulado,
                     borderColor: '#0d6efd',
                     backgroundColor: 'rgba(13, 110, 253, 0.1)',
@@ -637,7 +598,6 @@ const renderCategoryChart = () => {
     const { transacoes, lancamentosFuturos } = getState();
     const despesasMap = {};
     
-    // Soma Realizado + Previsto para o gráfico de categorias
     transacoes.filter(t => t.data.startsWith(currentDashboardMonth) && t.tipo === 'despesa').forEach(t => {
         despesasMap[t.categoria] = (despesasMap[t.categoria] || 0) + t.valor;
     });
@@ -668,11 +628,10 @@ export const renderVisaoAnual = () => {
     const container = document.getElementById('dashboard-yearly-container');
     if (!container) return;
     
-    // Usa a timeline completa para o ano atual
     const timelineData = calculateAnnualTimeline(getState(), new Date().getFullYear());
     const labels = timelineData.map(d => d.mes.substring(0, 3));
     const receitas = timelineData.map(d => d.receitas);
-    const despesas = timelineData.map(d => d.despesas); // Despesas de Caixa
+    const despesas = timelineData.map(d => d.despesas);
 
     container.innerHTML = `<h5 class="mb-3">Fluxo de Caixa (Real + Previsto)</h5><div style="height: 300px;"><canvas id="annual-chart"></canvas></div>`;
     
@@ -839,7 +798,6 @@ const renderTransactionCard = (t) => {
     const statusBadge = isPendente ? '<span class="badge bg-warning text-dark me-2">Pendente</span>' : '<span class="badge bg-success me-2">Realizado</span>';
     const opacityClass = isPendente ? 'opacity-75' : '';
     
-    // Botão de Engrenagem (Se tiver vínculo de série)
     const extraBtn = (t.compra_parcelada_id) 
         ? `<button class="btn btn-outline-secondary btn-sm" data-action="recriar-compra-parcelada" data-id="${t.compra_parcelada_id}" title="Configurar Série"><i class="fas fa-cog"></i></button>` 
         : '';
@@ -867,9 +825,8 @@ const renderTransactionCard = (t) => {
             </div>`;
     }
 
-    const tipo = t.tipo === 'despesa' || t.tipo === 'a_pagar' ? 'despesa' : 'receita';
-    const sinal = tipo === 'despesa' ? '-' : '+';
-    const corValor = tipo === 'despesa' ? 'expense-text' : 'income-text';
+    const sinal = (t.tipo === 'despesa' || t.tipo === 'a_pagar') ? '-' : '+';
+    const corValor = (t.tipo === 'despesa' || t.tipo === 'a_pagar') ? 'expense-text' : 'income-text';
 
     return `
         <div class="accordion-item ${opacityClass}">
@@ -1414,6 +1371,125 @@ export const renderAccountStatementDetails = (contaId, mesSelecionado) => {
         <div class="accordion">
             ${itemsHtml}
         </div>`;
+};
+
+// --- FUNÇÃO PARA A TAB DE EXTRATO MENSAL NO DASHBOARD ---
+
+export const renderMonthlyStatementTab = () => {
+    const container = document.getElementById('statement-tab-pane');
+    if (!container) return;
+
+    const { transacoes } = getState();
+    
+    // Pega os meses disponíveis nas transações
+    const months = [...new Set(transacoes.map(t => t.data.substring(0, 7)))].sort().reverse();
+    
+    // Define o mês atual como padrão, ou o primeiro disponível
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const selectedMonth = months.includes(currentMonth) ? currentMonth : (months[0] || currentMonth);
+
+    const options = months.map(m => {
+        const [ano, mes] = m.split('-');
+        const date = new Date(ano, mes - 1);
+        const label = date.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        // Letra maiúscula na primeira letra do mês
+        const labelCapitalized = label.charAt(0).toUpperCase() + label.slice(1);
+        return `<option value="${m}" ${m === selectedMonth ? 'selected' : ''}>${labelCapitalized}</option>`;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="card mb-3 shadow-sm border-0">
+            <div class="card-body py-3">
+                <div class="row align-items-center justify-content-center justify-content-md-start">
+                    <div class="col-auto"><label class="col-form-label fw-bold text-body-secondary">Mês de Referência:</label></div>
+                    <div class="col-auto flex-grow-1 flex-md-grow-0" style="min-width: 200px;">
+                        <select id="tab-statement-month-select" class="form-select">
+                            ${options || '<option>Sem transações registradas</option>'}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="tab-statement-content"></div>
+    `;
+
+    // Renderiza o conteúdo do mês selecionado inicialmente
+    // Nota: Mesmo que não haja "transacoes" (histórico), pode haver "pendentes", então chamamos a função.
+    renderMonthlyStatementDetails(selectedMonth || currentMonth);
+};
+
+export const renderMonthlyStatementDetails = (mes) => {
+    const container = document.getElementById('tab-statement-content');
+    if (!container || !mes) return;
+
+    const { transacoes, lancamentosFuturos } = getState();
+    
+    // 1. Busca Transações Realizadas (Histórico)
+    const realizados = transacoes
+        .filter(t => t.data.startsWith(mes))
+        .map(t => ({ ...t, isPending: false })); // Marca como realizado
+
+    // 2. Busca Lançamentos Pendentes (Futuro/Recorrente)
+    const pendentes = lancamentosFuturos
+        .filter(l => l.data_vencimento.startsWith(mes) && l.status === 'pendente')
+        .map(l => ({ 
+            ...l, 
+            data: l.data_vencimento, // Unifica nome do campo de data para ordenação
+            tipo: l.tipo === 'a_pagar' ? 'despesa' : 'receita', // Unifica tipos para cálculo
+            isPending: true // Marca como pendente
+        }));
+
+    // 3. Combina tudo
+    const todasMovimentacoes = [...realizados, ...pendentes].sort((a, b) => new Date(b.data) - new Date(a.data));
+
+    if (todasMovimentacoes.length === 0) {
+        container.innerHTML = '<div class="alert alert-info text-center">Nenhuma movimentação (realizada ou prevista) neste mês.</div>';
+        return;
+    }
+
+    // Cálculos de totais
+    const entradas = todasMovimentacoes.filter(t => t.tipo === 'receita').reduce((acc, t) => acc + t.valor, 0);
+    const saidas = todasMovimentacoes.filter(t => t.tipo === 'despesa').reduce((acc, t) => acc + t.valor, 0);
+    const resultado = entradas - saidas;
+
+    const listHtml = todasMovimentacoes.map(t => renderTransactionCard(t)).join('');
+
+    container.innerHTML = `
+        <div class="row mb-4 g-3 text-center">
+            <div class="col-md-4">
+                <div class="card h-100 border-success shadow-sm">
+                    <div class="card-header bg-success text-white py-2 fw-bold">Entradas (Previsto)</div>
+                    <div class="card-body">
+                        <h4 class="card-title text-success mb-0">${formatarMoeda(entradas)}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 border-danger shadow-sm">
+                    <div class="card-header bg-danger text-white py-2 fw-bold">Saídas (Previsto)</div>
+                    <div class="card-body">
+                        <h4 class="card-title text-danger mb-0">${formatarMoeda(saidas)}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 border-${resultado >= 0 ? 'success' : 'danger'} shadow-sm">
+                    <div class="card-header bg-${resultado >= 0 ? 'success' : 'danger'} text-white py-2 fw-bold">Balanço Final</div>
+                    <div class="card-body">
+                        <h4 class="card-title text-${resultado >= 0 ? 'success' : 'danger'} mb-0">${formatarMoeda(resultado)}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <h6 class="border-bottom pb-2 mb-3 text-body-secondary d-flex justify-content-between align-items-center">
+            <span>Detalhamento das Movimentações</span>
+            <small class="text-muted fw-normal"><span class="badge bg-warning text-dark">Pendente</span> = Agendado</small>
+        </h6>
+        <div class="accordion" id="statement-accordion">
+            ${listHtml}
+        </div>
+    `;
 };
 
 // =========================================================================
