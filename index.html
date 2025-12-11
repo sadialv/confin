@@ -8,183 +8,133 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
 
-    <style>
-        :root {
-            --bg-body: #f8f9fa;
-            --text-body: #212529;
-            --card-bg: #ffffff;
-        }
-        [data-theme="dark"] {
-            --bg-body: #212529;
-            --text-body: #f8f9fa;
-            --card-bg: #343a40;
-        }
-        body {
-            background-color: var(--bg-body);
-            color: var(--text-body);
-            transition: background-color 0.3s, color 0.3s;
-        }
-        .card {
-            background-color: var(--card-bg);
-            border: none;
-        }
-        .income-text { color: #198754; }
-        .expense-text { color: #dc3545; }
-        
-        /* Ajuste para o Sticky Header da Tabela */
-        thead th {
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-        
-        /* Modal Centralizado */
-        .popup-dialog {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: var(--card-bg);
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.3);
-            z-index: 1050;
-            width: 90%;
-            max-width: 500px;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        #modal-container {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 1040;
-            display: none;
-        }
-        #modal-container.active { display: block; }
-        
-        /* Toast Container */
-        #toast-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1060;
-        }
-        
-        /* Login Container (Centralizado) */
-        #login-container {
-            min-height: 100vh;
-            display: flex; /* Flex ativado via JS */
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-        }
-        [data-theme="dark"] #login-container {
-            background: linear-gradient(135deg, #232526 0%, #414345 100%);
-        }
-    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
     <div id="login-container"></div>
 
-    <div id="app-container" style="display: none;">
+    <div id="app-container" style="display: none; min-height: 100vh;">
         
-        <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4">
-            <div class="container-fluid">
+        <nav class="navbar navbar-expand-lg bg-white shadow-sm mb-4 sticky-top">
+            <div class="container">
                 <a class="navbar-brand fw-bold text-primary" href="#">
                     <i class="fas fa-wallet me-2"></i>ConFin
                 </a>
-                <div class="d-flex align-items-center gap-2">
-                    <button class="btn btn-sm btn-outline-secondary" id="theme-switcher">
-                        <i class="fas fa-adjust"></i>
+                
+                <div class="d-flex align-items-center gap-3">
+                    <button class="btn btn-link text-secondary p-0 border-0" id="theme-switcher" title="Alternar Tema">
+                        <i class="fas fa-moon"></i>
                     </button>
-                    <button class="btn btn-sm btn-primary" id="btn-add-account">
-                        <i class="fas fa-plus me-1"></i> Conta
+                    <button class="btn btn-outline-danger btn-sm rounded-pill px-3" id="btn-logout">
+                        <i class="fas fa-sign-out-alt me-1"></i> Sair
                     </button>
-                    </div>
+                </div>
             </div>
         </nav>
 
-        <div class="container-fluid">
-            <div class="row">
-                <div class="col-lg-3 mb-4">
-                    <div class="card shadow-sm mb-3">
-                        <div class="card-header bg-primary text-white">
-                            <h6 class="mb-0"><i class="fas fa-bolt me-2"></i>Nova Transação</h6>
-                        </div>
-                        <div class="card-body">
-                            <form id="form-transacao-unificada">
-                                </form>
-                        </div>
-                    </div>
+        <div class="container pb-5">
+            
+            <ul class="nav nav-pills nav-fill bg-white p-2 rounded shadow-sm mb-4 gap-2" id="mainTabs" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active fw-semibold" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-tab-pane" type="button">
+                        <i class="fas fa-chart-pie me-2"></i><span class="d-none d-sm-inline">Visão Geral</span>
+                    </button>
+                </li>
+                
+                <li class="nav-item">
+                    <button class="nav-link fw-semibold" id="wallet-tab" data-bs-toggle="tab" data-bs-target="#wallet-tab-pane" type="button">
+                        <i class="fas fa-wallet me-2"></i><span class="d-none d-sm-inline">Carteira</span>
+                    </button>
+                </li>
+                
+                <li class="nav-item">
+                    <button class="nav-link fw-semibold bg-primary-subtle text-primary border border-primary-subtle" id="launch-tab" data-bs-toggle="tab" data-bs-target="#launch-tab-pane" type="button">
+                        <i class="fas fa-plus-circle me-2"></i>Lançar
+                    </button>
+                </li>
+                
+                <li class="nav-item">
+                    <button class="nav-link fw-semibold" id="bills-tab" data-bs-toggle="tab" data-bs-target="#bills-tab-pane" type="button">
+                        <i class="fas fa-file-invoice-dollar me-2"></i><span class="d-none d-sm-inline">Agendamentos</span>
+                    </button>
+                </li>
+                
+                <li class="nav-item">
+                    <button class="nav-link fw-semibold" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-tab-pane" type="button">
+                        <i class="fas fa-list me-2"></i><span class="d-none d-sm-inline">Histórico</span>
+                    </button>
+                </li>
+                
+                <li class="nav-item d-none d-md-block">
+                     <button class="nav-link fw-semibold" id="planning-tab" data-bs-toggle="tab" data-bs-target="#planning-tab-pane" type="button">
+                        <i class="fas fa-calendar-alt me-2"></i>Planejamento
+                    </button>
+                </li>
+            </ul>
 
-                    <div class="card shadow-sm">
-                        <div class="card-header bg-light fw-bold">Minhas Contas</div>
-                        <div class="card-body p-0" id="accounts-container">
+            <div class="tab-content" id="mainTabsContent">
+                
+                <div class="tab-pane fade show active" id="overview-tab-pane" role="tabpanel" tabindex="0">
+                    <div id="dashboard-monthly-container"></div>
+                    <div id="dashboard-yearly-container" class="mt-4"></div>
+                    
+                    <div class="card shadow-sm border-0 mt-4">
+                         <div class="card-header bg-white fw-bold border-bottom">Extrato Detalhado do Mês</div>
+                         <div class="card-body">
+                             <div id="statement-tab-pane"></div>
+                         </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="wallet-tab-pane" role="tabpanel" tabindex="0">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0 fw-bold text-secondary">Minhas Contas e Cartões</h5>
+                        <button class="btn btn-primary btn-sm shadow-sm" id="btn-add-account">
+                            <i class="fas fa-plus me-1"></i> Nova Conta
+                        </button>
+                    </div>
+                    <div id="accounts-container" class="row g-3">
+                        </div>
+                </div>
+
+                <div class="tab-pane fade" id="launch-tab-pane" role="tabpanel" tabindex="0">
+                    <div class="row justify-content-center">
+                        <div class="col-md-8 col-lg-6">
+                            <div class="card shadow-lg border-0" style="border-radius: 16px;">
+                                <div class="card-header bg-primary text-white text-center py-3" style="border-radius: 16px 16px 0 0;">
+                                    <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Nova Transação</h5>
+                                </div>
+                                <div class="card-body p-4">
+                                    <form id="form-transacao-unificada">
+                                        </form>
+                                </div>
                             </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="col-lg-9">
-                    <div class="card shadow-sm">
-                        <div class="card-header">
-                            <ul class="nav nav-tabs card-header-tabs" id="mainTabs" role="tablist">
-                                <li class="nav-item">
-                                    <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-tab-pane" type="button">Visão Geral</button>
-                                </li>
-                                <li class="nav-item">
-                                    <button class="nav-link" id="health-tab" data-bs-toggle="tab" data-bs-target="#health-tab-pane" type="button">Saúde Financeira</button>
-                                </li>
-                                <li class="nav-item">
-                                    <button class="nav-link" id="planning-tab" data-bs-toggle="tab" data-bs-target="#planning-tab-pane" type="button">Planejamento Anual</button>
-                                </li>
-                                <li class="nav-item">
-                                    <button class="nav-link" id="bills-tab" data-bs-toggle="tab" data-bs-target="#bills-tab-pane" type="button">Contas a Pagar/Receber</button>
-                                </li>
-                                <li class="nav-item">
-                                    <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-tab-pane" type="button">Histórico</button>
-                                </li>
-                                <li class="nav-item">
-                                    <button class="nav-link" id="statement-tab" data-bs-toggle="tab" data-bs-target="#statement-tab-pane" type="button">Extrato Mensal</button>
-                                </li>
-                            </ul>
+                <div class="tab-pane fade" id="bills-tab-pane" role="tabpanel" tabindex="0">
+                    <div id="bills-filters-container"></div>
+                    <div id="bills-summary-panel" class="mb-2"></div>
+                    <div id="bills-list-container">
                         </div>
-                        
-                        <div class="card-body">
-                            <div class="tab-content" id="mainTabsContent">
-                                <div class="tab-pane fade show active" id="overview-tab-pane" role="tabpanel">
-                                    <div id="dashboard-monthly-container"></div>
-                                    <div id="dashboard-yearly-container" class="mt-4"></div>
-                                </div>
-
-                                <div class="tab-pane fade" id="health-tab-pane" role="tabpanel">
-                                    </div>
-
-                                <div class="tab-pane fade" id="planning-tab-pane" role="tabpanel">
-                                    </div>
-
-                                <div class="tab-pane fade" id="bills-tab-pane" role="tabpanel">
-                                    <div id="bills-filters-container"></div>
-                                    <div id="bills-summary-panel" class="mb-2"></div>
-                                    <div id="bills-list-container"></div>
-                                </div>
-
-                                <div class="tab-pane fade" id="history-tab-pane" role="tabpanel">
-                                    <div id="history-filters-container"></div>
-                                    <div id="history-summary-panel" class="mb-2"></div>
-                                    <div id="history-list-container"></div>
-                                </div>
-
-                                <div class="tab-pane fade" id="statement-tab-pane" role="tabpanel">
-                                    </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
+
+                <div class="tab-pane fade" id="history-tab-pane" role="tabpanel" tabindex="0">
+                    <div id="history-filters-container"></div>
+                    <div id="history-summary-panel" class="mb-2"></div>
+                    <div id="history-list-container">
+                        </div>
+                </div>
+                
+                <div class="tab-pane fade" id="planning-tab-pane" role="tabpanel" tabindex="0">
+                     </div>
+                
+                <div class="tab-pane fade" id="health-tab-pane" role="tabpanel"></div>
+
             </div>
         </div>
     </div>
