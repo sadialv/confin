@@ -8,7 +8,10 @@ const isContaInvestimento = (tipoConta) => {
     return tiposInvestimento.some(t => tipoConta.includes(t));
 };
 
-// 1. Métricas Principais (Dashboard - Visão Geral)
+// Converte qualquer valor para número de forma segura
+const toNum = (val) => parseFloat(val) || 0;
+
+// 1. Métricas Principais (Dashboard)
 export const calculateFinancialHealthMetrics = (state, mesSelecionado = null) => {
     const { contas, transacoes, lancamentosFuturos } = state;
     const hoje = new Date();
@@ -18,11 +21,10 @@ export const calculateFinancialHealthMetrics = (state, mesSelecionado = null) =>
     let totalPassivos = 0;
     let totalInvestido = 0;
 
-    // Calcula saldos acumulados
     contas.forEach(conta => {
         const saldoConta = transacoes
             .filter(t => t.conta_id === conta.id)
-            .reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, conta.saldo_inicial);
+            .reduce((acc, t) => t.tipo === 'receita' ? acc + toNum(t.valor) : acc - toNum(t.valor), toNum(conta.saldo_inicial));
 
         if (isTipoCartao(conta.tipo)) {
             if (saldoConta < 0) totalPassivos += Math.abs(saldoConta);
@@ -34,42 +36,39 @@ export const calculateFinancialHealthMetrics = (state, mesSelecionado = null) =>
         }
     });
 
-    // Passivos Futuros do Mês
     totalPassivos += lancamentosFuturos
-        .filter(l => l.status === 'pendente' && l.tipo === 'a_pagar' && l.data_vencimento.startsWith(mesAtual))
-        .reduce((acc, l) => acc + l.valor, 0);
+        .filter(l => l.status === 'pendente' && l.tipo === 'a_pagar')
+        .reduce((acc, l) => acc + toNum(l.valor), 0);
 
     const patrimonioLiquido = totalAtivos - totalPassivos;
 
-    // Métricas do Mês
     const transacoesMes = transacoes.filter(t => t.data?.startsWith(mesAtual));
-    const rendaRealizada = transacoesMes.filter(t => t.tipo === 'receita').reduce((acc, t) => acc + t.valor, 0);
-    const despesaRealizada = transacoesMes.filter(t => t.tipo === 'despesa').reduce((acc, t) => acc + t.valor, 0);
+    const rendaRealizada = transacoesMes.filter(t => t.tipo === 'receita').reduce((acc, t) => acc + toNum(t.valor), 0);
+    const despesaRealizada = transacoesMes.filter(t => t.tipo === 'despesa').reduce((acc, t) => acc + toNum(t.valor), 0);
 
     const receitasPendentes = lancamentosFuturos
         .filter(l => l.status === 'pendente' && l.tipo === 'a_receber' && l.data_vencimento.startsWith(mesAtual))
-        .reduce((acc, l) => acc + l.valor, 0);
+        .reduce((acc, l) => acc + toNum(l.valor), 0);
     const despesasPendentes = lancamentosFuturos
         .filter(l => l.status === 'pendente' && l.tipo === 'a_pagar' && l.data_vencimento.startsWith(mesAtual))
-        .reduce((acc, l) => acc + l.valor, 0);
+        .reduce((acc, l) => acc + toNum(l.valor), 0);
 
     const rendaPrevistaTotal = rendaRealizada + receitasPendentes;
     const despesaPrevistaTotal = despesaRealizada + despesasPendentes;
     const saldoPrevisto = rendaPrevistaTotal - despesaPrevistaTotal;
 
-    // Scores
     const saldoRealizado = rendaRealizada - despesaRealizada;
     const taxaPoupanca = rendaRealizada > 0 ? (saldoRealizado / rendaRealizada) * 100 : 0;
     const financialScore = Math.min(100, Math.max(0, (taxaPoupanca / 20) * 100));
 
-    // Histórico para o gráfico de linha (Patrimônio)
+    // Histórico Patrimonial
     let mesesSet = new Set();
     transacoes.forEach(t => mesesSet.add(t.data.substring(0, 7)));
     const historicoPatrimonio = Array.from(mesesSet).sort().slice(-12).map(mes => {
         const transacoesAteMes = transacoes.filter(t => t.data.substring(0,7) <= mes);
         let ativos = 0, passivos = 0;
         contas.forEach(c => {
-            const saldo = transacoesAteMes.filter(t => t.conta_id === c.id).reduce((acc, t) => t.tipo === 'receita' ? acc + t.valor : acc - t.valor, c.saldo_inicial);
+            const saldo = transacoesAteMes.filter(t => t.conta_id === c.id).reduce((acc, t) => t.tipo === 'receita' ? acc + toNum(t.valor) : acc - toNum(t.valor), toNum(c.saldo_inicial));
             if(!isTipoCartao(c.tipo)) ativos += saldo > 0 ? saldo : 0;
             else if (saldo < 0) passivos += Math.abs(saldo);
         });
@@ -85,7 +84,7 @@ export const calculateFinancialHealthMetrics = (state, mesSelecionado = null) =>
     };
 };
 
-// 2. Evolução Diária (Dashboard - Gráfico de Linha)
+// 2. Evolução Diária
 export const calculateDailyEvolution = (state, mesISO) => {
     const { transacoes, lancamentosFuturos } = state;
     const [ano, mes] = mesISO.split('-').map(Number);
@@ -96,13 +95,11 @@ export const calculateDailyEvolution = (state, mesISO) => {
     for (let d = 1; d <= diasNoMes; d++) {
         const diaStr = `${mesISO}-${String(d).padStart(2, '0')}`;
         
-        // Receitas
-        const rec = transacoes.filter(t => t.data === diaStr && t.tipo === 'receita').reduce((s,t) => s+t.valor, 0) + 
-                    lancamentosFuturos.filter(l => l.status === 'pendente' && l.data_vencimento === diaStr && l.tipo === 'a_receber').reduce((s,l) => s+l.valor, 0);
+        const rec = transacoes.filter(t => t.data === diaStr && t.tipo === 'receita').reduce((s,t) => s+toNum(t.valor), 0) + 
+                    lancamentosFuturos.filter(l => l.status === 'pendente' && l.data_vencimento === diaStr && l.tipo === 'a_receber').reduce((s,l) => s+toNum(l.valor), 0);
         
-        // Despesas
-        const desp = transacoes.filter(t => t.data === diaStr && t.tipo === 'despesa').reduce((s,t) => s+t.valor, 0) + 
-                     lancamentosFuturos.filter(l => l.status === 'pendente' && l.data_vencimento === diaStr && l.tipo === 'a_pagar').reduce((s,l) => s+l.valor, 0);
+        const desp = transacoes.filter(t => t.data === diaStr && t.tipo === 'despesa').reduce((s,t) => s+toNum(t.valor), 0) + 
+                     lancamentosFuturos.filter(l => l.status === 'pendente' && l.data_vencimento === diaStr && l.tipo === 'a_pagar').reduce((s,l) => s+toNum(l.valor), 0);
         
         const liq = rec - desp;
         saldoDia += liq;
@@ -111,21 +108,21 @@ export const calculateDailyEvolution = (state, mesISO) => {
     return evolution;
 };
 
-// 3. Timeline Anual (Gráfico de Barras do Planejamento) - RESTAURADO!
+// 3. Timeline Anual (AQUI ESTAVA O PROBLEMA - RESTAURADO)
 export const calculateAnnualTimeline = (state, anoSelecionado) => {
     const { contas, transacoes, lancamentosFuturos, comprasParceladas } = state;
     const ano = anoSelecionado || new Date().getFullYear();
     const meses = Array.from({ length: 12 }, (_, i) => i); 
     const idsCartao = contas.filter(c => isTipoCartao(c.tipo)).map(c => c.id);
 
-    // Saldo Inicial do Ano (Soma contas que não são cartão)
-    let saldoAcumulado = contas.filter(c => !isTipoCartao(c.tipo)).reduce((acc, c) => acc + c.saldo_inicial, 0);
+    // Saldo Inicial do Ano
+    let saldoAcumulado = contas.filter(c => !isTipoCartao(c.tipo)).reduce((acc, c) => acc + toNum(c.saldo_inicial), 0);
     const dataCorte = `${ano}-01-01`;
     
-    // Processa histórico anterior ao ano selecionado
+    // Ajuste histórico
     const deltaRealizado = transacoes.filter(t => t.data < dataCorte).reduce((acc, t) => {
         if (idsCartao.includes(t.conta_id)) return acc; 
-        return t.tipo === 'receita' ? acc + t.valor : acc - t.valor;
+        return t.tipo === 'receita' ? acc + toNum(t.valor) : acc - toNum(t.valor);
     }, 0);
     
     saldoAcumulado += deltaRealizado;
@@ -133,16 +130,14 @@ export const calculateAnnualTimeline = (state, anoSelecionado) => {
     return meses.map(mesIndex => {
         const mesStr = `${ano}-${String(mesIndex + 1).padStart(2, '0')}`;
         
-        // Receitas (Real + Previsto)
-        const rec = transacoes.filter(t => t.data.startsWith(mesStr) && t.tipo === 'receita').reduce((s,t)=>s+t.valor,0) + 
-                    lancamentosFuturos.filter(l => l.data_vencimento.startsWith(mesStr) && l.tipo === 'a_receber' && l.status === 'pendente').reduce((s,l)=>s+l.valor,0);
+        const rec = transacoes.filter(t => t.data.startsWith(mesStr) && t.tipo === 'receita').reduce((s,t)=>s+toNum(t.valor),0) + 
+                    lancamentosFuturos.filter(l => l.data_vencimento.startsWith(mesStr) && l.tipo === 'a_receber' && l.status === 'pendente').reduce((s,l)=>s+toNum(l.valor),0);
         
-        // Despesas (Real + Previsto) - Excluindo pagamentos com cartão na hora da compra para visualização de fluxo de caixa simples
-        const desp = transacoes.filter(t => t.data.startsWith(mesStr) && t.tipo === 'despesa' && !idsCartao.includes(t.conta_id)).reduce((s,t)=>s+t.valor,0) +
+        const desp = transacoes.filter(t => t.data.startsWith(mesStr) && t.tipo === 'despesa' && !idsCartao.includes(t.conta_id)).reduce((s,t)=>s+toNum(t.valor),0) +
                      lancamentosFuturos.filter(l => l.data_vencimento.startsWith(mesStr) && l.tipo === 'a_pagar' && l.status === 'pendente').reduce((s, l) => {
                         const compraPai = l.compra_parcelada_id ? comprasParceladas.find(c => c.id === l.compra_parcelada_id) : null;
                         if ((compraPai && idsCartao.includes(compraPai.conta_id)) || (l.conta_id && idsCartao.includes(l.conta_id))) return s;
-                        return s + l.valor;
+                        return s + toNum(l.valor);
                      }, 0);
         
         const saldo = rec - desp;
@@ -152,45 +147,38 @@ export const calculateAnnualTimeline = (state, anoSelecionado) => {
     });
 };
 
-// 4. Tabela de Planejamento (Lógica de Resgate Automático Ajustada)
+// 4. Tabela de Planejamento (Lógica de Resgate Real)
 export const calculateCategoryGrid = (state, anoSelecionado) => {
     const { contas, transacoes, lancamentosFuturos, comprasParceladas } = state;
     const ano = anoSelecionado || new Date().getFullYear();
 
-    // 1. Separação de Contas
     const idsInvest = contas.filter(c => isContaInvestimento(c.tipo)).map(c => c.id);
     const idsCartao = contas.filter(c => isTipoCartao(c.tipo)).map(c => c.id);
-    // Caixa = Tudo que NÃO é investimento (inclui Cartão aqui apenas para exclusão da lista de Invest)
     const idsContaReal = contas.filter(c => !idsInvest.includes(c.id) && !idsCartao.includes(c.id)).map(c => c.id);
 
-    // 2. Saldos Iniciais
     const dataCorte = `${ano}-01-01`;
 
     const getSaldoAbertura = (ids) => {
-        let saldo = contas.filter(c => ids.includes(c.id)).reduce((a, c) => a + c.saldo_inicial, 0);
+        let saldo = contas.filter(c => ids.includes(c.id)).reduce((a, c) => a + toNum(c.saldo_inicial), 0);
         saldo += transacoes.filter(t => t.data < dataCorte && ids.includes(t.conta_id))
-            .reduce((a, t) => t.tipo === 'receita' ? a + t.valor : a - t.valor, 0);
-        // Soma lançamentos pendentes antigos também
+            .reduce((a, t) => t.tipo === 'receita' ? a + toNum(t.valor) : a - toNum(t.valor), 0);
         saldo += lancamentosFuturos.filter(l => l.status === 'pendente' && l.data_vencimento < dataCorte && ids.includes(l.conta_id))
-            .reduce((a, l) => l.tipo === 'a_receber' ? a + l.valor : a - l.valor, 0);
+            .reduce((a, l) => l.tipo === 'a_receber' ? a + toNum(l.valor) : a - toNum(l.valor), 0);
         return saldo;
     };
 
     let saldoInvestAtual = getSaldoAbertura(idsInvest);
     let saldoCaixaAtual = getSaldoAbertura(idsContaReal);
 
-    // Arrays de Retorno
     const gridReceitas = {};
     const gridDespesas = {};
     const arrReceitas = Array(12).fill(0);
     const arrDespesas = Array(12).fill(0);
-    
     const arrSaldosInvestimento = Array(12).fill(0);
     const arrSaldosConta = Array(12).fill(0);
     const arrResgates = Array(12).fill(0);
     const arrSaldoLiquido = Array(12).fill(0);
 
-    // 3. Loop Mensal
     for (let i = 0; i < 12; i++) {
         const mesStr = `${ano}-${String(i + 1).padStart(2, '0')}`;
         
@@ -199,16 +187,13 @@ export const calculateCategoryGrid = (state, anoSelecionado) => {
 
         let recMes = 0;
         let despMes = 0;
-        
-        // Fluxos do Mês
         let fluxoInvest = 0;
         let fluxoCaixa = 0;
 
-        const processar = (valor, tipo, contaId, cat) => {
+        const processar = (valorRaw, tipo, contaId, cat) => {
+            const valor = toNum(valorRaw);
             const c = cat || 'Outros';
             const isDestinoInvest = idsInvest.includes(contaId);
-            
-            // Lógica de Abatimento do Caixa (Força o débito no caixa se não for investimento)
             const isImpactoCaixa = !isDestinoInvest;
 
             if (tipo === 'receita') {
@@ -219,7 +204,7 @@ export const calculateCategoryGrid = (state, anoSelecionado) => {
                 if (isDestinoInvest) fluxoInvest += valor;
                 else if (isImpactoCaixa) fluxoCaixa += valor;
 
-            } else { // Despesa
+            } else { 
                 despMes += valor;
                 if (!gridDespesas[c]) gridDespesas[c] = Array(12).fill(0);
                 gridDespesas[c][i] += valor;
@@ -229,10 +214,7 @@ export const calculateCategoryGrid = (state, anoSelecionado) => {
             }
         };
 
-        // Processa Transações (Realizado)
         transacoes.filter(t => t.data.startsWith(mesStr)).forEach(t => processar(t.valor, t.tipo, t.conta_id, t.categoria));
-        
-        // Processa Futuros (Previsto)
         lancamentosFuturos.filter(l => l.status === 'pendente' && l.data_vencimento.startsWith(mesStr)).forEach(l => {
             let contaAlvo = l.conta_id;
             if (l.compra_parcelada_id) {
@@ -246,23 +228,18 @@ export const calculateCategoryGrid = (state, anoSelecionado) => {
         arrReceitas[i] = recMes;
         arrDespesas[i] = despMes;
 
-        // === LÓGICA DE RESGATE (SIMULAÇÃO DE FLUXO) ===
-        
+        // Lógica de Resgate
         let caixaPrevisorio = saldoCaixaAtual + fluxoCaixa;
         let investPrevisorio = saldoInvestAtual + fluxoInvest;
         let resgateNecessario = 0;
 
-        // Se faltou dinheiro no caixa
         if (caixaPrevisorio < 0) {
             const deficit = Math.abs(caixaPrevisorio);
-            
             if (investPrevisorio >= deficit) {
-                // Tira do investimento para cobrir o caixa
                 resgateNecessario = deficit;
                 investPrevisorio -= deficit; 
-                caixaPrevisorio = 0; // Caixa zerado (dívida paga)
+                caixaPrevisorio = 0;
             } else {
-                // Tira tudo o que tem
                 resgateNecessario = investPrevisorio;
                 caixaPrevisorio += investPrevisorio;
                 investPrevisorio = 0;
@@ -270,11 +247,8 @@ export const calculateCategoryGrid = (state, anoSelecionado) => {
         }
 
         arrResgates[i] = resgateNecessario;
-
-        // Atualiza para o próximo mês
         saldoCaixaAtual = caixaPrevisorio;
         saldoInvestAtual = investPrevisorio;
-
         arrSaldoLiquido[i] = saldoCaixaAtual + saldoInvestAtual;
     }
 
