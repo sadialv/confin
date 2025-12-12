@@ -111,7 +111,7 @@ export const calculateDailyEvolution = (state, mesISO) => {
     return evolution;
 };
 
-// 3. Timeline Anual (Gráfico de Barras do Planejamento)
+// 3. Timeline Anual (Gráfico de Barras do Planejamento) - RESTAURADO!
 export const calculateAnnualTimeline = (state, anoSelecionado) => {
     const { contas, transacoes, lancamentosFuturos, comprasParceladas } = state;
     const ano = anoSelecionado || new Date().getFullYear();
@@ -152,7 +152,7 @@ export const calculateAnnualTimeline = (state, anoSelecionado) => {
     });
 };
 
-// 4. Tabela de Planejamento (Lógica de Fluxo Real - Caixa vs Investimentos)
+// 4. Tabela de Planejamento (Lógica de Resgate Automático Ajustada)
 export const calculateCategoryGrid = (state, anoSelecionado) => {
     const { contas, transacoes, lancamentosFuturos, comprasParceladas } = state;
     const ano = anoSelecionado || new Date().getFullYear();
@@ -160,6 +160,7 @@ export const calculateCategoryGrid = (state, anoSelecionado) => {
     // 1. Separação de Contas
     const idsInvest = contas.filter(c => isContaInvestimento(c.tipo)).map(c => c.id);
     const idsCartao = contas.filter(c => isTipoCartao(c.tipo)).map(c => c.id);
+    // Caixa = Tudo que NÃO é investimento (inclui Cartão aqui apenas para exclusão da lista de Invest)
     const idsContaReal = contas.filter(c => !idsInvest.includes(c.id) && !idsCartao.includes(c.id)).map(c => c.id);
 
     // 2. Saldos Iniciais
