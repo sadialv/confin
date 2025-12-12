@@ -3,11 +3,12 @@ import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, CHAR
 import { getState, getContaPorId, getContas, getCategorias, getTiposContas, isTipoCartao } from './state.js';
 import { calculateFinancialHealthMetrics, calculateAnnualTimeline, calculateCategoryGrid, calculateDailyEvolution } from './finance.js';
 
-// --- VARIÁVEIS GLOBAIS ---
+// --- VARIÁVEIS GLOBAIS (Controle de Gráficos e Estado de UI) ---
 let summaryChart = null;
 let dailyChart = null;
 let annualChart = null;
 let netWorthChart = null;
+let avgSpendingChart = null;
 let annualMixedChart = null;
 
 // Estados locais da UI
@@ -521,12 +522,32 @@ const renderDetailedTable = () => {
             </tr>`;
     };
 
+    // Montagem das Linhas
     const rowsReceitasDetails = createRows(data.receitas);
     const rowTotalEntradas = renderSumRow('Total Entradas', data.totalReceitas, bgReceitasHeader, textReceitas, true);
     
     const rowsDespesasDetails = createRows(data.despesas);
     const rowTotalSaidas = renderSumRow('Total Saídas', data.totalDespesas, bgDespesasHeader, textDespesas, true);
 
+    // --- NOVA LINHA: SALDO DO MÊS (Receita - Despesa) COM FORMATAÇÃO CONDICIONAL ---
+    const arrSaldoMes = data.totalReceitas.map((rec, i) => rec - data.totalDespesas[i]);
+    const colsSaldoMes = arrSaldoMes.map(v => {
+        const color = v >= 0 ? '#047857' : '#c53030'; // Verde ou Vermelho
+        return `<td class="text-end fw-bold px-2" style="color: ${color}; font-size: 0.85rem;">
+            ${formatarMoeda(v).replace('R$', '')}
+        </td>`;
+    }).join('');
+
+    const rowSaldoMes = `
+        <tr style="background-color: #f8f9fa;">
+            <td class="fw-bold ps-3" style="${styleStickyCol} background-color: #f8f9fa; color: #1f2937; font-size: 0.85rem;">
+                Saldo do Mês (R - D)
+            </td>
+            ${colsSaldoMes}
+        </tr>`;
+    // -------------------------------------------------------------------------
+
+    // Bloco Resumo
     const rowResumoReceitas = renderSumRow('Receitas', data.totalReceitas, '#fff', '#2d3748');
     const rowResumoInvest = renderSumRow('Investimentos', data.saldosInvestimento, '#fff', '#2d3748');
     const rowResumoSaldos = renderSumRow('Saldos de contas', data.saldosConta, '#fff', '#2d3748');
@@ -563,6 +584,8 @@ const renderDetailedTable = () => {
                     </tr>
                     ${rowsDespesasDetails || '<tr><td colspan="13" class="text-center text-muted small py-2">Sem despesas lançadas</td></tr>'}
                     ${rowTotalSaidas}
+
+                    ${rowSaldoMes}
 
                     <tr>
                         <td colspan="13" class="py-2 ps-3 fw-bold text-uppercase border-top border-2" 
@@ -913,7 +936,7 @@ const renderSummaryPanel = (containerId, items, type) => {
 };
 
 // --- HELPER PARA CARDS FLUTUANTES ---
-// CORREÇÃO APLICADA: GERA ID ÚNICO E ATRIBUI CORRETAMENTE
+// GERA ID ÚNICO E ATRIBUI CORRETAMENTE
 const createCardHTML = (titulo, valor, data, categoria, contaNome, iconObj, type, actionsHTML, badgesHTML = '') => {
     const isDespesa = type === 'despesa' || type === 'a_pagar';
     const colorClass = isDespesa ? 'text-danger' : 'text-success';
@@ -1522,7 +1545,6 @@ export const renderMonthlyStatementTab = () => {
     `;
 
     // Renderiza o conteúdo do mês selecionado inicialmente
-    // Nota: Mesmo que não haja "transacoes" (histórico), pode haver "pendentes", então chamamos a função.
     renderMonthlyStatementDetails(selectedMonth || currentMonth);
 };
 
