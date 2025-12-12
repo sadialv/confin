@@ -3,7 +3,7 @@ import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, CHAR
 import { getState, getContaPorId, getContas, getCategorias, getTiposContas, isTipoCartao } from './state.js';
 import { calculateFinancialHealthMetrics, calculateAnnualTimeline, calculateCategoryGrid, calculateDailyEvolution } from './finance.js';
 
-// --- VARIÁVEIS GLOBAIS ---
+// --- VARIÁVEIS GLOBAIS (Controle de Gráficos e Estado de UI) ---
 let summaryChart = null;
 let dailyChart = null;
 let annualChart = null;
@@ -311,7 +311,7 @@ export const renderFormTransacaoRapida = () => {
 };
 
 // =========================================================================
-// === ABA: PLANEJAMENTO ANUAL (GRÁFICO MISTO E TABELA) ===
+// === ABA: PLANEJAMENTO ANUAL ===
 // =========================================================================
 
 export const renderAnnualPlanningTab = () => {
@@ -504,43 +504,33 @@ const renderDetailedTable = () => {
         return `<tr style="background-color: ${bgColor};"><td class="${weight} ps-3" style="${styleStickyCol} background-color: ${bgColor}; color: ${textColor}; font-size: 0.85rem;">${label}</td>${cols}</tr>`;
     };
 
-    // Montagem das Linhas
     const rowsReceitasDetails = createRows(data.receitas);
     const rowsDespesasDetails = createRows(data.despesas);
 
     // Linha de Saldo do Mês (Operacional)
     const arrSaldoMes = data.totalReceitas.map((rec, i) => rec - data.totalDespesas[i]);
     const colsSaldoMes = arrSaldoMes.map(v => {
-        const color = v >= 0 ? '#047857' : '#c53030'; // Verde ou Vermelho
-        return `<td class="text-end fw-bold px-2" style="color: ${color}; font-size: 0.85rem;">
-            ${formatarMoeda(v).replace('R$', '')}
-        </td>`;
+        const color = v >= 0 ? '#047857' : '#c53030';
+        return `<td class="text-end fw-bold px-2" style="color: ${color}; font-size: 0.85rem;">${formatarMoeda(v).replace('R$', '')}</td>`;
     }).join('');
     
     const rowSaldoMes = `
         <tr style="background-color: #f8f9fa;">
-            <td class="fw-bold ps-3" style="${styleStickyCol} background-color: #f8f9fa; color: #1f2937; font-size: 0.85rem;">
-                Saldo do Mês (R - D)
-            </td>
+            <td class="fw-bold ps-3" style="${styleStickyCol} background-color: #f8f9fa; color: #1f2937; font-size: 0.85rem;">Saldo do Mês (R - D)</td>
             ${colsSaldoMes}
         </tr>`;
 
-    // Linha de Resgate Automático (Nova)
-    // Mostra apenas se houver resgate (> 0) em algum mês
+    // Linha de Resgate Automático
     const hasResgate = data.resgates.some(v => v > 0);
     let rowResgates = '';
     if (hasResgate) {
         const colsResgate = data.resgates.map(v => 
-            `<td class="text-end px-2 fw-bold" style="color: #c53030; font-size: 0.8rem;">
-                ${v > 0 ? `(- ${formatarMoeda(v).replace('R$', '')})` : '-'}
-            </td>`
+            `<td class="text-end px-2 fw-bold" style="color: #c53030; font-size: 0.8rem;">${v > 0 ? `(- ${formatarMoeda(v).replace('R$', '')})` : '-'}</td>`
         ).join('');
         
         rowResgates = `
             <tr style="background-color: #fff5f5;">
-                <td class="fw-bold ps-3 text-danger" style="${styleStickyCol} background-color: #fff5f5; font-size: 0.8rem;">
-                    ⚠ Cobertura Automática
-                </td>
+                <td class="fw-bold ps-3 text-danger" style="${styleStickyCol} background-color: #fff5f5; font-size: 0.8rem;">⚠ Cobertura Automática</td>
                 ${colsResgate}
             </tr>`;
     }
@@ -566,19 +556,15 @@ const renderDetailedTable = () => {
                     ${renderSumRow('Saldo Disponível (Conta)', data.saldosConta, '#fff', '#2d3748')}
                     ${rowResgates}
                     ${renderSumRow('Investimentos Restantes', data.saldosInvestimento, '#fff', '#2d3748')}
-                    
                     ${renderSumRow('Patrimônio Líquido Final', data.saldoLiquido, bgSaldoLiquido, '#2b6cb0', true)}
                 </tbody>
             </table>
         </div>
-        <div class="mt-2 text-end text-muted fst-italic" style="font-size: 0.75rem;">
-            * Se o saldo em conta faltar, o sistema simula retirada automática dos investimentos.
-        </div>
-    `;
+        <div class="mt-2 text-end text-muted fst-italic" style="font-size: 0.75rem;">* Se o saldo em conta faltar, o sistema simula retirada automática dos investimentos.</div>`;
 };
 
 // =========================================================================
-// === DASHBOARDS E GRÁFICOS ===
+// === DASHBOARDS E GRÁFICOS (MENSAL/ANUAL/SAÚDE) ===
 // =========================================================================
 
 export const renderVisaoMensal = () => {
@@ -646,6 +632,7 @@ export const renderVisaoMensal = () => {
     document.getElementById('dashboard-month-picker').addEventListener('change', (e) => {
         currentDashboardMonth = e.target.value;
         renderVisaoMensal(); 
+        renderVisaoAnual(); // Atualiza também o gráfico anual
     });
     
     renderDailyChart();
@@ -726,12 +713,12 @@ export const renderVisaoAnual = () => {
     const container = document.getElementById('dashboard-yearly-container');
     if (!container) return;
     
-    const timelineData = calculateAnnualTimeline(getState(), new Date().getFullYear());
-    const labels = timelineData.map(d => d.mes.substring(0, 3));
-    const receitas = timelineData.map(d => d.receitas);
-    const despesas = timelineData.map(d => d.despesas);
+    // Mostra o gráfico do ano do mês selecionado
+    const anoSelecionado = parseInt(currentDashboardMonth.split('-')[0]);
+    const timelineData = calculateAnnualTimeline(getState(), anoSelecionado);
+    const labels = timelineData.map(d => d.mes.substring(5, 7)); // Apenas o mês
 
-    container.innerHTML = `<h5 class="mb-3">Fluxo de Caixa (Real + Previsto)</h5><div style="height: 300px;"><canvas id="annual-chart"></canvas></div>`;
+    container.innerHTML = `<h5 class="mb-3">Fluxo de Caixa (${anoSelecionado})</h5><div style="height: 300px;"><canvas id="annual-chart"></canvas></div>`;
     
     if(annualChart) annualChart.destroy();
     const ctx = document.getElementById('annual-chart')?.getContext('2d');
@@ -742,8 +729,8 @@ export const renderVisaoAnual = () => {
             data: {
                 labels: labels,
                 datasets: [
-                    { label: 'Receitas', data: receitas, backgroundColor: 'rgba(25,135,84,0.7)' },
-                    { label: 'Despesas', data: despesas, backgroundColor: 'rgba(220,53,69,0.7)' }
+                    { label: 'Receitas', data: timelineData.map(d => d.receitas), backgroundColor: 'rgba(25,135,84,0.7)' },
+                    { label: 'Despesas', data: timelineData.map(d => d.despesas), backgroundColor: 'rgba(220,53,69,0.7)' }
                 ]
             },
             options: {
@@ -906,7 +893,7 @@ const renderSummaryPanel = (containerId, items, type) => {
         </div>`;
 };
 
-// --- HELPER PARA CARDS FLUTUANTES (ID ÚNICO CORRIGIDO) ---
+// --- HELPER PARA CARDS FLUTUANTES (COM ID ÚNICO CORRIGIDO) ---
 const createCardHTML = (titulo, valor, data, categoria, contaNome, iconObj, type, actionsHTML, badgesHTML = '') => {
     const isDespesa = type === 'despesa' || type === 'a_pagar';
     const colorClass = isDespesa ? 'text-danger' : 'text-success';
