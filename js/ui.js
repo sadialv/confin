@@ -465,6 +465,8 @@ const renderMixedChart = () => {
     });
 };
 
+// ARQUIVO: js/ui.js (Apenas a função renderDetailedTable atualizada)
+
 const renderDetailedTable = () => {
     const container = document.getElementById('panel-table-view');
     if(!container) return;
@@ -475,13 +477,91 @@ const renderDetailedTable = () => {
     const styleStickyHeader = 'position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);';
     const styleStickyCol = 'position: sticky; left: 0; z-index: 5; border-right: 1px solid #dee2e6;';
     
+    // Cores
     const bgHeader = '#f8f9fa';
-    const bgReceitasHeader = '#e6fffa'; 
-    const textReceitas = '#047857';     
-    const bgDespesasHeader = '#fff5f5'; 
-    const textDespesas = '#c53030';     
-    const bgResumo = '#edf2f7';         
-    const bgSaldoLiquido = '#ebf8ff';   
+    const bgReceitasHeader = '#e6fffa'; const textReceitas = '#047857';
+    const bgDespesasHeader = '#fff5f5'; const textDespesas = '#c53030';
+    const bgResumo = '#edf2f7';
+    const bgSaldoLiquido = '#ebf8ff';
+    
+    const headerCols = meses.map(m => `
+        <th class="text-center py-2 text-secondary text-uppercase" 
+            style="min-width: 90px; background-color: ${bgHeader}; font-size: 0.75rem;">${m}</th>`).join('');
+
+    const createRows = (objData) => Object.keys(objData).sort().map(cat => {
+        const cols = objData[cat].map(v => 
+            `<td class="text-end border-light px-2" style="font-size: 0.85rem; color: #4a5568;">
+                ${v === 0 ? '<span class="text-muted opacity-25">-</span>' : formatarMoeda(v).replace('R$', '')}
+            </td>`
+        ).join('');
+        return `<tr><td class="fw-normal ps-3 bg-white" style="${styleStickyCol} font-size: 0.85rem;">${cat}</td>${cols}</tr>`;
+    }).join('');
+
+    const renderSumRow = (label, values, bgColor, textColor, isBold = false) => {
+        const weight = isBold ? 'fw-bold' : 'fw-normal';
+        const cols = values.map(v => 
+            `<td class="text-end ${weight} px-2" style="color: ${textColor}; font-size: 0.85rem;">
+                ${formatarMoeda(v).replace('R$', '')}
+            </td>`
+        ).join('');
+        return `<tr style="background-color: ${bgColor};"><td class="${weight} ps-3" style="${styleStickyCol} background-color: ${bgColor}; color: ${textColor}; font-size: 0.85rem;">${label}</td>${cols}</tr>`;
+    };
+
+    // Linha de Saldo do Mês (Operacional)
+    const arrSaldoMes = data.totalReceitas.map((rec, i) => rec - data.totalDespesas[i]);
+    const rowSaldoMes = renderSumRow('Saldo Operacional (Mês)', arrSaldoMes, '#f8f9fa', '#1f2937', true);
+
+    // Linha de Resgate (Nova)
+    // Mostra apenas se houver resgate (> 0)
+    const hasResgate = data.resgates.some(v => v > 0);
+    let rowResgates = '';
+    if (hasResgate) {
+        const colsResgate = data.resgates.map(v => 
+            `<td class="text-end px-2 fw-bold" style="color: #c53030; font-size: 0.8rem;">
+                ${v > 0 ? `(- ${formatarMoeda(v).replace('R$', '')})` : '-'}
+            </td>`
+        ).join('');
+        
+        rowResgates = `
+            <tr style="background-color: #fff5f5;">
+                <td class="fw-bold ps-3 text-danger" style="${styleStickyCol} background-color: #fff5f5; font-size: 0.8rem;">
+                    ⚠ Cobertura Automática
+                </td>
+                ${colsResgate}
+            </tr>`;
+    }
+
+    container.innerHTML = `
+        <div class="table-responsive border rounded" style="max-height: 600px; border-color: #e2e8f0;">
+            <table class="table table-sm mb-0" style="border-collapse: separate; border-spacing: 0;">
+                <thead style="${styleStickyHeader}">
+                    <tr><th class="ps-3 text-secondary text-uppercase border-bottom" style="${styleStickyCol} min-width: 180px; background-color: ${bgHeader}; z-index: 11;">Categoria</th>${headerCols}</tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="13" class="py-1 ps-3 fw-bold text-uppercase" style="background-color: #f0fdf4; color: ${textReceitas}; letter-spacing: 1px;">Receitas</td></tr>
+                    ${createRows(data.receitas)}
+                    ${renderSumRow('Total Entradas', data.totalReceitas, bgReceitasHeader, textReceitas, true)}
+
+                    <tr><td colspan="13" class="py-1 ps-3 fw-bold text-uppercase border-top" style="background-color: #fff5f5; color: ${textDespesas}; letter-spacing: 1px;">Despesas</td></tr>
+                    ${createRows(data.despesas)}
+                    ${renderSumRow('Total Saídas', data.totalDespesas, bgDespesasHeader, textDespesas, true)}
+
+                    ${rowSaldoMes}
+
+                    <tr><td colspan="13" class="py-2 ps-3 fw-bold text-uppercase border-top border-2" style="background-color: ${bgResumo}; color: #4a5568; letter-spacing: 1px;">Simulação de Caixa</td></tr>
+                    ${renderSumRow('Saldo Disponível (Conta)', data.saldosConta, '#fff', '#2d3748')}
+                    ${rowResgates}
+                    ${renderSumRow('Investimentos Restantes', data.saldosInvestimento, '#fff', '#2d3748')}
+                    
+                    ${renderSumRow('Patrimônio Líquido Final', data.saldoLiquido, bgSaldoLiquido, '#2b6cb0', true)}
+                </tbody>
+            </table>
+        </div>
+        <div class="mt-2 text-end text-muted fst-italic" style="font-size: 0.75rem;">
+            * Se o saldo em conta faltar, o sistema simula retirada automática dos investimentos.
+        </div>
+    `;
+};
     
     const headerCols = meses.map(m => `
         <th class="text-center py-2 text-secondary text-uppercase" 
@@ -1693,3 +1773,4 @@ export const renderLogoutButton = () => {
         // const btn = document.createElement('button'); ...
     }
 };
+
