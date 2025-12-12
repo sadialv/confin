@@ -3,12 +3,11 @@ import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, CHAR
 import { getState, getContaPorId, getContas, getCategorias, getTiposContas, isTipoCartao } from './state.js';
 import { calculateFinancialHealthMetrics, calculateAnnualTimeline, calculateCategoryGrid, calculateDailyEvolution } from './finance.js';
 
-// --- VARIÁVEIS GLOBAIS (Controle de Gráficos e Estado de UI) ---
+// --- VARIÁVEIS GLOBAIS ---
 let summaryChart = null;
 let dailyChart = null;
 let annualChart = null;
 let netWorthChart = null;
-let avgSpendingChart = null;
 let annualMixedChart = null;
 
 // Estados locais da UI
@@ -100,7 +99,7 @@ export const closeModal = () => {
 // === RENDERIZADORES DE COMPONENTES ===
 // =========================================================================
 
-// 1. Renderiza Cards de Contas (ATUALIZADO PARA GRID DA ABA CARTEIRA)
+// 1. Renderiza Cards de Contas (Grid da Aba Carteira)
 export const renderContas = () => {
     const container = document.getElementById('accounts-container');
     const { contas, transacoes } = getState();
@@ -128,7 +127,6 @@ export const renderContas = () => {
         const iconClass = ACCOUNT_TYPE_ICONS[conta.tipo] || ACCOUNT_TYPE_ICONS['default'];
         const isCartao = isTipoCartao(conta.tipo);
 
-        // Botões de ação específicos
         let acoesEspecificas = '';
         if (isCartao) {
             acoesEspecificas = `
@@ -185,7 +183,7 @@ export const renderContas = () => {
     container.innerHTML = cardsHtml;
 };
 
-// 2. Renderiza Formulário de Transação Rápida (ATUALIZADO PARA ABA LANÇAR)
+// 2. Renderiza Formulário de Transação Rápida (Aba Lançar)
 export const renderFormTransacaoRapida = () => {
     const container = document.getElementById('form-transacao-unificada');
     if (!container) return;
@@ -285,12 +283,10 @@ export const renderFormTransacaoRapida = () => {
         </div>
     `;
 
-    // Reatacha o evento de mudança de tipo
     const selectTipo = document.getElementById('tipo-compra');
     if (selectTipo) {
         selectTipo.addEventListener('change', (e) => {
              const tipo = e.target.value;
-             const form = document.getElementById('form-transacao-unificada');
              const parceladaFields = document.getElementById('parcelada-fields');
              const recorrenteFields = document.getElementById('recorrente-fields');
              const labelValor = document.getElementById('label-valor');
@@ -315,7 +311,7 @@ export const renderFormTransacaoRapida = () => {
 };
 
 // =========================================================================
-// === ABA: PLANEJAMENTO ANUAL (GRÁFICO MISTO E TABELA) ===
+// === ABA: PLANEJAMENTO ANUAL ===
 // =========================================================================
 
 export const renderAnnualPlanningTab = () => {
@@ -475,18 +471,16 @@ const renderDetailedTable = () => {
     const data = calculateCategoryGrid(getState(), currentPlanningYear);
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     
-    // Estilos Inline para garantir o visual (Sticky Header/Column)
     const styleStickyHeader = 'position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);';
     const styleStickyCol = 'position: sticky; left: 0; z-index: 5; border-right: 1px solid #dee2e6;';
     
-    // Cores (Paleta Suave/Formal)
     const bgHeader = '#f8f9fa';
-    const bgReceitasHeader = '#e6fffa'; // Verde muito claro
-    const textReceitas = '#047857';     // Verde escuro elegante
-    const bgDespesasHeader = '#fff5f5'; // Vermelho muito claro
-    const textDespesas = '#c53030';     // Vermelho escuro elegante
-    const bgResumo = '#edf2f7';         // Cinza azulado (neutro)
-    const bgSaldoLiquido = '#ebf8ff';   // Azul claro destaque
+    const bgReceitasHeader = '#e6fffa'; 
+    const textReceitas = '#047857';     
+    const bgDespesasHeader = '#fff5f5'; 
+    const textDespesas = '#c53030';     
+    const bgResumo = '#edf2f7';         
+    const bgSaldoLiquido = '#ebf8ff';   
     
     const headerCols = meses.map(m => `
         <th class="text-center py-2 text-secondary text-uppercase" 
@@ -494,7 +488,6 @@ const renderDetailedTable = () => {
             ${m}
         </th>`).join('');
 
-    // Helper para linhas de dados
     const createRows = (objData) => Object.keys(objData).sort().map(cat => {
         const cols = objData[cat].map(v => 
             `<td class="text-end border-light px-2" style="font-size: 0.85rem; color: #4a5568;">
@@ -511,7 +504,6 @@ const renderDetailedTable = () => {
             </tr>`;
     }).join('');
 
-    // Helper para linhas de Resumo/Total
     const renderSumRow = (label, values, bgColor, textColor, isBold = false) => {
         const weight = isBold ? 'fw-bold' : 'fw-normal';
         const cols = values.map(v => 
@@ -529,14 +521,12 @@ const renderDetailedTable = () => {
             </tr>`;
     };
 
-    // Montagem das Linhas
     const rowsReceitasDetails = createRows(data.receitas);
     const rowTotalEntradas = renderSumRow('Total Entradas', data.totalReceitas, bgReceitasHeader, textReceitas, true);
     
     const rowsDespesasDetails = createRows(data.despesas);
     const rowTotalSaidas = renderSumRow('Total Saídas', data.totalDespesas, bgDespesasHeader, textDespesas, true);
 
-    // Bloco Resumo
     const rowResumoReceitas = renderSumRow('Receitas', data.totalReceitas, '#fff', '#2d3748');
     const rowResumoInvest = renderSumRow('Investimentos', data.saldosInvestimento, '#fff', '#2d3748');
     const rowResumoSaldos = renderSumRow('Saldos de contas', data.saldosConta, '#fff', '#2d3748');
@@ -594,7 +584,7 @@ const renderDetailedTable = () => {
 };
 
 // =========================================================================
-// === DASHBOARDS E GRÁFICOS (MENSAL/ANUAL/SAÚDE) ===
+// === DASHBOARDS E GRÁFICOS ===
 // =========================================================================
 
 export const renderVisaoMensal = () => {
@@ -883,7 +873,7 @@ export const renderFilters = (type, currentFilters = {}) => {
         </div>`;
 };
 
-// --- PAINEL DE RESUMO ATUALIZADO (MODERNO) ---
+// --- PAINEL DE RESUMO MODERNO ---
 const renderSummaryPanel = (containerId, items, type) => {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -923,19 +913,22 @@ const renderSummaryPanel = (containerId, items, type) => {
 };
 
 // --- HELPER PARA CARDS FLUTUANTES ---
+// CORREÇÃO APLICADA: GERA ID ÚNICO E ATRIBUI CORRETAMENTE
 const createCardHTML = (titulo, valor, data, categoria, contaNome, iconObj, type, actionsHTML, badgesHTML = '') => {
     const isDespesa = type === 'despesa' || type === 'a_pagar';
     const colorClass = isDespesa ? 'text-danger' : 'text-success';
     const symbol = isDespesa ? '-' : '+';
     
-    // Formata Data (DD MMM)
+    // GERA ID ÚNICO PARA ESTE CARD
+    const uniqueId = 'collapse-' + Math.random().toString(36).substr(2, 9);
+    
     const dateObj = new Date(data + 'T12:00:00');
     const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 
     return `
     <div class="accordion-item shadow-sm border-0 mb-2" style="border-radius: 12px; overflow:hidden;">
         <h2 class="accordion-header">
-            <button class="accordion-button collapsed py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${Math.random().toString(36).substr(2,9)}">
+            <button class="accordion-button collapsed py-3" type="button" data-bs-toggle="collapse" data-bs-target="#${uniqueId}">
                 <div class="d-flex w-100 align-items-center">
                     <div class="transaction-icon-wrapper me-3 flex-shrink-0" style="background-color: ${iconObj.color}; width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:white;">
                         <i class="${iconObj.icon}"></i>
@@ -955,7 +948,7 @@ const createCardHTML = (titulo, valor, data, categoria, contaNome, iconObj, type
                 </div>
             </button>
         </h2>
-        <div class="accordion-collapse collapse">
+        <div id="${uniqueId}" class="accordion-collapse collapse">
             <div class="accordion-body bg-light">
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <small class="text-muted">
@@ -1080,7 +1073,7 @@ export const renderHistoricoTransacoes = (page = 1, filters) => {
     container.innerHTML = paginados.map(renderTransactionCard).join('');
 };
 
-// --- MODAIS (COMPLETOS) ---
+// --- MODAIS ---
 
 export const getAccountModalContent = (id = null) => {
     const conta = id ? getContaPorId(id) : {};
@@ -1529,6 +1522,7 @@ export const renderMonthlyStatementTab = () => {
     `;
 
     // Renderiza o conteúdo do mês selecionado inicialmente
+    // Nota: Mesmo que não haja "transacoes" (histórico), pode haver "pendentes", então chamamos a função.
     renderMonthlyStatementDetails(selectedMonth || currentMonth);
 };
 
