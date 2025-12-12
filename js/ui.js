@@ -3,12 +3,11 @@ import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, CHAR
 import { getState, getContaPorId, getContas, getCategorias, getTiposContas, isTipoCartao } from './state.js';
 import { calculateFinancialHealthMetrics, calculateAnnualTimeline, calculateCategoryGrid, calculateDailyEvolution } from './finance.js';
 
-// --- VARIÁVEIS GLOBAIS (Controle de Gráficos e Estado de UI) ---
+// --- VARIÁVEIS GLOBAIS ---
 let summaryChart = null;
 let dailyChart = null;
 let annualChart = null;
 let netWorthChart = null;
-let avgSpendingChart = null;
 let annualMixedChart = null;
 
 // Estados locais da UI
@@ -312,7 +311,7 @@ export const renderFormTransacaoRapida = () => {
 };
 
 // =========================================================================
-// === ABA: PLANEJAMENTO ANUAL ===
+// === ABA: PLANEJAMENTO ANUAL (GRÁFICO MISTO E TABELA) ===
 // =========================================================================
 
 export const renderAnnualPlanningTab = () => {
@@ -465,8 +464,6 @@ const renderMixedChart = () => {
     });
 };
 
-// ARQUIVO: js/ui.js (Apenas a função renderDetailedTable atualizada)
-
 const renderDetailedTable = () => {
     const container = document.getElementById('panel-table-view');
     if(!container) return;
@@ -494,7 +491,7 @@ const renderDetailedTable = () => {
                 ${v === 0 ? '<span class="text-muted opacity-25">-</span>' : formatarMoeda(v).replace('R$', '')}
             </td>`
         ).join('');
-        return `<tr><td class="fw-normal ps-3 bg-white" style="${styleStickyCol} font-size: 0.85rem;">${cat}</td>${cols}</tr>`;
+        return `<tr class="bg-white hover-row"><td class="fw-normal ps-3 bg-white" style="${styleStickyCol} font-size: 0.85rem;">${cat}</td>${cols}</tr>`;
     }).join('');
 
     const renderSumRow = (label, values, bgColor, textColor, isBold = false) => {
@@ -507,12 +504,29 @@ const renderDetailedTable = () => {
         return `<tr style="background-color: ${bgColor};"><td class="${weight} ps-3" style="${styleStickyCol} background-color: ${bgColor}; color: ${textColor}; font-size: 0.85rem;">${label}</td>${cols}</tr>`;
     };
 
+    // Montagem das Linhas
+    const rowsReceitasDetails = createRows(data.receitas);
+    const rowsDespesasDetails = createRows(data.despesas);
+
     // Linha de Saldo do Mês (Operacional)
     const arrSaldoMes = data.totalReceitas.map((rec, i) => rec - data.totalDespesas[i]);
-    const rowSaldoMes = renderSumRow('Saldo Operacional (Mês)', arrSaldoMes, '#f8f9fa', '#1f2937', true);
+    const colsSaldoMes = arrSaldoMes.map(v => {
+        const color = v >= 0 ? '#047857' : '#c53030'; // Verde ou Vermelho
+        return `<td class="text-end fw-bold px-2" style="color: ${color}; font-size: 0.85rem;">
+            ${formatarMoeda(v).replace('R$', '')}
+        </td>`;
+    }).join('');
+    
+    const rowSaldoMes = `
+        <tr style="background-color: #f8f9fa;">
+            <td class="fw-bold ps-3" style="${styleStickyCol} background-color: #f8f9fa; color: #1f2937; font-size: 0.85rem;">
+                Saldo do Mês (R - D)
+            </td>
+            ${colsSaldoMes}
+        </tr>`;
 
-    // Linha de Resgate (Nova)
-    // Mostra apenas se houver resgate (> 0)
+    // Linha de Resgate Automático (Nova)
+    // Mostra apenas se houver resgate (> 0) em algum mês
     const hasResgate = data.resgates.some(v => v > 0);
     let rowResgates = '';
     if (hasResgate) {
@@ -539,11 +553,11 @@ const renderDetailedTable = () => {
                 </thead>
                 <tbody>
                     <tr><td colspan="13" class="py-1 ps-3 fw-bold text-uppercase" style="background-color: #f0fdf4; color: ${textReceitas}; letter-spacing: 1px;">Receitas</td></tr>
-                    ${createRows(data.receitas)}
+                    ${rowsReceitasDetails}
                     ${renderSumRow('Total Entradas', data.totalReceitas, bgReceitasHeader, textReceitas, true)}
 
                     <tr><td colspan="13" class="py-1 ps-3 fw-bold text-uppercase border-top" style="background-color: #fff5f5; color: ${textDespesas}; letter-spacing: 1px;">Despesas</td></tr>
-                    ${createRows(data.despesas)}
+                    ${rowsDespesasDetails}
                     ${renderSumRow('Total Saídas', data.totalDespesas, bgDespesasHeader, textDespesas, true)}
 
                     ${rowSaldoMes}
@@ -559,129 +573,6 @@ const renderDetailedTable = () => {
         </div>
         <div class="mt-2 text-end text-muted fst-italic" style="font-size: 0.75rem;">
             * Se o saldo em conta faltar, o sistema simula retirada automática dos investimentos.
-        </div>
-    `;
-};
-    
-    const headerCols = meses.map(m => `
-        <th class="text-center py-2 text-secondary text-uppercase" 
-            style="min-width: 90px; background-color: ${bgHeader}; font-size: 0.75rem; letter-spacing: 0.5px;">
-            ${m}
-        </th>`).join('');
-
-    const createRows = (objData) => Object.keys(objData).sort().map(cat => {
-        const cols = objData[cat].map(v => 
-            `<td class="text-end border-light px-2" style="font-size: 0.85rem; color: #4a5568;">
-                ${v === 0 ? '<span class="text-muted opacity-25">-</span>' : formatarMoeda(v).replace('R$', '')}
-            </td>`
-        ).join('');
-        
-        return `
-            <tr class="bg-white hover-row">
-                <td class="fw-normal ps-3 bg-white" style="${styleStickyCol} font-size: 0.85rem; color: #2d3748;">
-                    ${cat}
-                </td>
-                ${cols}
-            </tr>`;
-    }).join('');
-
-    const renderSumRow = (label, values, bgColor, textColor, isBold = false) => {
-        const weight = isBold ? 'fw-bold' : 'fw-normal';
-        const cols = values.map(v => 
-            `<td class="text-end ${weight} px-2" style="color: ${textColor}; font-size: 0.85rem;">
-                ${formatarMoeda(v).replace('R$', '')}
-            </td>`
-        ).join('');
-        
-        return `
-            <tr style="background-color: ${bgColor};">
-                <td class="${weight} ps-3" style="${styleStickyCol} background-color: ${bgColor}; color: ${textColor}; font-size: 0.85rem;">
-                    ${label}
-                </td>
-                ${cols}
-            </tr>`;
-    };
-
-    // Montagem das Linhas
-    const rowsReceitasDetails = createRows(data.receitas);
-    const rowTotalEntradas = renderSumRow('Total Entradas', data.totalReceitas, bgReceitasHeader, textReceitas, true);
-    
-    const rowsDespesasDetails = createRows(data.despesas);
-    const rowTotalSaidas = renderSumRow('Total Saídas', data.totalDespesas, bgDespesasHeader, textDespesas, true);
-
-    // --- NOVA LINHA: SALDO DO MÊS (Receita - Despesa) COM FORMATAÇÃO CONDICIONAL ---
-    const arrSaldoMes = data.totalReceitas.map((rec, i) => rec - data.totalDespesas[i]);
-    const colsSaldoMes = arrSaldoMes.map(v => {
-        const color = v >= 0 ? '#047857' : '#c53030'; // Verde ou Vermelho
-        return `<td class="text-end fw-bold px-2" style="color: ${color}; font-size: 0.85rem;">
-            ${formatarMoeda(v).replace('R$', '')}
-        </td>`;
-    }).join('');
-
-    const rowSaldoMes = `
-        <tr style="background-color: #f8f9fa;">
-            <td class="fw-bold ps-3" style="${styleStickyCol} background-color: #f8f9fa; color: #1f2937; font-size: 0.85rem;">
-                Saldo do Mês (R - D)
-            </td>
-            ${colsSaldoMes}
-        </tr>`;
-    // -------------------------------------------------------------------------
-
-    // Bloco Resumo
-    const rowResumoReceitas = renderSumRow('Receitas', data.totalReceitas, '#fff', '#2d3748');
-    const rowResumoInvest = renderSumRow('Investimentos', data.saldosInvestimento, '#fff', '#2d3748');
-    const rowResumoSaldos = renderSumRow('Saldos de contas', data.saldosConta, '#fff', '#2d3748');
-    
-    const rowSaldoLiquido = renderSumRow('Saldo Líquido (Projetado)', data.saldoLiquido, bgSaldoLiquido, '#2b6cb0', true);
-
-    container.innerHTML = `
-        <div class="table-responsive border rounded" style="max-height: 600px; border-color: #e2e8f0;">
-            <table class="table table-sm mb-0" style="border-collapse: separate; border-spacing: 0;">
-                <thead style="${styleStickyHeader}">
-                    <tr>
-                        <th class="ps-3 text-secondary text-uppercase border-bottom" 
-                            style="${styleStickyCol} min-width: 180px; background-color: ${bgHeader}; z-index: 11; font-size: 0.75rem;">
-                            Categoria
-                        </th>
-                        ${headerCols}
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td colspan="13" class="py-1 ps-3 fw-bold text-uppercase" 
-                            style="background-color: #f0fdf4; color: ${textReceitas}; font-size: 0.75rem; letter-spacing: 1px;">
-                            Receitas
-                        </td>
-                    </tr>
-                    ${rowsReceitasDetails || '<tr><td colspan="13" class="text-center text-muted small py-2">Sem receitas lançadas</td></tr>'}
-                    ${rowTotalEntradas}
-
-                    <tr>
-                        <td colspan="13" class="py-1 ps-3 fw-bold text-uppercase border-top" 
-                            style="background-color: #fff5f5; color: ${textDespesas}; font-size: 0.75rem; letter-spacing: 1px;">
-                            Despesas
-                        </td>
-                    </tr>
-                    ${rowsDespesasDetails || '<tr><td colspan="13" class="text-center text-muted small py-2">Sem despesas lançadas</td></tr>'}
-                    ${rowTotalSaidas}
-
-                    ${rowSaldoMes}
-
-                    <tr>
-                        <td colspan="13" class="py-2 ps-3 fw-bold text-uppercase border-top border-2" 
-                            style="background-color: ${bgResumo}; color: #4a5568; font-size: 0.8rem; letter-spacing: 1px;">
-                            Resumo do Caixa
-                        </td>
-                    </tr>
-                    ${rowResumoReceitas}
-                    ${rowResumoInvest}
-                    ${rowResumoSaldos}
-                    ${rowSaldoLiquido}
-                </tbody>
-            </table>
-        </div>
-        <div class="mt-2 text-end text-muted fst-italic" style="font-size: 0.75rem;">
-            * Valores projetados com base no saldo inicial + histórico + lançamentos futuros.
         </div>
     `;
 };
@@ -1015,14 +906,13 @@ const renderSummaryPanel = (containerId, items, type) => {
         </div>`;
 };
 
-// --- HELPER PARA CARDS FLUTUANTES ---
-// GERA ID ÚNICO E ATRIBUI CORRETAMENTE
+// --- HELPER PARA CARDS FLUTUANTES (ID ÚNICO CORRIGIDO) ---
 const createCardHTML = (titulo, valor, data, categoria, contaNome, iconObj, type, actionsHTML, badgesHTML = '') => {
     const isDespesa = type === 'despesa' || type === 'a_pagar';
     const colorClass = isDespesa ? 'text-danger' : 'text-success';
     const symbol = isDespesa ? '-' : '+';
     
-    // GERA ID ÚNICO PARA ESTE CARD
+    // GERA ID ÚNICO PARA ESTE CARD E SEU BOTÃO CORRESPONDENTE
     const uniqueId = 'collapse-' + Math.random().toString(36).substr(2, 9);
     
     const dateObj = new Date(data + 'T12:00:00');
@@ -1773,4 +1663,3 @@ export const renderLogoutButton = () => {
         // const btn = document.createElement('button'); ...
     }
 };
-
