@@ -79,3 +79,53 @@ body { background-color: var(--bg-body); color: var(--text-main); font-family: '
 .popup-header { padding: 1rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
 .popup-body { padding: 1.5rem; max-height: 80vh; overflow-y: auto; }
 #toast-container { position: fixed; top: 20px; right: 20px; z-index: 1100; }
+/* =========================================
+   AJUSTES MOBILE (MENU DESLIZANTE)
+   ========================================= */
+
+@media (max-width: 991px) {
+    /* Container do Menu */
+    #mainTabs {
+        flex-wrap: nowrap !important; /* Impede que os itens quebrem linha */
+        overflow-x: auto !important; /* Ativa rolagem horizontal */
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch; /* Rolagem suave no iOS */
+        justify-content: flex-start !important; /* Alinha ao início */
+        padding-bottom: 5px; /* Espaço sutil */
+        
+        /* Esconde a barra de rolagem visualmente mas mantém a função */
+        scrollbar-width: none; /* Firefox */
+        -ms-overflow-style: none; /* IE/Edge */
+    }
+    
+    #mainTabs::-webkit-scrollbar {
+        display: none; /* Chrome/Safari */
+    }
+
+    /* Itens do Menu */
+    #mainTabs .nav-item {
+        flex: 0 0 auto; /* Impede que o botão encolha */
+        width: auto;
+    }
+
+    /* Botões */
+    #mainTabs .nav-link {
+        font-size: 0.85rem; /* Texto levemente menor */
+        padding: 0.6rem 1rem;
+        white-space: nowrap; /* Texto em uma linha só */
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    /* Ajuste para o botão "Lançar" não ficar gigante */
+    #launch-tab {
+        border: 1px solid var(--primary-color);
+    }
+
+    /* Remove espaçamentos laterais desnecessários do container principal no mobile */
+    .container {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+}
