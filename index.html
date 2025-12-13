@@ -153,6 +153,22 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <script type="module" src="js/main.js"></script>
-
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold">Tem certeza?</h5>
+      </div>
+      <div class="modal-body text-secondary" id="confirmModalBody">
+        Essa ação não pode ser desfeita.
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="confirmModalBtn">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
+
