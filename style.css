@@ -129,3 +129,13 @@ body { background-color: var(--bg-body); color: var(--text-main); font-family: '
         padding-right: 12px;
     }
 }
+/* ARQUIVO: style.css */
+button, .nav-link, .accordion-button {
+    touch-action: manipulation; /* Melhora a resposta ao toque */
+    -webkit-tap-highlight-color: transparent; /* Remove o quadrado azul padrão do Android */
+}
+
+button:active, .nav-link:active {
+    transform: scale(0.98); /* Leve efeito de "apertar" */
+    transition: transform 0.1s;
+}
