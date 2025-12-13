@@ -14,7 +14,8 @@
 </head>
 <body>
 
-    <div id="login-container"></div>
+    <div id="login-container">
+        </div>
 
     <div id="app-container" style="display: none; min-height: 100vh;">
         
@@ -25,9 +26,14 @@
                 </a>
                 
                 <div class="d-flex align-items-center gap-3">
+                    <button class="btn btn-link text-secondary p-0 border-0" id="btn-privacy-toggle" title="Ocultar/Exibir Valores">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    
                     <button class="btn btn-link text-secondary p-0 border-0" id="theme-switcher" title="Alternar Tema">
                         <i class="fas fa-moon"></i>
                     </button>
+                    
                     <button class="btn btn-outline-danger btn-sm rounded-pill px-3" id="btn-logout">
                         <i class="fas fa-sign-out-alt me-1"></i> Sair
                     </button>
@@ -78,7 +84,14 @@
             <div class="tab-content" id="mainTabsContent">
                 
                 <div class="tab-pane fade show active" id="overview-tab-pane" role="tabpanel" tabindex="0">
-                    <div id="dashboard-monthly-container"></div>
+                    <div id="dashboard-monthly-container">
+                        <div class="row g-3">
+                            <div class="col-4"><div class="skeleton-card"><div class="skeleton w-50 mb-2"></div><div class="skeleton w-75 h-50"></div></div></div>
+                            <div class="col-4"><div class="skeleton-card"><div class="skeleton w-50 mb-2"></div><div class="skeleton w-75 h-50"></div></div></div>
+                            <div class="col-4"><div class="skeleton-card"><div class="skeleton w-50 mb-2"></div><div class="skeleton w-75 h-50"></div></div></div>
+                        </div>
+                    </div>
+                    
                     <div id="dashboard-yearly-container" class="mt-4"></div>
                     
                     <div class="card shadow-sm border-0 mt-4">
@@ -103,8 +116,7 @@
                         </div>
                     </div>
                     
-                    <div id="accounts-container" class="row g-3">
-                        </div>
+                    <div id="accounts-container" class="row g-3"></div>
                 </div>
 
                 <div class="tab-pane fade" id="launch-tab-pane" role="tabpanel" tabindex="0">
@@ -126,15 +138,19 @@
                 <div class="tab-pane fade" id="bills-tab-pane" role="tabpanel" tabindex="0">
                     <div id="bills-filters-container"></div>
                     <div id="bills-summary-panel" class="mb-2"></div>
-                    <div id="bills-list-container">
-                        </div>
+                    <div id="bills-list-container"></div>
                 </div>
 
                 <div class="tab-pane fade" id="history-tab-pane" role="tabpanel" tabindex="0">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0 fw-bold text-secondary">Histórico</h5>
+                        <button class="btn btn-sm btn-outline-success shadow-sm" id="btn-export-csv">
+                            <i class="fas fa-file-csv me-1"></i> Exportar CSV
+                        </button>
+                    </div>
                     <div id="history-filters-container"></div>
                     <div id="history-summary-panel" class="mb-2"></div>
-                    <div id="history-list-container">
-                        </div>
+                    <div id="history-list-container"></div>
                 </div>
                 
                 <div class="tab-pane fade" id="planning-tab-pane" role="tabpanel" tabindex="0">
@@ -149,26 +165,27 @@
     <div id="modal-container"></div>
     <div id="toast-container"></div>
 
+    <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header border-0 pb-0">
+            <h5 class="modal-title fw-bold">Tem certeza?</h5>
+          </div>
+          <div class="modal-body text-secondary" id="confirmModalBody">
+            Essa ação não pode ser desfeita.
+          </div>
+          <div class="modal-footer border-0 pt-0">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-danger" id="confirmModalBtn">Confirmar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <script type="module" src="js/main.js"></script>
-<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header border-0 pb-0">
-        <h5 class="modal-title fw-bold">Tem certeza?</h5>
-      </div>
-      <div class="modal-body text-secondary" id="confirmModalBody">
-        Essa ação não pode ser desfeita.
-      </div>
-      <div class="modal-footer border-0 pt-0">
-        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn btn-danger" id="confirmModalBtn">Confirmar</button>
-      </div>
-    </div>
-  </div>
-</div>
+
 </body>
 </html>
-
