@@ -2,8 +2,8 @@
 
 // --- 1. CONFIGURAÇÃO E INICIALIZAÇÃO ---
 // Recuperei a URL dos seus logs, mas VERIFIQUE A CHAVE!
-const SUPABASE_URL = 'https://fjrpiikhbsvauzbdugtd.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqcnBpaWtoYnN2YXV6YmR1Z3RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwODUwNjcsImV4cCI6MjA2OTY2MTA2N30.htvLwyMRQcJhB4GgkromHejZ2f8aHPWxCCxA3mAQCcM'; // <--- OBRIGATÓRIO: Cole sua chave 'anon public' aqui
+export const SUPABASE_URL = 'https://fjrpiikhbsvauzbdugtd.supabase.co';
+export const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqcnBpaWtoYnN2YXV6YmR1Z3RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwODUwNjcsImV4cCI6MjA2OTY2MTA2N30.htvLwyMRQcJhB4GgkromHejZ2f8aHPWxCCxA3mAQCcM'; // <--- OBRIGATÓRIO: Cole sua chave 'anon public' aqui
 
 // Inicializa o cliente usando a biblioteca carregada no index.html
 if (!window.supabase) {
@@ -158,6 +158,7 @@ export const atualizarNomeCategoriaEmMassa = async (nomeAntigo, nomeNovo) => {
     await supabaseClient.from('compras_parceladas').update({ categoria: nomeNovo }).eq('categoria', nomeAntigo);
     return true;
 };
+
 
 
 
