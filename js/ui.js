@@ -1,22 +1,21 @@
 // ARQUIVO: js/ui.js
-import { formatarMoeda, CATEGORIAS_PADRAO, toISODateString, CATEGORY_ICONS, CHART_COLORS } from './utils.js';
+import { formatarMoeda, toISODateString, CATEGORY_ICONS, CHART_COLORS, escapeHTML } from './utils.js';
 import { getState, getContaPorId, getContas, getCategorias, getTiposContas, isTipoCartao } from './state.js';
 import { calculateFinancialHealthMetrics, calculateAnnualTimeline, calculateCategoryGrid, calculateDailyEvolution } from './finance.js';
 
-// --- VARIÁVEIS GLOBAIS (Controle de Gráficos e Estado de UI) ---
+// --- VARIÁVEIS GLOBAIS ---
 let summaryChart = null;
 let dailyChart = null;
 let annualChart = null;
 let netWorthChart = null;
 let annualMixedChart = null;
 
-// Estados locais da UI
 let currentPlanningYear = new Date().getFullYear();
 let currentDashboardMonth = new Date().toISOString().slice(0, 7);
 
 const ITEMS_PER_PAGE = 10;
 
-// --- HELPERS ---
+// --- HELPERS E CORE ---
 
 const getCategoriaOptionsHTML = (selecionada = null) => {
     const categorias = getCategorias();
@@ -24,7 +23,7 @@ const getCategoriaOptionsHTML = (selecionada = null) => {
         return '<option disabled>Nenhuma categoria cadastrada</option>';
     }
     return categorias.map(c => 
-        `<option value="${c.nome}" ${c.nome === selecionada ? 'selected' : ''}>${c.nome}</option>`
+        `<option value="${escapeHTML(c.nome)}" ${c.nome === selecionada ? 'selected' : ''}>${escapeHTML(c.nome)}</option>`
     ).join('');
 };
 
@@ -48,8 +47,6 @@ const gerarTransacoesVirtuais = () => {
         }).filter(Boolean);
 };
 
-// --- FUNÇÕES GERAIS DE UI ---
-
 export const showToast = (message, type = 'success') => {
     const container = document.getElementById('toast-container');
     if (!container) return;
@@ -69,6 +66,34 @@ export const setLoadingState = (button, isLoading, originalText = 'Salvar') => {
     button.innerHTML = isLoading 
         ? `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>` 
         : originalText;
+};
+
+// --- NOVO: MODAL DE CONFIRMAÇÃO (Substitui o window.confirm) ---
+export const showConfirmModal = (message, onConfirm) => {
+    const modalEl = document.getElementById('confirmModal');
+    // Fallback se o modal não existir no HTML
+    if(!modalEl) {
+        if(confirm(message)) onConfirm();
+        return;
+    }
+    
+    const bodyEl = document.getElementById('confirmModalBody');
+    const btnEl = document.getElementById('confirmModalBtn');
+    
+    bodyEl.textContent = message;
+    
+    // Clona o botão para limpar event listeners antigos e evitar duplicação de disparos
+    const newBtn = btnEl.cloneNode(true);
+    btnEl.parentNode.replaceChild(newBtn, btnEl);
+    
+    const bsModal = new bootstrap.Modal(modalEl);
+    
+    newBtn.addEventListener('click', () => {
+        onConfirm();
+        bsModal.hide();
+    });
+    
+    bsModal.show();
 };
 
 export const openModal = (content) => {
@@ -149,8 +174,8 @@ export const renderContas = () => {
                                 <i class="${iconClass}"></i>
                             </div>
                             <div>
-                                <h6 class="fw-bold mb-0 text-dark">${conta.nome}</h6>
-                                <small class="text-muted">${conta.tipo}</small>
+                                <h6 class="fw-bold mb-0 text-dark">${escapeHTML(conta.nome)}</h6>
+                                <small class="text-muted">${escapeHTML(conta.tipo)}</small>
                             </div>
                         </div>
                         
@@ -189,7 +214,7 @@ export const renderFormTransacaoRapida = () => {
     if (!container) return;
     
     const contas = getContas();
-    const contasOptions = contas.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+    const contasOptions = contas.map(c => `<option value="${c.id}">${escapeHTML(c.nome)}</option>`).join('');
     const categoriasOptions = getCategoriaOptionsHTML();
 
     container.innerHTML = `
@@ -491,7 +516,7 @@ const renderDetailedTable = () => {
                 ${v === 0 ? '<span class="text-muted opacity-25">-</span>' : formatarMoeda(v).replace('R$', '')}
             </td>`
         ).join('');
-        return `<tr class="bg-white hover-row"><td class="fw-normal ps-3 bg-white" style="${styleStickyCol} font-size: 0.85rem;">${cat}</td>${cols}</tr>`;
+        return `<tr class="bg-white hover-row"><td class="fw-normal ps-3 bg-white" style="${styleStickyCol} font-size: 0.85rem;">${escapeHTML(cat)}</td>${cols}</tr>`;
     }).join('');
 
     const renderSumRow = (label, values, bgColor, textColor, isBold = false) => {
@@ -504,33 +529,43 @@ const renderDetailedTable = () => {
         return `<tr style="background-color: ${bgColor};"><td class="${weight} ps-3" style="${styleStickyCol} background-color: ${bgColor}; color: ${textColor}; font-size: 0.85rem;">${label}</td>${cols}</tr>`;
     };
 
+    // Montagem das Linhas
     const rowsReceitasDetails = createRows(data.receitas);
     const rowsDespesasDetails = createRows(data.despesas);
 
     // Linha de Saldo do Mês (Operacional)
     const arrSaldoMes = data.totalReceitas.map((rec, i) => rec - data.totalDespesas[i]);
     const colsSaldoMes = arrSaldoMes.map(v => {
-        const color = v >= 0 ? '#047857' : '#c53030';
-        return `<td class="text-end fw-bold px-2" style="color: ${color}; font-size: 0.85rem;">${formatarMoeda(v).replace('R$', '')}</td>`;
+        const color = v >= 0 ? '#047857' : '#c53030'; // Verde ou Vermelho
+        return `<td class="text-end fw-bold px-2" style="color: ${color}; font-size: 0.85rem;">
+            ${formatarMoeda(v).replace('R$', '')}
+        </td>`;
     }).join('');
     
     const rowSaldoMes = `
         <tr style="background-color: #f8f9fa;">
-            <td class="fw-bold ps-3" style="${styleStickyCol} background-color: #f8f9fa; color: #1f2937; font-size: 0.85rem;">Saldo do Mês (R - D)</td>
+            <td class="fw-bold ps-3" style="${styleStickyCol} background-color: #f8f9fa; color: #1f2937; font-size: 0.85rem;">
+                Saldo do Mês (R - D)
+            </td>
             ${colsSaldoMes}
         </tr>`;
 
-    // Linha de Resgate Automático
+    // Linha de Resgate Automático (Nova)
+    // Mostra apenas se houver resgate (> 0) em algum mês
     const hasResgate = data.resgates.some(v => v > 0);
     let rowResgates = '';
     if (hasResgate) {
         const colsResgate = data.resgates.map(v => 
-            `<td class="text-end px-2 fw-bold" style="color: #c53030; font-size: 0.8rem;">${v > 0 ? `(- ${formatarMoeda(v).replace('R$', '')})` : '-'}</td>`
+            `<td class="text-end px-2 fw-bold" style="color: #c53030; font-size: 0.8rem;">
+                ${v > 0 ? `(- ${formatarMoeda(v).replace('R$', '')})` : '-'}
+            </td>`
         ).join('');
         
         rowResgates = `
             <tr style="background-color: #fff5f5;">
-                <td class="fw-bold ps-3 text-danger" style="${styleStickyCol} background-color: #fff5f5; font-size: 0.8rem;">⚠ Cobertura Automática</td>
+                <td class="fw-bold ps-3 text-danger" style="${styleStickyCol} background-color: #fff5f5; font-size: 0.8rem;">
+                    ⚠ Cobertura Automática
+                </td>
                 ${colsResgate}
             </tr>`;
     }
@@ -556,15 +591,19 @@ const renderDetailedTable = () => {
                     ${renderSumRow('Saldo Disponível (Conta)', data.saldosConta, '#fff', '#2d3748')}
                     ${rowResgates}
                     ${renderSumRow('Investimentos Restantes', data.saldosInvestimento, '#fff', '#2d3748')}
+                    
                     ${renderSumRow('Patrimônio Líquido Final', data.saldoLiquido, bgSaldoLiquido, '#2b6cb0', true)}
                 </tbody>
             </table>
         </div>
-        <div class="mt-2 text-end text-muted fst-italic" style="font-size: 0.75rem;">* Se o saldo em conta faltar, o sistema simula retirada automática dos investimentos.</div>`;
+        <div class="mt-2 text-end text-muted fst-italic" style="font-size: 0.75rem;">
+            * Se o saldo em conta faltar, o sistema simula retirada automática dos investimentos.
+        </div>
+    `;
 };
 
 // =========================================================================
-// === DASHBOARDS E GRÁFICOS (MENSAL/ANUAL/SAÚDE) ===
+// === DASHBOARDS E GRÁFICOS ===
 // =========================================================================
 
 export const renderVisaoMensal = () => {
@@ -584,7 +623,7 @@ export const renderVisaoMensal = () => {
                 <div class="card border-0 shadow-sm h-100 bg-success-subtle">
                     <div class="card-body py-3">
                         <small class="text-success-emphasis fw-bold text-uppercase">Receitas Previstas</small>
-                        <h3 class="mb-1 text-success fw-bold">${formatarMoeda(metrics.rendaPrevistaTotal)}</h3>
+                        <h3 class="mb-1 text-success fw-bold income-text">${formatarMoeda(metrics.rendaPrevistaTotal)}</h3>
                         <small style="font-size: 0.8rem" class="text-muted">Realizado: ${formatarMoeda(metrics.rendaRealizada)}</small>
                     </div>
                 </div>
@@ -593,7 +632,7 @@ export const renderVisaoMensal = () => {
                 <div class="card border-0 shadow-sm h-100 bg-danger-subtle">
                     <div class="card-body py-3">
                         <small class="text-danger-emphasis fw-bold text-uppercase">Despesas Previstas</small>
-                        <h3 class="mb-1 text-danger fw-bold">${formatarMoeda(metrics.despesaPrevistaTotal)}</h3>
+                        <h3 class="mb-1 text-danger fw-bold expense-text">${formatarMoeda(metrics.despesaPrevistaTotal)}</h3>
                         <small style="font-size: 0.8rem" class="text-muted">Realizado: ${formatarMoeda(metrics.despesaRealizada)}</small>
                     </div>
                 </div>
@@ -821,7 +860,7 @@ export const renderFilters = (type, currentFilters = {}) => {
 
     const contas = getContas();
     const accountOptions = contas.map(conta => 
-        `<option value="${conta.id}" ${currentFilters.contaId == conta.id ? 'selected' : ''}>${conta.nome}</option>`
+        `<option value="${conta.id}" ${currentFilters.contaId == conta.id ? 'selected' : ''}>${escapeHTML(conta.nome)}</option>`
     ).join('');
 
     const data = type === 'bills' ? getState().lancamentosFuturos : [...getState().transacoes, ...gerarTransacoesVirtuais()];
@@ -893,13 +932,14 @@ const renderSummaryPanel = (containerId, items, type) => {
         </div>`;
 };
 
-// --- HELPER PARA CARDS FLUTUANTES (COM ID ÚNICO CORRIGIDO) ---
+// --- HELPER PARA CARDS FLUTUANTES ---
+// GERA ID ÚNICO E ATRIBUI CORRETAMENTE
 const createCardHTML = (titulo, valor, data, categoria, contaNome, iconObj, type, actionsHTML, badgesHTML = '') => {
     const isDespesa = type === 'despesa' || type === 'a_pagar';
     const colorClass = isDespesa ? 'text-danger' : 'text-success';
     const symbol = isDespesa ? '-' : '+';
     
-    // GERA ID ÚNICO PARA ESTE CARD E SEU BOTÃO CORRESPONDENTE
+    // GERA ID ÚNICO PARA ESTE CARD
     const uniqueId = 'collapse-' + Math.random().toString(36).substr(2, 9);
     
     const dateObj = new Date(data + 'T12:00:00');
@@ -915,13 +955,13 @@ const createCardHTML = (titulo, valor, data, categoria, contaNome, iconObj, type
                     </div>
                     <div class="flex-grow-1" style="min-width: 0;">
                         <div class="d-flex align-items-center gap-2">
-                            <span class="fw-bold text-truncate text-dark" style="font-size:0.95rem;">${titulo}</span>
+                            <span class="fw-bold text-truncate text-dark" style="font-size:0.95rem;">${escapeHTML(titulo)}</span>
                             ${badgesHTML}
                         </div>
                         <div class="small text-muted d-flex align-items-center gap-2">
                             <span><i class="far fa-calendar me-1"></i>${dateStr}</span>
                             <span class="d-none d-sm-inline">•</span>
-                            <span class="d-none d-sm-inline text-truncate">${contaNome}</span>
+                            <span class="d-none d-sm-inline text-truncate">${escapeHTML(contaNome)}</span>
                         </div>
                     </div>
                     <span class="fw-bold fs-6 ${colorClass} ms-2 text-nowrap">${symbol} ${formatarMoeda(valor).replace('R$', '')}</span>
@@ -932,7 +972,7 @@ const createCardHTML = (titulo, valor, data, categoria, contaNome, iconObj, type
             <div class="accordion-body bg-light">
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <small class="text-muted">
-                        <strong>Categoria:</strong> ${categoria} <br>
+                        <strong>Categoria:</strong> ${escapeHTML(categoria)} <br>
                         <strong>Data Completa:</strong> ${dateObj.toLocaleDateString('pt-BR')}
                     </small>
                     <div class="btn-group btn-group-sm">
@@ -1061,14 +1101,14 @@ export const getAccountModalContent = (id = null) => {
     const tipos = getTiposContas();
     
     const options = tipos.map(t => 
-        `<option value="${t.nome}" data-is-card="${t.e_cartao}" ${conta.tipo === t.nome ? 'selected' : ''}>${t.nome}</option>`
+        `<option value="${t.nome}" data-is-card="${t.e_cartao}" ${conta.tipo === t.nome ? 'selected' : ''}>${escapeHTML(t.nome)}</option>`
     ).join('');
     
     const currentIsCard = conta.tipo ? isTipoCartao(conta.tipo) : (tipos[0] ? tipos[0].e_cartao : false);
 
     const body = `
         <form id="form-conta" data-id="${id || ''}">
-            <div class="mb-3"><label class="form-label">Nome da Conta</label><input name="nome" class="form-control" value="${conta.nome || ''}" required></div>
+            <div class="mb-3"><label class="form-label">Nome da Conta</label><input name="nome" class="form-control" value="${escapeHTML(conta.nome || '')}" required></div>
             <div class="mb-3">
                 <label class="form-label d-flex justify-content-between">
                     Tipo de Conta
@@ -1092,9 +1132,9 @@ export const getCategoriesModalContent = () => {
     const categorias = getCategorias();
     const listaHtml = categorias.map(c => `
         <li class="list-group-item d-flex justify-content-between align-items-center">
-            <span>${c.nome}</span>
+            <span>${escapeHTML(c.nome)}</span>
             <div class="btn-group">
-                <button class="btn btn-sm btn-outline-secondary" data-action="editar-categoria" data-id="${c.id}" data-nome="${c.nome}"><i class="fas fa-pen"></i></button>
+                <button class="btn btn-sm btn-outline-secondary" data-action="editar-categoria" data-id="${c.id}" data-nome="${escapeHTML(c.nome)}"><i class="fas fa-pen"></i></button>
                 <button class="btn btn-sm btn-outline-danger" data-action="deletar-categoria" data-id="${c.id}"><i class="fas fa-trash"></i></button>
             </div>
         </li>`).join('');
@@ -1117,8 +1157,8 @@ export const getEditCategoryModalContent = (id, nomeAtual) => {
         <div class="alert alert-warning small">
             <i class="fas fa-exclamation-triangle"></i> Alterar o nome atualizará todo o histórico.
         </div>
-        <form id="form-editar-categoria" data-id="${id}" data-nome-antigo="${nomeAtual}">
-            <div class="mb-3"><label class="form-label">Nome da Categoria</label><input type="text" name="nome" class="form-control" value="${nomeAtual}" required></div>
+        <form id="form-editar-categoria" data-id="${id}" data-nome-antigo="${escapeHTML(nomeAtual)}">
+            <div class="mb-3"><label class="form-label">Nome da Categoria</label><input type="text" name="nome" class="form-control" value="${escapeHTML(nomeAtual)}" required></div>
             <div class="text-end"><button type="submit" class="btn btn-primary">Salvar</button></div>
         </form>`;
     return { title: 'Editar Categoria', body };
@@ -1129,7 +1169,7 @@ export const getAccountTypesModalContent = () => {
     const listaHtml = tipos.map(t => `
         <li class="list-group-item d-flex justify-content-between align-items-center">
             <div>
-                <span>${t.nome}</span>
+                <span>${escapeHTML(t.nome)}</span>
                 ${t.e_cartao ? '<span class="badge bg-info text-dark ms-2" style="font-size:0.6rem">Cartão</span>' : ''}
             </div>
             <button class="btn btn-sm btn-outline-danger" data-action="deletar-tipo-conta" data-id="${t.id}"><i class="fas fa-trash"></i></button>
@@ -1171,7 +1211,7 @@ export const getBillModalContent = (id = null) => {
     const body = `
         <form id="form-lancamento" data-id="${id || ''}">
             ${warning}
-            <div class="mb-3"><label class="form-label">Descrição</label><input name="descricao" value="${bill.descricao || ''}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Descrição</label><input name="descricao" value="${escapeHTML(bill.descricao || '')}" class="form-control" required></div>
             <div class="mb-3"><label class="form-label">Valor</label><input name="valor" type="number" step="0.01" value="${bill.valor || ''}" class="form-control" required></div>
             <div class="mb-3"><label class="form-label">Data Vencimento</label><input name="data_vencimento" type="date" value="${bill.data_vencimento || toISODateString(new Date())}" class="form-control" required></div>
             <div class="mb-3"><label class="form-label">Categoria</label><select name="categoria" class="form-select">${categoriasOptions}</select></div>
@@ -1186,12 +1226,12 @@ export const getTransactionModalContent = (id) => {
     if (!transacao) return { title: 'Erro', body: '<p>Transação não encontrada.</p>' };
 
     const title = 'Editar Transação';
-    const contasOptions = getContas().map(c => `<option value="${c.id}" ${transacao.conta_id === c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
+    const contasOptions = getContas().map(c => `<option value="${c.id}" ${transacao.conta_id === c.id ? 'selected' : ''}>${escapeHTML(c.nome)}</option>`).join('');
     const categoriasOptions = getCategoriaOptionsHTML(transacao.categoria);
 
     const body = `
         <form id="form-edicao-transacao" data-id="${id}">
-            <div class="mb-3"><label class="form-label">Descrição</label><input name="descricao" value="${transacao.descricao}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Descrição</label><input name="descricao" value="${escapeHTML(transacao.descricao)}" class="form-control" required></div>
             <div class="mb-3"><label class="form-label">Valor</label><input name="valor" type="number" step="0.01" value="${transacao.valor}" class="form-control" required></div>
             <div class="mb-3"><label class="form-label">Data</label><input name="data" type="date" value="${transacao.data}" class="form-control" required></div>
             <div class="mb-3"><label class="form-label">Conta</label><select name="conta_id" class="form-select">${contasOptions}</select></div>
@@ -1208,7 +1248,7 @@ export const getInstallmentPurchaseModalContent = (compra) => {
     const conta = getContaPorId(compra.conta_id);
     const isCartao = conta && isTipoCartao(conta.tipo);
     const title = isCartao ? 'Reconfigurar Parcelamento' : 'Editar Série Recorrente';
-    const contasOptions = getContas().map(c => `<option value="${c.id}" ${compra.conta_id === c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
+    const contasOptions = getContas().map(c => `<option value="${c.id}" ${compra.conta_id === c.id ? 'selected' : ''}>${escapeHTML(c.nome)}</option>`).join('');
     const categoriasOptions = getCategoriaOptionsHTML(compra.categoria);
 
     let camposEspecificos = '';
@@ -1252,7 +1292,7 @@ export const getInstallmentPurchaseModalContent = (compra) => {
             O histórico de itens já pagos/recebidos será <strong>mantido</strong>.
         </div>
         <form id="form-compra-parcelada" data-compra-antiga-id="${compra.id}">
-            <div class="mb-3"><label class="form-label">Descrição da Série</label><input name="descricao" value="${compra.descricao}" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Descrição da Série</label><input name="descricao" value="${escapeHTML(compra.descricao)}" class="form-control" required></div>
             <div class="mb-3"><label class="form-label">Valor (Novo Padrão)</label><input name="valor_total" type="number" step="0.01" value="${(compra.valor_total / (compra.numero_parcelas || 1)).toFixed(2)}" class="form-control" required></div>
             
             ${camposEspecificos}
@@ -1279,11 +1319,11 @@ export const getPayBillModalContent = (billId) => {
     const btnText = isReceita ? 'Confirmar Recebimento' : 'Confirmar Pagamento';
 
     const body = `
-        <form id="form-pagamento" data-bill-id="${bill.id}" data-valor="${bill.valor}" data-desc="${bill.descricao}" data-cat="${bill.categoria || 'Contas'}">
-            <p>Você está ${textoAcao} <strong>${bill.descricao}</strong> no valor de:</p>
+        <form id="form-pagamento" data-bill-id="${bill.id}" data-valor="${bill.valor}" data-desc="${escapeHTML(bill.descricao)}" data-cat="${escapeHTML(bill.categoria || 'Contas')}">
+            <p>Você está ${textoAcao} <strong>${escapeHTML(bill.descricao)}</strong> no valor de:</p>
             <p class="h3 text-center my-3 ${isReceita ? 'income-text' : 'expense-text'}">${formatarMoeda(bill.valor)}</p>
             <div class="mb-3"><label class="form-label">Data da Transação</label><input type="date" name="data" value="${toISODateString(new Date())}" class="form-control"></div>
-            <div class="mb-3"><label class="form-label">Conta</label><select name="conta_id" class="form-select">${getContas().filter(c=>c.tipo!=='Cartão de Crédito').map(c=>`<option value="${c.id}">${c.nome}</option>`).join('')}</select></div>
+            <div class="mb-3"><label class="form-label">Conta</label><select name="conta_id" class="form-select">${getContas().filter(c=>c.tipo!=='Cartão de Crédito').map(c=>`<option value="${c.id}">${escapeHTML(c.nome)}</option>`).join('')}</select></div>
             <div class="text-end"><button type="submit" class="btn ${btnClass}">${btnText}</button></div>
         </form>`;
     return { title, body };
@@ -1293,7 +1333,7 @@ export const getStatementModalContent = (contaId) => {
     const conta = getContaPorId(contaId);
     if (!conta) return { title: 'Erro', body: 'Conta não encontrada.' };
 
-    const title = `Fatura - ${conta.nome}`;
+    const title = `Fatura - ${escapeHTML(conta.nome)}`;
     const { transacoes, lancamentosFuturos, comprasParceladas } = getState();
 
     const mesesDeTransacoes = transacoes
@@ -1384,7 +1424,7 @@ export const getAccountStatementModalContent = (contaId) => {
     const conta = getContaPorId(contaId);
     if (!conta) return { title: 'Erro', body: 'Conta não encontrada.' };
 
-    const title = `Extrato - ${conta.nome}`;
+    const title = `Extrato - ${escapeHTML(conta.nome)}`;
     const { transacoes } = getState();
 
     const mesesDisponiveis = [...new Set(
@@ -1643,10 +1683,5 @@ export const toggleAppView = (showApp) => {
 };
 
 export const renderLogoutButton = () => {
-    // Exemplo: injetar no header existente
-    const header = document.querySelector('.navbar .container .d-flex'); // Ajustado para o novo HTML
-    if(header && !document.getElementById('btn-logout')) {
-        // No novo HTML o botão já existe no HTML estático, mas se precisarmos reinjetar:
-        // const btn = document.createElement('button'); ...
-    }
+    // A função é mantida para compatibilidade, mas o botão já está no HTML estático
 };
