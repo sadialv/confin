@@ -1,44 +1,76 @@
-// js/utils.js
-export const CATEGORIAS_PADRAO = ['Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Lazer', 'Educação', 'Salário', 'Investimentos', 'Contas', 'Ajustes', 'Pagamento de Fatura', 'Compras', 'Outros'];
+// ARQUIVO: js/utils.js
 
-// PALETA DE ÍCONES ATUALIZADA PARA COMBINAR COM O TEMA NORDIC
-export const CATEGORY_ICONS = {
-    'Alimentação': { icon: 'fas fa-utensils', color: '#D08770' }, // Laranja
-    'Transporte': { icon: 'fas fa-car', color: '#8FBCBB' }, // Turquesa
-    'Moradia': { icon: 'fas fa-home', color: '#A3BE8C' }, // Verde
-    'Saúde': { icon: 'fas fa-heartbeat', color: '#BF616A' }, // Vermelho
-    'Lazer': { icon: 'fas fa-film', color: '#B48EAD' }, // Roxo
-    'Educação': { icon: 'fas fa-graduation-cap', color: '#88C0D0' }, // Azul Gelo
-    'Salário': { icon: 'fas fa-dollar-sign', color: '#A3BE8C' },
-    'Investimentos': { icon: 'fas fa-chart-line', color: '#81A1C1' }, // Azul
-    'Contas': { icon: 'fas fa-file-invoice-dollar', color: '#EBCB8B' }, // Amarelo
-    'Ajustes': { icon: 'fas fa-sliders-h', color: '#D8DEE9' }, // Cinza
-    'Pagamento de Fatura': { icon: 'fas fa-credit-card', color: '#88C0D0' },
-    'Compras': { icon: 'fas fa-shopping-bag', color: '#D08770' },
-    'Outros': { icon: 'fas fa-question-circle', color: '#4C566A' } 
+export const formatarMoeda = (valor) => {
+    return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+    }).format(valor);
 };
 
-// NOVA PALETA DE CORES PARA OS GRÁFICOS (NORDIC)
-export const CHART_COLORS = [
-    '#BF616A', // Vermelho
-    '#D08770', // Laranja
-    '#EBCB8B', // Amarelo
-    '#A3BE8C', // Verde
-    '#8FBCBB', // Turquesa
-    '#88C0D0', // Azul Gelo
-    '#81A1C1', // Azul
-    '#B48EAD', // Roxo
-    '#4C566A', // Cinza
+export const toISODateString = (date) => {
+    const offset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - offset).toISOString().split('T')[0];
+};
+
+// --- NOVO: SEGURANÇA (Prevenção de XSS) ---
+export const escapeHTML = (str) => {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+};
+
+// --- NOVO: EXPORTAR CSV ---
+export const exportToCSV = (data, filename) => {
+    if (!data || !data.length) {
+        alert("Não há dados para exportar.");
+        return;
+    }
+    
+    // Pega os cabeçalhos
+    const headers = Object.keys(data[0]).join(',');
+    
+    // Converte as linhas
+    const rows = data.map(obj => 
+        Object.values(obj).map(val => 
+            `"${String(val).replace(/"/g, '""')}"` 
+        ).join(',')
+    ).join('\n');
+    
+    const csvContent = headers + '\n' + rows;
+    
+    // Download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${filename}.csv`);
+    link.click();
+};
+
+export const CATEGORIAS_PADRAO = [
+    'Alimentação', 'Moradia', 'Transporte', 'Saúde', 'Educação', 
+    'Lazer', 'Contas', 'Salário', 'Investimentos', 'Outros'
 ];
 
-export const formatarMoeda = (valor) => (valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-export const toISODateString = (date) => new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
-
-export const HOJE = new Date();
-HOJE.setHours(0, 0, 0, 0);
-
-export const applyTheme = (theme) => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('confin-theme', theme);
+export const CATEGORY_ICONS = {
+    'Alimentação': { icon: 'fas fa-utensils', color: '#ff6b6b' },
+    'Moradia': { icon: 'fas fa-home', color: '#4ecdc4' },
+    'Transporte': { icon: 'fas fa-bus', color: '#45b7d1' },
+    'Saúde': { icon: 'fas fa-heartbeat', color: '#ff9f43' },
+    'Educação': { icon: 'fas fa-graduation-cap', color: '#a55eea' },
+    'Lazer': { icon: 'fas fa-gamepad', color: '#2bcbba' },
+    'Contas': { icon: 'fas fa-file-invoice-dollar', color: '#778ca3' },
+    'Salário': { icon: 'fas fa-money-bill-wave', color: '#20bf6b' },
+    'Investimentos': { icon: 'fas fa-chart-line', color: '#2d98da' },
+    'Outros': { icon: 'fas fa-tag', color: '#a5b1c2' }
 };
+
+export const CHART_COLORS = [
+    '#4ecdc4', '#ff6b6b', '#45b7d1', '#ff9f43', '#a55eea', 
+    '#2bcbba', '#778ca3', '#20bf6b', '#2d98da', '#fc5c65', 
+    '#fed330', '#eb3b5a', '#fa8231', '#0fb9b1', '#4b7bec'
+];
