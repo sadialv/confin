@@ -1,11 +1,18 @@
 // ARQUIVO: js/main.js
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+// 1. NÃO IMPORTE O CREATECLIENT VIA URL (Isso causava o erro wrapper.mjs)
+// Em vez disso, usamos o objeto global 'window.supabase' injetado pelo index.html
+
 import { SUPABASE_URL, SUPABASE_KEY } from './api.js';
 import * as State from './state.js';
 import * as UI from './ui.js';
-import { toISODateString, exportToCSV } from './utils.js';
+import { toISODateString, exportToCSV, applyTheme } from './utils.js';
 
-// --- INICIALIZAÇÃO DO SUPABASE ---
+// --- CORREÇÃO DO ERRO ---
+// Pegamos a função de criação do objeto global do navegador
+const { createClient } = window.supabase;
+
+// Inicializa Supabase
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // --- ESTADO LOCAL (FILTROS) ---
@@ -19,6 +26,10 @@ let activeFilters = {
 // =========================================================================
 
 const initApp = async () => {
+    // Aplica o tema salvo (Dark/Light)
+    const savedTheme = localStorage.getItem('confin_theme') || 'light';
+    applyTheme(savedTheme);
+
     // Verifica se usuário está logado
     const { data: { session } } = await supabase.auth.getSession();
     
@@ -103,11 +114,9 @@ const setupEventListeners = () => {
     // Alternar Tema (Dark/Light)
     document.getElementById('theme-switcher')?.addEventListener('click', () => {
         const html = document.documentElement;
-        const currentTheme = html.getAttribute('data-theme');
+        const currentTheme = html.getAttribute('data-theme') || 'light';
         const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-        html.setAttribute('data-theme', newTheme);
-        const icon = document.querySelector('#theme-switcher i');
-        icon.className = newTheme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
+        applyTheme(newTheme);
     });
 
     // Modo Privacidade (Blur nos valores)
