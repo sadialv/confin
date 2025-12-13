@@ -1,88 +1,291 @@
-/* ARQUIVO: style.css */
-:root {
-    --primary-color: #4A5568; 
-    --bg-body: #f3f4f6;
-    --card-bg: #ffffff;
-    --text-main: #1f2937;
-    --text-sec: #6b7280;
-    --border-color: #e5e7eb;
-    --success: #10b981;
-    --danger: #ef4444;
-}
-
-[data-theme="dark"] {
-    --bg-body: #111827;
-    --card-bg: #1f2937;
-    --text-main: #f9fafb;
-    --text-sec: #9ca3af;
-    --border-color: #374151;
-}
-
-body { background-color: var(--bg-body); color: var(--text-main); font-family: 'Segoe UI', system-ui, sans-serif; }
-.card { background-color: var(--card-bg); border: 1px solid var(--border-color); }
-
-/* --- TABS --- */
-.nav-pills .nav-link { color: var(--text-sec); border-radius: 8px; transition: all 0.2s; }
-.nav-pills .nav-link.active { background-color: var(--primary-color); color: white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-
-/* --- CARTÕES FLUTUANTES (A SOLUÇÃO DO VISUAL) --- */
-/* Isso força o espaçamento entre os itens da lista */
-#bills-list-container .accordion-item,
-#history-list-container .accordion-item {
-    margin-bottom: 12px !important; 
-    border: 1px solid var(--border-color) !important;
-    border-radius: 12px !important;
-    overflow: hidden;
-    background-color: var(--card-bg);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-
-.accordion-button {
-    background-color: var(--card-bg) !important;
-    padding: 1rem;
-    box-shadow: none !important; /* Remove glow azul padrão */
-    color: var(--text-main);
-}
-.accordion-button:not(.collapsed) {
-    background-color: var(--bg-body) !important; /* Cor levemente diferente ao abrir */
-}
-.accordion-body { border-top: 1px solid var(--border-color); }
-
-/* Ícone */
-.transaction-icon-wrapper {
-    width: 40px; height: 40px;
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    color: white; font-size: 1.1rem;
-    margin-right: 12px;
-}
-
-/* Tipografia */
-.income-text { color: var(--success) !important; }
-.expense-text { color: var(--danger) !important; }
-.text-body-secondary { color: var(--text-sec) !important; }
-
-/* Dashboard Strip */
-.summary-panel-modern {
-    display: flex; gap: 1rem; flex-wrap: wrap; justify-content: space-around;
-    background: var(--card-bg); padding: 1rem; border-radius: 12px;
-    border: 1px solid var(--border-color); margin-bottom: 1.5rem;
-}
-.stat-item { text-align: center; }
-.stat-label { font-size: 0.7rem; text-transform: uppercase; color: var(--text-sec); font-weight: bold; }
-.stat-value { font-size: 1.2rem; font-weight: bold; }
-
-/* Modais e Toasts */
-#modal-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1050; display: none; align-items: center; justify-content: center; }
-#modal-container.active { display: flex; }
-.popup-dialog { background: var(--card-bg); width: 90%; max-width: 500px; border-radius: 12px; padding: 0; overflow: hidden; }
-.popup-header { padding: 1rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
-.popup-body { padding: 1.5rem; max-height: 80vh; overflow-y: auto; }
-#toast-container { position: fixed; top: 20px; right: 20px; z-index: 1100; }
 /* =========================================
-   AJUSTES MOBILE (MENU DESLIZANTE)
+   1. VARIÁVEIS E RESET BÁSICO
+   ========================================= */
+:root {
+    --primary-color: #0d6efd;
+    --secondary-color: #6c757d;
+    --success-color: #198754;
+    --danger-color: #dc3545;
+    --background-color: #f8f9fa;
+    --card-border-radius: 12px;
+    --transition-speed: 0.2s;
+}
+
+body {
+    background-color: var(--background-color);
+    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    color: #333;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* =========================================
+   2. UTILITÁRIOS DE TEXTO E CORES
+   ========================================= */
+.income-text {
+    color: var(--success-color) !important;
+    font-weight: 700;
+}
+
+.expense-text {
+    color: var(--danger-color) !important;
+    font-weight: 700;
+}
+
+.text-primary-emphasis {
+    color: #052c65 !important;
+}
+
+/* =========================================
+   3. COMPONENTES DE UI (CARDS, BOTÕES)
    ========================================= */
 
+/* Cards Gerais */
+.card {
+    border-radius: var(--card-border-radius);
+    border: none;
+    transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+}
+
+.card:hover {
+    /* Leve elevação ao passar o mouse (apenas desktop) */
+    @media (min-width: 992px) {
+        transform: translateY(-2px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    }
+}
+
+/* Sombras Suaves */
+.shadow-sm {
+    box-shadow: 0 .125rem .25rem rgba(0,0,0,.075)!important;
+}
+
+.shadow-lg {
+    box-shadow: 0 1rem 3rem rgba(0,0,0,.175)!important;
+}
+
+/* Botões Arredondados */
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+    /* Melhora a resposta ao toque no mobile */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent; 
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+.btn-rounded {
+    border-radius: 50px;
+}
+
+/* Inputs (Prevenção de Zoom no Mobile) */
+input, select, textarea {
+    font-size: 16px !important; 
+}
+
+/* =========================================
+   4. ELEMENTOS ESPECÍFICOS (LISTAS, ÍCONES)
+   ========================================= */
+
+/* Ícone de Categoria nos Cards */
+.transaction-icon-wrapper {
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* Tabela de Planejamento */
+.hover-row:hover {
+    background-color: #f1f3f5 !important;
+}
+
+.table td, .table th {
+    vertical-align: middle;
+}
+
+/* Painel de Resumo Moderno (Bills/History) */
+.summary-panel-modern {
+    display: flex;
+    justify-content: space-between;
+    background: white;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    margin-bottom: 20px;
+    border: 1px solid #dee2e6;
+}
+
+.stat-item {
+    text-align: center;
+    flex: 1;
+    border-right: 1px solid #eee;
+}
+
+.stat-item:last-child {
+    border-right: none;
+}
+
+.stat-label {
+    display: block;
+    font-size: 0.75rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.stat-value {
+    display: block;
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #212529;
+}
+
+/* Accordion (Transações) */
+.accordion-button {
+    border-radius: 12px !important;
+    background-color: white;
+    box-shadow: none !important; /* Remove o anel azul padrão do focus */
+}
+
+.accordion-button:not(.collapsed) {
+    background-color: #f8f9fa;
+    color: inherit;
+    box-shadow: none;
+}
+
+.accordion-item {
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+/* =========================================
+   5. MODO PRIVACIDADE (BLUR)
+   ========================================= */
+body.privacy-mode .income-text,
+body.privacy-mode .expense-text,
+body.privacy-mode .text-success,
+body.privacy-mode .text-danger,
+body.privacy-mode .text-primary,
+body.privacy-mode h3, 
+body.privacy-mode h4,
+body.privacy-mode .accordion-button span.fw-bold.fs-6,
+body.privacy-mode td.text-end,
+body.privacy-mode .stat-value {
+    filter: blur(6px);
+    user-select: none; /* Impede selecionar o texto borrado */
+    transition: filter 0.3s ease;
+}
+
+/* =========================================
+   6. SKELETON LOADING (ANIMAÇÃO DE CARREGAMENTO)
+   ========================================= */
+.skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+    border-radius: 4px;
+    height: 20px;
+    width: 100%;
+    display: inline-block;
+    opacity: 0.7;
+}
+
+.skeleton-card {
+    border: none;
+    box-shadow: 0 .125rem .25rem rgba(0,0,0,.075);
+    background: #fff;
+    border-radius: var(--card-border-radius);
+    padding: 1rem;
+    height: 100%;
+    min-height: 120px;
+}
+
+@keyframes loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* =========================================
+   7. MODAIS E POPUPS
+   ========================================= */
+.popup-dialog {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 0;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    border-radius: 16px;
+    z-index: 2000;
+    width: 90%;
+    max-width: 500px;
+    display: none; /* Controlado via JS */
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+#modal-container.active .popup-dialog {
+    display: block;
+    animation: fadeInModal 0.3s ease-out;
+}
+
+#modal-container.active {
+    position: fixed;
+    top: 0; 
+    left: 0;
+    width: 100%; 
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1999;
+    backdrop-filter: blur(2px);
+}
+
+.popup-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.popup-body {
+    padding: 20px;
+}
+
+@keyframes fadeInModal {
+    from { opacity: 0; transform: translate(-50%, -45%); }
+    to { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+/* Toast Notification */
+#toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+}
+
+.toast {
+    background: white;
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    margin-bottom: 10px;
+    border-left: 5px solid var(--primary-color);
+    font-weight: 500;
+    min-width: 250px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.toast.show { opacity: 1; }
+.toast.success { border-left-color: var(--success-color); }
+.toast.error { border-left-color: var(--danger-color); }
+
+/* =========================================
+   8. AJUSTES MOBILE (MENU DESLIZANTE)
+   ========================================= */
 @media (max-width: 991px) {
     /* Container do Menu */
     #mainTabs {
@@ -108,34 +311,42 @@ body { background-color: var(--bg-body); color: var(--text-main); font-family: '
         width: auto;
     }
 
-    /* Botões */
+    /* Botões do Menu */
     #mainTabs .nav-link {
-        font-size: 0.85rem; /* Texto levemente menor */
+        font-size: 0.85rem; 
         padding: 0.6rem 1rem;
-        white-space: nowrap; /* Texto em uma linha só */
+        white-space: nowrap; 
         display: flex;
         align-items: center;
         gap: 6px;
     }
 
-    /* Ajuste para o botão "Lançar" não ficar gigante */
+    /* Ajuste visual do botão Lançar no mobile */
     #launch-tab {
         border: 1px solid var(--primary-color);
     }
 
-    /* Remove espaçamentos laterais desnecessários do container principal no mobile */
+    /* Ajuste de espaçamento lateral no container */
     .container {
-        padding-left: 12px;
-        padding-right: 12px;
+        padding-left: 15px;
+        padding-right: 15px;
     }
-}
-/* ARQUIVO: style.css */
-button, .nav-link, .accordion-button {
-    touch-action: manipulation; /* Melhora a resposta ao toque */
-    -webkit-tap-highlight-color: transparent; /* Remove o quadrado azul padrão do Android */
-}
-
-button:active, .nav-link:active {
-    transform: scale(0.98); /* Leve efeito de "apertar" */
-    transition: transform 0.1s;
+    
+    /* Sumário Responsivo */
+    .summary-panel-modern {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .stat-item {
+        border-right: none;
+        min-width: 45%; /* 2 itens por linha */
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+    }
+    
+    .stat-item:nth-last-child(-n+2) {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
 }
