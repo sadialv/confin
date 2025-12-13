@@ -12,7 +12,6 @@ export const toISODateString = (date) => {
     return new Date(date.getTime() - offset).toISOString().split('T')[0];
 };
 
-// --- NOVO: SEGURANÇA (Prevenção de XSS) ---
 export const escapeHTML = (str) => {
     if (!str) return '';
     return String(str)
@@ -23,17 +22,12 @@ export const escapeHTML = (str) => {
         .replace(/'/g, '&#039;');
 };
 
-// --- NOVO: EXPORTAR CSV ---
 export const exportToCSV = (data, filename) => {
     if (!data || !data.length) {
         alert("Não há dados para exportar.");
         return;
     }
-    
-    // Pega os cabeçalhos
     const headers = Object.keys(data[0]).join(',');
-    
-    // Converte as linhas
     const rows = data.map(obj => 
         Object.values(obj).map(val => 
             `"${String(val).replace(/"/g, '""')}"` 
@@ -41,14 +35,29 @@ export const exportToCSV = (data, filename) => {
     ).join('\n');
     
     const csvContent = headers + '\n' + rows;
-    
-    // Download
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
     link.setAttribute('download', `${filename}.csv`);
     link.click();
+};
+
+// --- NOVA FUNÇÃO: Gerenciar Tema (Correção do Erro) ---
+export const applyTheme = (theme) => {
+    const html = document.documentElement;
+    
+    // Define o atributo no HTML
+    html.setAttribute('data-theme', theme);
+    
+    // Atualiza o ícone do botão
+    const icon = document.querySelector('#theme-switcher i');
+    if (icon) {
+        icon.className = theme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
+    }
+    
+    // Salva no navegador para não perder ao atualizar a página
+    localStorage.setItem('confin_theme', theme);
 };
 
 export const CATEGORIAS_PADRAO = [
