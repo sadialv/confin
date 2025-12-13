@@ -109,20 +109,25 @@ export const calculateDailyEvolution = (state, mesISO) => {
 };
 
 // 3. Timeline Anual (AQUI ESTAVA O PROBLEMA - RESTAURADO)
+// ARQUIVO: js/finance.js (Substitua apenas a função calculateAnnualTimeline)
+
 export const calculateAnnualTimeline = (state, anoSelecionado) => {
     const { contas, transacoes, lancamentosFuturos, comprasParceladas } = state;
     const ano = anoSelecionado || new Date().getFullYear();
     const meses = Array.from({ length: 12 }, (_, i) => i); 
-    const idsCartao = contas.filter(c => isTipoCartao(c.tipo)).map(c => c.id);
-
-    // Saldo Inicial do Ano
-    let saldoAcumulado = contas.filter(c => !isTipoCartao(c.tipo)).reduce((acc, c) => acc + toNum(c.saldo_inicial), 0);
+    
+    // Identifica Contas
+    const idsInvest = contas.filter(c => isContaInvestimento(c.tipo)).map(c => c.id);
+    // Nota: Na lógica de Fluxo Real, consideramos o saldo inicial apenas do que é LIQUIDEZ (Caixa + Investimentos)
+    // Ignoramos o "saldo inicial" de cartões de crédito pois é dívida, não dinheiro disponível.
+    let saldoAcumulado = contas.filter(c => !isTipoCartao(c.tipo)).reduce((acc, c) => acc + (parseFloat(c.saldo_inicial)||0), 0);
+    
     const dataCorte = `${ano}-01-01`;
     
-    // Ajuste histórico
+    // Processa histórico anterior (Lógica unificada: Tudo impacta o saldo, exceto transferências internas se houvesse)
+    // Se saiu dinheiro (seja no débito ou crédito), no Fluxo Real, consideramos que saiu do seu patrimônio.
     const deltaRealizado = transacoes.filter(t => t.data < dataCorte).reduce((acc, t) => {
-        if (idsCartao.includes(t.conta_id)) return acc; 
-        return t.tipo === 'receita' ? acc + toNum(t.valor) : acc - toNum(t.valor);
+        return t.tipo === 'receita' ? acc + (parseFloat(t.valor)||0) : acc - (parseFloat(t.valor)||0);
     }, 0);
     
     saldoAcumulado += deltaRealizado;
@@ -130,15 +135,18 @@ export const calculateAnnualTimeline = (state, anoSelecionado) => {
     return meses.map(mesIndex => {
         const mesStr = `${ano}-${String(mesIndex + 1).padStart(2, '0')}`;
         
-        const rec = transacoes.filter(t => t.data.startsWith(mesStr) && t.tipo === 'receita').reduce((s,t)=>s+toNum(t.valor),0) + 
-                    lancamentosFuturos.filter(l => l.data_vencimento.startsWith(mesStr) && l.tipo === 'a_receber' && l.status === 'pendente').reduce((s,l)=>s+toNum(l.valor),0);
+        // Receitas (Real + Previsto)
+        const rec = transacoes.filter(t => t.data.startsWith(mesStr) && t.tipo === 'receita')
+            .reduce((s,t)=>s+(parseFloat(t.valor)||0),0) + 
+                    lancamentosFuturos.filter(l => l.data_vencimento.startsWith(mesStr) && l.tipo === 'a_receber' && l.status === 'pendente')
+            .reduce((s,l)=>s+(parseFloat(l.valor)||0),0);
         
-        const desp = transacoes.filter(t => t.data.startsWith(mesStr) && t.tipo === 'despesa' && !idsCartao.includes(t.conta_id)).reduce((s,t)=>s+toNum(t.valor),0) +
-                     lancamentosFuturos.filter(l => l.data_vencimento.startsWith(mesStr) && l.tipo === 'a_pagar' && l.status === 'pendente').reduce((s, l) => {
-                        const compraPai = l.compra_parcelada_id ? comprasParceladas.find(c => c.id === l.compra_parcelada_id) : null;
-                        if ((compraPai && idsCartao.includes(compraPai.conta_id)) || (l.conta_id && idsCartao.includes(l.conta_id))) return s;
-                        return s + toNum(l.valor);
-                     }, 0);
+        // Despesas (Real + Previsto) 
+        // REMOVIDO O FILTRO !idsCartao.includes para alinhar com a tabela "Fluxo Real"
+        const desp = transacoes.filter(t => t.data.startsWith(mesStr) && t.tipo === 'despesa')
+            .reduce((s,t)=>s+(parseFloat(t.valor)||0),0) +
+                     lancamentosFuturos.filter(l => l.data_vencimento.startsWith(mesStr) && l.tipo === 'a_pagar' && l.status === 'pendente')
+            .reduce((s, l) => s + (parseFloat(l.valor)||0), 0);
         
         const saldo = rec - desp;
         saldoAcumulado += saldo;
