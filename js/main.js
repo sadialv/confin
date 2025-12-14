@@ -1,18 +1,12 @@
 // ARQUIVO: js/main.js
-
-// 1. NÃO IMPORTE O CREATECLIENT VIA URL (Isso causava o erro wrapper.mjs)
-// Em vez disso, usamos o objeto global 'window.supabase' injetado pelo index.html
-
 import { SUPABASE_URL, SUPABASE_KEY } from './api.js';
 import * as State from './state.js';
 import * as UI from './ui.js';
 import { toISODateString, exportToCSV, applyTheme } from './utils.js';
 
-// --- CORREÇÃO DO ERRO ---
-// Pegamos a função de criação do objeto global do navegador
+// --- INICIALIZAÇÃO DO SUPABASE ---
+// Usa o objeto global injetado pelo script no HTML para evitar erros de módulo
 const { createClient } = window.supabase;
-
-// Inicializa Supabase
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // --- ESTADO LOCAL (FILTROS) ---
@@ -26,11 +20,11 @@ let activeFilters = {
 // =========================================================================
 
 const initApp = async () => {
-    // Aplica o tema salvo (Dark/Light)
+    // 1. Aplica o tema salvo (Dark/Light)
     const savedTheme = localStorage.getItem('confin_theme') || 'light';
     applyTheme(savedTheme);
 
-    // Verifica se usuário está logado
+    // 2. Verifica se usuário está logado
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
@@ -278,8 +272,11 @@ const setupEventListeners = () => {
                 await processarLancamentoUnificado(data);
                 form.reset(); 
                 // Esconde campos condicionais
-                document.getElementById('parcelada-fields').style.display = 'none';
-                document.getElementById('recorrente-fields').style.display = 'none';
+                const divParcelada = document.getElementById('parcelada-fields');
+                const divRecorrente = document.getElementById('recorrente-fields');
+                if (divParcelada) divParcelada.style.display = 'none';
+                if (divRecorrente) divRecorrente.style.display = 'none';
+                
                 UI.showToast('Lançamento realizado com sucesso!');
             }
             
@@ -410,7 +407,7 @@ const processarLancamentoUnificado = async (data) => {
     
     // CASO 1: Transação Simples (À Vista)
     if (data.tipo_compra === 'vista') {
-        await supabase.from('transacoes').insert([{
+        const { error } = await supabase.from('transacoes').insert([{
             descricao: data.descricao,
             valor: valor,
             data: data.data,
@@ -418,6 +415,8 @@ const processarLancamentoUnificado = async (data) => {
             categoria: data.categoria,
             tipo: data.tipo
         }]);
+        
+        if (error) throw error;
         await loadData();
         return;
     }
@@ -428,7 +427,14 @@ const processarLancamentoUnificado = async (data) => {
     const { data: compra, error } = await supabase.from('compras_parceladas').insert([{
         descricao: data.descricao + (data.tipo_compra==='recorrente' ? ' (Série)' : ''),
         valor_total: data.tipo_compra === 'parcelada' ? valor : 0,
-        numero_parcelas: data.tipo_compra === 'parcelada' ? parseInt(data.numero_parcelas) : null,
+        
+        // CORREÇÃO CRÍTICA DO ERRO "NOT NULL":
+        // Se for Recorrente, usamos a quantidade (duração) no campo numero_parcelas
+        // para satisfazer a regra do banco de dados.
+        numero_parcelas: data.tipo_compra === 'parcelada' 
+            ? parseInt(data.numero_parcelas) 
+            : parseInt(data.quantidade),
+            
         conta_id: data.conta_id,
         categoria: data.categoria,
         data_compra: data.data
@@ -452,9 +458,14 @@ const processarLancamentoUnificado = async (data) => {
             if (data.frequencia === 'diaria') vencimento.setDate(vencimento.getDate() + i);
             else if (data.frequencia === 'quinzenal') vencimento.setDate(vencimento.getDate() + (i * 15));
             else if (data.frequencia === 'anual') vencimento.setFullYear(vencimento.getFullYear() + i);
-            else { // mensal
+            else { // mensal (padrão)
                 vencimento.setMonth(vencimento.getMonth() + i);
-                if(data.dia_vencimento) vencimento.setDate(parseInt(data.dia_vencimento));
+                // Ajusta o dia se o usuário escolheu um dia específico de vencimento
+                if(data.dia_vencimento) {
+                    const diaAlvo = parseInt(data.dia_vencimento);
+                    const ultimoDiaMes = new Date(vencimento.getFullYear(), vencimento.getMonth() + 1, 0).getDate();
+                    vencimento.setDate(Math.min(diaAlvo, ultimoDiaMes));
+                }
             }
         }
 
@@ -471,7 +482,9 @@ const processarLancamentoUnificado = async (data) => {
         });
     }
 
-    await supabase.from('lancamentos_futuros').insert(lancamentos);
+    const { error: errFilhos } = await supabase.from('lancamentos_futuros').insert(lancamentos);
+    if (errFilhos) throw errFilhos;
+    
     await loadData();
 };
 
