@@ -3,7 +3,7 @@ import { formatarMoeda, toISODateString, CATEGORY_ICONS, CHART_COLORS, escapeHTM
 import { getState, getContaPorId, getContas, getCategorias, getTiposContas, isTipoCartao } from './state.js';
 import { calculateFinancialHealthMetrics, calculateAnnualTimeline, calculateCategoryGrid, calculateDailyEvolution } from './finance.js';
 
-// --- VARIÁVEIS GLOBAIS (Controle de Gráficos) ---
+// --- VARIÁVEIS GLOBAIS ---
 let summaryChart = null;
 let dailyChart = null;
 let annualChart = null;
@@ -35,7 +35,7 @@ const gerarTransacoesVirtuais = () => {
             const compra = comprasParceladas.find(c => c.id === parcela.compra_parcelada_id);
             if (!compra) return null;
             return {
-                id: `v_${parcela.id}`, // ID Virtual para diferenciar no histórico
+                id: `v_${parcela.id}`, 
                 descricao: parcela.descricao, 
                 valor: parcela.valor,
                 data: parcela.data_vencimento, 
@@ -81,7 +81,6 @@ export const showConfirmModal = (message, onConfirm) => {
     
     bodyEl.textContent = message;
     
-    // Clona o botão para limpar listeners antigos
     const newBtn = btnEl.cloneNode(true);
     btnEl.parentNode.replaceChild(newBtn, btnEl);
     
@@ -95,7 +94,7 @@ export const showConfirmModal = (message, onConfirm) => {
     bsModal.show();
 };
 
-// --- MODAL GENÉRICO (CORRIGIDO BOTÃO FECHAR) ---
+// --- MODAL GENÉRICO ---
 export const openModal = (content) => {
     const container = document.getElementById('modal-container');
     if(!container) return;
@@ -114,7 +113,7 @@ export const openModal = (content) => {
     container.innerHTML = modalHTML;
     container.classList.add('active');
 
-    // CORREÇÃO: Adiciona listener ao botão de fechar criado dinamicamente
+    // Listener para fechar o modal
     document.getElementById('modal-close-btn')?.addEventListener('click', closeModal);
 };
 
@@ -553,7 +552,8 @@ const renderDetailedTable = () => {
             ${colsSaldoMes}
         </tr>`;
 
-    // Linha de Resgate Automático
+    // Linha de Resgate Automático (Nova)
+    // Mostra apenas se houver resgate (> 0) em algum mês
     const hasResgate = data.resgates.some(v => v > 0);
     let rowResgates = '';
     if (hasResgate) {
@@ -1201,7 +1201,8 @@ export const getAccountTypesModalContent = () => {
 };
 
 export const getBillModalContent = (id = null) => {
-    const bill = id ? getState().lancamentosFuturos.find(l => l.id === id) : {};
+    // CORREÇÃO: Usar '==' para comparar ID string com número
+    const bill = id ? getState().lancamentosFuturos.find(l => l.id == id) : {};
     const title = id ? 'Editar Parcela' : 'Novo Lançamento';
     const isParcela = !!bill.compra_parcelada_id;
     const categoriasOptions = getCategoriaOptionsHTML(bill.categoria);
@@ -1224,7 +1225,8 @@ export const getBillModalContent = (id = null) => {
 };
 
 export const getTransactionModalContent = (id) => {
-    const transacao = getState().transacoes.find(t => t.id === id);
+    // CORREÇÃO: Usar '==' para comparar ID string com número
+    const transacao = getState().transacoes.find(t => t.id == id);
     if (!transacao) return { title: 'Erro', body: '<p>Transação não encontrada.</p>' };
 
     const title = 'Editar Transação';
@@ -1310,7 +1312,8 @@ export const getInstallmentPurchaseModalContent = (compra) => {
 };
 
 export const getPayBillModalContent = (billId) => {
-    const bill = getState().lancamentosFuturos.find(b=>b.id===billId);
+    // CORREÇÃO: Usar '==' para comparar ID string com número
+    const bill = getState().lancamentosFuturos.find(b => b.id == billId);
     if (!bill) return { title: 'Erro', body: 'Lançamento não encontrado.' };
     
     // Modal Inteligente (Pagar vs Receber)
