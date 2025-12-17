@@ -3,7 +3,7 @@ import { formatarMoeda, toISODateString, CATEGORY_ICONS, CHART_COLORS, escapeHTM
 import { getState, getContaPorId, getContas, getCategorias, getTiposContas, isTipoCartao } from './state.js';
 import { calculateFinancialHealthMetrics, calculateAnnualTimeline, calculateCategoryGrid, calculateDailyEvolution } from './finance.js';
 
-// --- VARIÁVEIS GLOBAIS ---
+// --- VARIÁVEIS GLOBAIS (Controle de Gráficos) ---
 let summaryChart = null;
 let dailyChart = null;
 let annualChart = null;
@@ -35,7 +35,7 @@ const gerarTransacoesVirtuais = () => {
             const compra = comprasParceladas.find(c => c.id === parcela.compra_parcelada_id);
             if (!compra) return null;
             return {
-                id: `v_${parcela.id}`, 
+                id: `v_${parcela.id}`, // ID Virtual para diferenciar no histórico
                 descricao: parcela.descricao, 
                 valor: parcela.valor,
                 data: parcela.data_vencimento, 
@@ -68,10 +68,9 @@ export const setLoadingState = (button, isLoading, originalText = 'Salvar') => {
         : originalText;
 };
 
-// --- NOVO: MODAL DE CONFIRMAÇÃO (Substitui o window.confirm) ---
+// --- MODAL DE CONFIRMAÇÃO ---
 export const showConfirmModal = (message, onConfirm) => {
     const modalEl = document.getElementById('confirmModal');
-    // Fallback se o modal não existir no HTML
     if(!modalEl) {
         if(confirm(message)) onConfirm();
         return;
@@ -82,7 +81,7 @@ export const showConfirmModal = (message, onConfirm) => {
     
     bodyEl.textContent = message;
     
-    // Clona o botão para limpar event listeners antigos e evitar duplicação de disparos
+    // Clona o botão para limpar listeners antigos
     const newBtn = btnEl.cloneNode(true);
     btnEl.parentNode.replaceChild(newBtn, btnEl);
     
@@ -96,6 +95,7 @@ export const showConfirmModal = (message, onConfirm) => {
     bsModal.show();
 };
 
+// --- MODAL GENÉRICO (CORRIGIDO BOTÃO FECHAR) ---
 export const openModal = (content) => {
     const container = document.getElementById('modal-container');
     if(!container) return;
@@ -113,6 +113,9 @@ export const openModal = (content) => {
 
     container.innerHTML = modalHTML;
     container.classList.add('active');
+
+    // CORREÇÃO: Adiciona listener ao botão de fechar criado dinamicamente
+    document.getElementById('modal-close-btn')?.addEventListener('click', closeModal);
 };
 
 export const closeModal = () => {
@@ -124,7 +127,7 @@ export const closeModal = () => {
 // === RENDERIZADORES DE COMPONENTES ===
 // =========================================================================
 
-// 1. Renderiza Cards de Contas (Grid da Aba Carteira)
+// 1. Renderiza Cards de Contas
 export const renderContas = () => {
     const container = document.getElementById('accounts-container');
     const { contas, transacoes } = getState();
@@ -208,7 +211,7 @@ export const renderContas = () => {
     container.innerHTML = cardsHtml;
 };
 
-// 2. Renderiza Formulário de Transação Rápida (Aba Lançar)
+// 2. Renderiza Formulário de Transação Rápida
 export const renderFormTransacaoRapida = () => {
     const container = document.getElementById('form-transacao-unificada');
     if (!container) return;
@@ -550,8 +553,7 @@ const renderDetailedTable = () => {
             ${colsSaldoMes}
         </tr>`;
 
-    // Linha de Resgate Automático (Nova)
-    // Mostra apenas se houver resgate (> 0) em algum mês
+    // Linha de Resgate Automático
     const hasResgate = data.resgates.some(v => v > 0);
     let rowResgates = '';
     if (hasResgate) {
