@@ -5,7 +5,7 @@ import * as UI from './ui.js';
 import { toISODateString, exportToCSV, applyTheme } from './utils.js';
 
 // --- INICIALIZAÇÃO DO SUPABASE ---
-// Usa o objeto global injetado pelo script no HTML para evitar erros de módulo
+// Usa o objeto global para evitar erros de importação via URL
 const { createClient } = window.supabase;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -245,9 +245,22 @@ const setupEventListeners = () => {
             UI.openModal(UI.getPayBillModalContent(id));
         } else if (action === 'editar-lancamento') {
             UI.openModal(UI.getBillModalContent(id));
-        } else if (action === 'editar-transacao') {
-            UI.openModal(UI.getTransactionModalContent(id));
-        } else if (action === 'recriar-compra-parcelada') {
+        } 
+        
+        // CORREÇÃO: Edição Inteligente (Real vs Virtual)
+        else if (action === 'editar-transacao') {
+            // Verifica se é uma transação virtual (previsão futura no histórico)
+            if (String(id).startsWith('v_')) {
+                // É Virtual! Remove o prefixo 'v_' e abre o modal de Agendamento
+                const realId = id.substring(2); 
+                UI.openModal(UI.getBillModalContent(realId));
+            } else {
+                // É Real! Abre o modal de Transação normal
+                UI.openModal(UI.getTransactionModalContent(id));
+            }
+        } 
+        
+        else if (action === 'recriar-compra-parcelada') {
             const compra = State.getState().comprasParceladas.find(c => c.id == id);
             if(compra) UI.openModal(UI.getInstallmentPurchaseModalContent(compra));
         }
@@ -378,7 +391,6 @@ const setupEventListeners = () => {
                 await supabase.from('categorias').update({ nome: novoNome }).eq('id', id);
                 
                 // Opcional: Atualizar histórico para manter consistência
-                // (Isso é pesado, mas garante integridade se não usar Foreign Keys estritas)
                 await supabase.from('transacoes').update({ categoria: novoNome }).eq('categoria', nomeAntigo);
                 await supabase.from('lancamentos_futuros').update({ categoria: novoNome }).eq('categoria', nomeAntigo);
                 await supabase.from('compras_parceladas').update({ categoria: novoNome }).eq('categoria', nomeAntigo);
